@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title id="page-title">Ontology Specification</title>
+<!-- Handlebars.js and Mermaid.js are loaded dynamically at the bottom of
+     the page, with a fallback CDN and a visible error banner if both
+     fail - see the loadWithFallback()/boot() logic near the end of this
+     file. A static <script src=...> tag here would fail completely
+     silently (blank page, no visible error) if cdnjs.cloudflare.com is
+     unreachable for any reason: a corporate firewall, an ad-blocker,
+     offline use, or a sandboxed environment with restricted network
+     access - which is exactly what happened during testing. -->
+<style>
+  :root{
+    --paper:#F2F5F8;
+    --panel:#FFFFFF;
+    --ink:#13202B;
+    --ink-soft:#4C5F70;
+    --ink-faint:#7C8C99;
+    --line:#CBD6DE;
+    --line-soft:#E1E8EC;
+    --blueprint:#1D4E78;
+    --blueprint-deep:#123350;
+    --blueprint-dim:#E7EFF5;
+    --amber:#C97A2B;
+    --amber-dim:#F6E9D8;
+    --mono:ui-monospace,"Cascadia Code","SF Mono",Consolas,"Roboto Mono",monospace;
+    --serif:"Iowan Old Style","Palatino Linotype",Georgia,"Times New Roman",serif;
+    --sans:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:var(--sans); font-size:15px; line-height:1.6;
+  }
+  a{color:var(--blueprint);}
+  code, .mono{font-family:var(--mono); font-size:0.88em;}
+
+  .titleblock{
+    margin:28px 24px 0; border:1.5px solid var(--ink); background:var(--panel);
+    max-width:1180px; margin-left:auto; margin-right:auto;
+  }
+  .titleblock-top{ padding:28px 32px 20px; border-bottom:1.5px solid var(--ink); }
+  .eyebrow{
+    font-family:var(--mono); letter-spacing:.12em; text-transform:uppercase;
+    font-size:11px; color:var(--blueprint); margin:0 0 10px;
+  }
+  .titleblock h1{ font-family:var(--serif); font-weight:600; font-size:2.3rem; margin:0 0 8px; color:var(--ink); }
+  .titleblock .subtitle{color:var(--ink-soft); font-size:1.02rem; max-width:66ch;}
+  .stamp-grid{ display:grid; grid-template-columns:repeat(5,1fr); }
+  .stamp-cell{ padding:12px 18px; border-right:1px solid var(--line); }
+  .stamp-cell:last-child{border-right:none;}
+  .stamp-label{
+    font-family:var(--mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--ink-faint); margin-bottom:4px;
+  }
+  .stamp-value{font-family:var(--mono); font-size:13px; color:var(--ink); font-weight:600; word-break:break-word;}
+
+  .layout{ max-width:1180px; margin:0 auto; display:grid; grid-template-columns:250px 1fr; gap:0; align-items:start; }
+  nav.toc{ position:sticky; top:0; align-self:start; padding:32px 18px 60px 24px; max-height:100vh; overflow-y:auto; }
+  nav.toc h2{
+    font-family:var(--mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--ink-faint); margin:0 0 12px;
+  }
+  nav.toc ol{list-style:none; margin:0; padding:0; counter-reset:sect;}
+  nav.toc > ol > li{counter-increment:sect; margin-bottom:6px;}
+  nav.toc a{
+    display:block; text-decoration:none; color:var(--ink-soft); font-size:13.5px;
+    padding:3px 0; border-left:2px solid transparent; padding-left:10px;
+  }
+  nav.toc > ol > li > a::before{content: counter(sect) ". "; color:var(--blueprint); font-family:var(--mono);}
+  nav.toc a:hover{color:var(--blueprint); border-left-color:var(--blueprint);}
+  nav.toc ul{list-style:none; margin:2px 0 8px 10px; padding:0; border-left:1px solid var(--line-soft);}
+  nav.toc ul li a{font-size:12.5px; padding-left:14px; color:var(--ink-faint);}
+
+  main{padding:32px 32px 100px;}
+  section{margin-bottom:56px; scroll-margin-top:20px;}
+  h2.sect-title{
+    font-family:var(--serif); font-size:1.55rem; margin:0 0 6px; color:var(--blueprint-deep);
+    border-bottom:2px solid var(--ink); padding-bottom:10px;
+  }
+  h3.subsect-title{ font-family:var(--serif); font-size:1.18rem; margin:34px 0 12px; color:var(--ink); }
+  p.lead{color:var(--ink-soft); max-width:74ch;}
+  p.empty-note{color:var(--ink-faint); font-style:italic; font-size:13.5px;}
+
+  table.nsTable{border-collapse:collapse; width:100%; margin-top:14px;}
+  table.nsTable th, table.nsTable td{
+    text-align:left; padding:8px 14px; border-bottom:1px solid var(--line-soft); font-size:13.5px;
+  }
+  table.nsTable th{
+    font-family:var(--mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.06em;
+    color:var(--ink-faint); border-bottom:1.5px solid var(--ink);
+  }
+
+  .diagram-frame{
+    background:var(--panel); border:1px solid var(--line); border-radius:2px;
+    padding:18px; margin:18px 0 30px; overflow-x:auto;
+  }
+  .diagram-toolbar{
+    display:flex; gap:6px; align-items:center; margin-bottom:12px; flex-wrap:wrap;
+  }
+  .diagram-btn{
+    font-family:var(--mono); font-size:12px; padding:5px 11px; border:1px solid var(--line);
+    background:var(--paper); color:var(--ink-soft); border-radius:2px; cursor:pointer; line-height:1;
+  }
+  .diagram-btn:hover{ border-color:var(--blueprint); color:var(--blueprint); }
+  .diagram-btn:active{ background:var(--blueprint-dim); }
+  .diagram-zoom-label{
+    font-family:var(--mono); font-size:11px; color:var(--ink-faint); min-width:46px; text-align:center;
+  }
+  .diagram-hint{
+    font-family:var(--mono); font-size:10.5px; color:var(--ink-faint); margin-left:auto;
+  }
+  .diagram-viewport{
+    overflow:hidden; border:1px solid var(--line-soft); border-radius:2px; background:var(--paper);
+    height:440px; position:relative; cursor:grab; resize:vertical; min-height:220px;
+  }
+  .diagram-viewport.is-panning{ cursor:grabbing; }
+  .diagram-viewport .mermaid{
+    transform-origin:0 0; display:inline-block; position:absolute; left:0; top:0;
+    will-change:transform;
+  }
+  .diagram-caption{
+    font-family:var(--mono); font-size:11.5px; color:var(--ink-faint); margin-top:10px;
+    border-top:1px dashed var(--line); padding-top:8px;
+  }
+
+  .filterbar{margin:14px 0 22px; display:flex; gap:10px; align-items:center;}
+  .filterbar input{
+    font-family:var(--sans); font-size:13.5px; padding:9px 12px; border:1px solid var(--line);
+    border-radius:2px; width:280px; background:var(--panel); color:var(--ink);
+  }
+  .filterbar input:focus{outline:2px solid var(--blueprint); outline-offset:1px;}
+  .filter-count{font-family:var(--mono); font-size:12px; color:var(--ink-faint);}
+
+  .group-title{
+    font-family:var(--mono); font-size:12px; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--blueprint); margin:30px 0 12px; padding-bottom:6px; border-bottom:1px solid var(--line);
+  }
+  .card{
+    background:var(--panel); border:1px solid var(--line); border-left:3px solid var(--blueprint);
+    border-radius:2px; padding:16px 20px; margin-bottom:14px; scroll-margin-top:16px;
+  }
+  .card.is-prop{border-left-color:var(--amber);}
+  .card-head{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:6px;}
+  .card-label{font-family:var(--serif); font-size:1.08rem; font-weight:600;}
+  .card-uri{font-family:var(--mono); font-size:12px; color:var(--ink-faint);}
+  .card-uri .prefix{color:var(--blueprint);}
+  .card-def{color:var(--ink); margin:8px 0;}
+  .card-example{
+    font-size:13px; color:var(--ink-soft); margin:6px 0; padding-left:10px;
+    border-left:2px solid var(--line-soft);
+  }
+  .card-example em{font-style:normal; color:var(--ink-faint); font-family:var(--mono); font-size:11px;}
+  .badge-row{display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; align-items:center;}
+  .badge{
+    font-family:var(--mono); font-size:11px; padding:3px 8px; border-radius:2px;
+    background:var(--blueprint-dim); color:var(--blueprint-deep); text-decoration:none;
+    border:1px solid transparent;
+  }
+  .badge:hover{border-color:var(--blueprint);}
+  .badge.amber{background:var(--amber-dim); color:#7A4A17;}
+  .badge.ghost{background:transparent; border:1px dashed var(--line); color:var(--ink-faint);}
+  .badge-label{
+    font-family:var(--mono); font-size:9.5px; text-transform:uppercase; color:var(--ink-faint);
+    letter-spacing:.06em; align-self:center; margin-right:2px;
+  }
+  .badge-label.hint{ font-style:italic; }
+  details.scope{margin-top:10px;}
+  details.scope summary{
+    cursor:pointer; font-family:var(--mono); font-size:11px; color:var(--ink-faint);
+    text-transform:uppercase; letter-spacing:.05em;
+  }
+  details.scope .scope-text{ font-size:13px; color:var(--ink-soft); margin-top:8px; line-height:1.65; }
+  .eqv-formula{
+    font-family:var(--mono); font-size:12.5px; background:var(--amber-dim); color:#5A3A10;
+    padding:8px 10px; border-radius:2px; margin-top:8px; word-break:break-word;
+  }
+  details.diagram{margin-top:12px;}
+  details.diagram summary{
+    cursor:pointer; font-family:var(--mono); font-size:11px; color:var(--ink-faint);
+    text-transform:uppercase; letter-spacing:.05em;
+  }
+  .diagram-img{
+    display:block; max-width:100%; margin-top:8px; border:1px solid var(--line);
+    border-radius:2px; background:#fff;
+  }
+  .diagram-links{margin-top:6px; display:flex; gap:12px;}
+  .diagram-links a{font-family:var(--mono); font-size:11px; color:var(--blueprint-deep); text-decoration:none;}
+  .diagram-links a:hover{text-decoration:underline;}
+
+  table.extTable{border-collapse:collapse; width:100%; font-size:13px;}
+  table.extTable th, table.extTable td{
+    text-align:left; padding:8px 12px; border-bottom:1px solid var(--line-soft); vertical-align:top;
+  }
+  table.extTable th{
+    font-family:var(--mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.06em;
+    color:var(--ink-faint); border-bottom:1.5px solid var(--ink);
+  }
+  .kind-tag{
+    font-family:var(--mono); font-size:10px; padding:2px 6px; border-radius:2px;
+    background:var(--blueprint-dim); color:var(--blueprint-deep);
+  }
+  .kind-tag.prop{background:var(--amber-dim); color:#7A4A17;}
+  .kind-tag.unknown{background:transparent; border:1px dashed var(--line); color:var(--ink-faint);}
+
+  footer{
+    border-top:1.5px solid var(--ink); padding:26px 32px; font-size:12.5px; color:var(--ink-faint);
+    font-family:var(--mono);
+  }
+
+  @media (max-width:900px){
+    .layout{grid-template-columns:1fr;}
+    nav.toc{position:static; max-height:none; padding:20px 24px 0;}
+    .stamp-grid{grid-template-columns:repeat(2,1fr);}
+  }
+</style>
+<link href="https://semantechs.co.uk/turtle-editor-viewer-new/assets/semantechsLogo-C3PGK8jf.jpeg" type="image/x-icon" rel="icon"/>
+</head>
+<body>
+
+<div id="load-error-banner" style="display:none; background:#3A1414; color:#F5D9D9; font-family:ui-monospace,Consolas,monospace; font-size:13.5px; padding:16px 24px; line-height:1.6; border-bottom:3px solid #B84A4A;"></div>
+
+<div class="titleblock">
+  <div class="titleblock-top">
+    <p class="eyebrow">Ontology Specification &middot; </p>
+    <h1 id="title-h1">Ontology Documentation</h1>
+    <p class="subtitle" id="title-subtitle"></p>
+  </div>
+  <div class="stamp-grid">
+    <div class="stamp-cell"><div class="stamp-label">Ontology IRI</div><div class="stamp-value" id="stamp-iri">–</div></div>
+    <div class="stamp-cell"><div class="stamp-label">Version</div><div class="stamp-value" id="stamp-version">–</div></div>
+    <div class="stamp-cell"><div class="stamp-label">Imports</div><div class="stamp-value" id="stamp-imports">–</div></div>
+    <div class="stamp-cell"><div class="stamp-label">Classes</div><div class="stamp-value" id="stamp-classes">–</div></div>
+    <div class="stamp-cell"><div class="stamp-label">Properties</div><div class="stamp-value" id="stamp-props">–</div></div>
+  </div>
+</div>
+
+<div class="layout">
+  <nav class="toc" id="toc"></nav>
+  <main>
+
+    <section id="sec-abstract">
+      <h2 class="sect-title">Abstract</h2>
+      <p class="lead" id="abstract-text">This document is a generated reference specification, rendered directly from the ontology's own Turtle source and its <code>rdfs:label</code>/<code>rdfs:comment</code> (or SKOS <code>prefLabel</code>/<code>definition</code>, where present) annotations, following the cross-reference pattern used in W3C ontology specification documents. Class hierarchy diagrams are rendered with Mermaid; the reference tables below are rendered with Handlebars.js from a single JSON data model extracted from the ontology's source file(s).</p>
+    </section>
+
+    <section id="sec-intro">
+      <h2 class="sect-title">1. Introduction</h2>
+      <p id="intro-text"></p>
+      <p>Treat this page as generated documentation, not the source of truth - the Turtle file(s) it was generated from remain authoritative for anything this page doesn't capture.</p>
+    </section>
+
+    <section id="sec-overview">
+      <h2 class="sect-title">2. Overview</h2>
+      <p class="lead">The diagrams below are generated by Handlebars from the same JSON model as the reference tables in &sect;4&ndash;6: nothing here is hand-drawn - each is derived from the ontology's actual <code>rdfs:subClassOf</code>, <code>owl:equivalentClass</code>, and property axioms.</p>
+
+      <h3 class="subsect-title" id="h-diagram-local">2.1 Class hierarchy</h3>
+      <p id="local-diagram-note" class="lead"></p>
+      <div class="diagram-frame">
+        <div class="diagram-toolbar" data-diagram-toolbar="diagram-local-hierarchy">
+          <button class="diagram-btn" data-zoom-out>−</button>
+          <span class="diagram-zoom-label" data-zoom-label>100%</span>
+          <button class="diagram-btn" data-zoom-in>+</button>
+          <button class="diagram-btn" data-zoom-reset>Reset</button>
+          <button class="diagram-btn" data-zoom-fit>Fit</button>
+          <span class="diagram-hint">scroll to zoom · drag to pan · drag corner to resize</span>
+        </div>
+        <div class="diagram-viewport" data-diagram-viewport="diagram-local-hierarchy">
+          <div class="mermaid" id="diagram-local-hierarchy"></div>
+        </div>
+        <p class="diagram-caption">Solid arrows: rdfs:subClassOf. Dashed arrows: owl:equivalentClass (defining restriction).</p>
+      </div>
+
+      <h3 class="subsect-title" id="h-diagram-external">2.2 Alignment with imported/external terms</h3>
+      <p id="external-diagram-note" class="lead"></p>
+      <div class="diagram-frame">
+        <div class="diagram-toolbar" data-diagram-toolbar="diagram-external-alignment">
+          <button class="diagram-btn" data-zoom-out>−</button>
+          <span class="diagram-zoom-label" data-zoom-label>100%</span>
+          <button class="diagram-btn" data-zoom-in>+</button>
+          <button class="diagram-btn" data-zoom-reset>Reset</button>
+          <button class="diagram-btn" data-zoom-fit>Fit</button>
+          <span class="diagram-hint">scroll to zoom · drag to pan · drag corner to resize</span>
+        </div>
+        <div class="diagram-viewport" data-diagram-viewport="diagram-external-alignment">
+          <div class="mermaid" id="diagram-external-alignment"></div>
+        </div>
+        <p class="diagram-caption">Each edge shows a local class's direct external superclass or equivalentClass target.</p>
+      </div>
+
+      <h3 class="subsect-title" id="h-diagram-props">2.3 Object properties</h3>
+      <p id="props-diagram-note" class="lead"></p>
+      <div class="diagram-frame">
+        <div class="diagram-toolbar" data-diagram-toolbar="diagram-properties">
+          <button class="diagram-btn" data-zoom-out>−</button>
+          <span class="diagram-zoom-label" data-zoom-label>100%</span>
+          <button class="diagram-btn" data-zoom-in>+</button>
+          <button class="diagram-btn" data-zoom-reset>Reset</button>
+          <button class="diagram-btn" data-zoom-fit>Fit</button>
+          <span class="diagram-hint">scroll to zoom · drag to pan · drag corner to resize</span>
+        </div>
+        <div class="diagram-viewport" data-diagram-viewport="diagram-properties">
+          <div class="mermaid" id="diagram-properties"></div>
+        </div>
+        <p class="diagram-caption">domain --propertyName--&gt; range (solid: rdfs:domain/rdfs:range; dashed: falls back to gist:domainIncludes/rangeIncludes, a non-logical annotation hint), for object properties with a resolvable domain and range.</p>
+      </div>
+    </section>
+
+    <section id="sec-namespaces">
+      <h2 class="sect-title">3. Namespace Declarations</h2>
+      <table class="nsTable">
+        <thead><tr><th>Prefix</th><th>Namespace IRI</th></tr></thead>
+        <tbody id="ns-table-body"></tbody>
+      </table>
+    </section>
+
+    <section id="sec-classes">
+      <h2 class="sect-title">4. Classes</h2>
+      <p class="lead" id="classes-lead"></p>
+      <div class="filterbar">
+        <input type="text" id="class-filter" placeholder="Filter classes by name or text…">
+        <span class="filter-count" id="class-filter-count"></span>
+      </div>
+      <div id="class-groups"></div>
+    </section>
+
+    <section id="sec-obj-properties">
+      <h2 class="sect-title">5. Object Properties</h2>
+      <p class="lead" id="obj-props-lead"></p>
+      <div id="obj-property-list"></div>
+    </section>
+
+    <section id="sec-dt-properties">
+      <h2 class="sect-title">6. Datatype Properties</h2>
+      <p class="lead" id="dt-props-lead"></p>
+      <div id="dt-property-list"></div>
+    </section>
+
+    <section id="sec-ext-reuse">
+      <h2 class="sect-title">7. External Terms Referenced</h2>
+      <p class="lead" id="ext-reuse-lead"></p>
+      <table class="extTable">
+        <thead><tr><th style="width:24%">Term</th><th style="width:10%">Kind</th><th>Definition</th></tr></thead>
+        <tbody id="ext-table-body"></tbody>
+      </table>
+    </section>
+
+    <section id="sec-individuals">
+      <h2 class="sect-title">8. Individuals per Class</h2>
+      <p class="lead" id="individuals-lead"></p>
+      <table class="nsTable" id="individuals-table" style="display:none;">
+        <thead><tr><th>Class</th><th>Count</th></tr></thead>
+        <tbody id="individuals-table-body"></tbody>
+      </table>
+    </section>
+
+    <section id="sec-references">
+      <h2 class="sect-title">9. References</h2>
+      <ul id="references-list"></ul>
+    </section>
+
+  </main>
+</div>
+
+<footer>
+  Generated documentation — rendered client-side from an embedded JSON data model using Handlebars.js and Mermaid.js.
+</footer>
+
+<script type="text/x-handlebars-template" id="tpl-ns-row">
+  <tr><td class="mono">{{prefix}}:</td><td class="mono">{{uri}}</td></tr>
+</script>
+
+<script type="text/x-handlebars-template" id="tpl-toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#sec-abstract">Abstract</a></li>
+    <li><a href="#sec-intro">Introduction</a></li>
+    <li><a href="#sec-overview">Overview</a>
+      <ul>
+        <li><a href="#h-diagram-local">Class hierarchy</a></li>
+        <li><a href="#h-diagram-external">External alignment</a></li>
+        <li><a href="#h-diagram-props">Object properties</a></li>
+      </ul>
+    </li>
+    <li><a href="#sec-namespaces">Namespaces</a></li>
+    <li><a href="#sec-classes">Classes</a>
+      <ul>
+        {{#each sections}}
+        <li><a href="#group-{{slug this}}">{{this}}</a></li>
+        {{/each}}
+      </ul>
+    </li>
+    <li><a href="#sec-obj-properties">Object Properties</a></li>
+    <li><a href="#sec-dt-properties">Datatype Properties</a></li>
+    <li><a href="#sec-ext-reuse">External Terms</a></li>
+    <li><a href="#sec-individuals">Individuals per Class</a></li>
+    <li><a href="#sec-references">References</a></li>
+  </ol>
+</script>
+
+<script type="text/x-handlebars-template" id="tpl-class-group">
+  <h4 class="group-title" id="group-{{slug title}}">{{title}}</h4>
+  {{#each classes}}
+    {{> entityCard this}}
+  {{/each}}
+</script>
+
+<script type="text/x-handlebars-template" id="tpl-entity-card">
+  <div class="card {{#if isProperty}}is-prop{{/if}}" id="{{anchor id}}" data-search="{{lower label}} {{lower id}} {{lower definition}}">
+    <div class="card-head">
+      <span class="card-label">{{label}}</span>
+      <span class="card-uri">{{{prefixed id}}}</span>
+    </div>
+    {{#if definition}}<p class="card-def">{{definition}}</p>{{/if}}
+    {{#if example}}<p class="card-example"><em>Example —</em> {{example}}</p>{{/if}}
+    {{#if equivalentClass}}<div class="eqv-formula">≡ {{equivalentClass}}</div>{{/if}}
+
+    {{#if subClassOf.length}}
+    <div class="badge-row"><span class="badge-label">subClassOf</span>{{#each subClassOf}}{{{xref this}}}{{/each}}</div>
+    {{/if}}
+    {{#if disjointWith.length}}
+    <div class="badge-row"><span class="badge-label">disjointWith</span>{{#each disjointWith}}{{{xref this}}}{{/each}}</div>
+    {{/if}}
+    {{#if subPropertyOf.length}}
+    <div class="badge-row"><span class="badge-label">subPropertyOf</span>{{#each subPropertyOf}}{{{xref this}}}{{/each}}</div>
+    {{/if}}
+    {{#if domain.length}}
+    <div class="badge-row"><span class="badge-label">domain</span>{{#each domain}}{{{xref this}}}{{/each}}{{#if range.length}}<span class="badge-label" style="margin-left:10px;">range</span>{{#each range}}{{{xref this}}}{{/each}}{{/if}}</div>
+    {{/if}}
+    {{#unless domain.length}}{{#if range.length}}
+    <div class="badge-row"><span class="badge-label">range</span>{{#each range}}{{{xref this}}}{{/each}}</div>
+    {{/if}}{{/unless}}
+    {{#if domainIncludes.length}}
+    <div class="badge-row"><span class="badge-label hint" title="gist:domainIncludes - a non-logical annotation hint (rdfs:subPropertyOf skos:scopeNote), not an OWL axiom">domain includes</span>{{#each domainIncludes}}{{{xref this}}}{{/each}}{{#if rangeIncludes.length}}<span class="badge-label hint" style="margin-left:10px;" title="gist:rangeIncludes - a non-logical annotation hint (rdfs:subPropertyOf skos:scopeNote), not an OWL axiom">range includes</span>{{#each rangeIncludes}}{{{xref this}}}{{/each}}{{/if}}</div>
+    {{/if}}
+    {{#unless domainIncludes.length}}{{#if rangeIncludes.length}}
+    <div class="badge-row"><span class="badge-label hint" title="gist:rangeIncludes - a non-logical annotation hint (rdfs:subPropertyOf skos:scopeNote), not an OWL axiom">range includes</span>{{#each rangeIncludes}}{{{xref this}}}{{/each}}</div>
+    {{/if}}{{/unless}}
+    {{#if scopeNote.length}}
+    <details class="scope">
+      <summary>Modeling rationale (scopeNote)</summary>
+      {{#each scopeNote}}<p class="scope-text">{{this}}</p>{{/each}}
+    </details>
+    {{/if}}
+    {{#if diagram}}
+    <details class="diagram">
+      <summary>Class diagram</summary>
+      {{#if diagram.svg}}<img class="diagram-img" src="{{diagram.svg}}" alt="Class diagram for {{id}}" loading="lazy" />{{/if}}
+      <div class="diagram-links">
+        {{#if diagram.svg}}<a href="{{diagram.svg}}" target="_blank" rel="noopener">SVG</a>{{/if}}
+        {{#if diagram.png}}<a href="{{diagram.png}}" target="_blank" rel="noopener">PNG</a>{{/if}}
+        {{#if diagram.ttl}}<a href="{{diagram.ttl}}" target="_blank" rel="noopener">Turtle</a>{{/if}}
+      </div>
+    </details>
+    {{/if}}
+  </div>
+</script>
+
+<script type="text/x-handlebars-template" id="tpl-ext-row">
+  {{#each rows}}
+  <tr>
+    <td class="mono">{{id}}</td>
+    <td><span class="kind-tag {{kindClass kind}}">{{kind}}</span></td>
+    <td>{{#if definition}}{{definition}}{{else}}<span style="color:var(--ink-faint)">— no definition resolved (pass a --ref file to resolve it) —</span>{{/if}}</td>
+  </tr>
+  {{/each}}
+</script>
+
+<script type="text/x-handlebars-template" id="tpl-individuals-row">
+  {{#each rows}}
+  <tr><td class="mono">{{id}}</td><td>{{count}}</td></tr>
+  {{/each}}
+</script>
+
+<script id="ontology-data" type="application/json">
+__ONTOLOGY_DATA_JSON__
+</script>
+
+<script>
+/* ============ Handlebars helpers & partials ============
+   These must NOT run at top-level script-parse time: they reference
+   the Handlebars global, which - now that it's loaded dynamically with
+   a fallback (see boot() below) - may not exist yet when this <script>
+   block is first parsed. Wrapped in a function and called only after
+   loadWithFallback() confirms Handlebars actually loaded. An earlier
+   version of this template had these as bare top-level statements,
+   which threw "Handlebars is not defined" immediately on page load
+   whenever the CDN was unreachable, before the (also-broken-at-the-time)
+   error banner ever got a chance to run. */
+let ONTOLOGY_DATA = null;
+const definedIds = new Set();
+
+function xrefHelper(id){
+  const isLocal = definedIds.has(id);
+  const cls = isLocal ? 'badge' : 'badge ghost';
+  if (isLocal) return `<a class="${cls}" href="#${id.replace(/[:#/]/g,'-')}">${id}</a>`;
+  return `<span class="${cls}" title="External term - see §7">${id}</span>`;
+}
+
+function registerHandlebarsHelpers(){
+  Handlebars.registerHelper('slug', s => String(s).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,''));
+  Handlebars.registerHelper('lower', s => String(s || '').toLowerCase());
+  Handlebars.registerHelper('anchor', id => String(id).replace(/[:#/]/g,'-'));
+  Handlebars.registerHelper('kindClass', k => k === 'ObjectProperty' || k === 'DatatypeProperty' ? 'prop' : (k === 'Unknown' ? 'unknown' : ''));
+  Handlebars.registerHelper('prefixed', function(id){
+    const idx = String(id).indexOf(':');
+    if (idx === -1) return new Handlebars.SafeString(id);
+    const p = id.slice(0, idx), rest = id.slice(idx + 1);
+    return new Handlebars.SafeString(`<span class="prefix">${p}:</span>${rest}`);
+  });
+  Handlebars.registerHelper('xref', function(id){ return new Handlebars.SafeString(xrefHelper(id)); });
+}
+
+/* ============ Boot ============ */
+async function renderDocumentation(){
+  registerHandlebarsHelpers();
+  const raw = document.getElementById('ontology-data').textContent;
+  ONTOLOGY_DATA = JSON.parse(raw);
+
+  const { ontology, namespaces, localPrefix, classes, objectProperties, datatypeProperties,
+          sections, externalReuse, individualCounts } = ONTOLOGY_DATA;
+
+  classes.forEach(c => definedIds.add(c.id));
+  objectProperties.forEach(p => definedIds.add(p.id));
+  datatypeProperties.forEach(p => definedIds.add(p.id));
+
+  // ---- Title block ----
+  const title = ontology.label || (localPrefix ? `"${localPrefix}:" Ontology` : 'Ontology Documentation');
+  document.getElementById('page-title').textContent = title + ' — Specification';
+  document.getElementById('title-h1').textContent = title;
+  document.getElementById('title-subtitle').textContent = ontology.comment || '';
+  document.getElementById('stamp-iri').textContent = ontology.iri || '(not declared)';
+  document.getElementById('stamp-version').textContent = ontology.versionInfo || ontology.versionIri || '—';
+  document.getElementById('stamp-imports').textContent = ontology.imports.length ? ontology.imports.length : '0';
+  document.getElementById('stamp-classes').textContent = classes.length;
+  document.getElementById('stamp-props').textContent = objectProperties.length + datatypeProperties.length;
+
+  document.getElementById('intro-text').textContent =
+    `This ontology declares its own vocabulary under the "${localPrefix}:" prefix` +
+    (ontology.imports.length ? `, and imports ${ontology.imports.length} external ontolog${ontology.imports.length===1?'y':'ies'} (see §9).` : '.') +
+    ` Every class and property below is drawn directly from the ontology's own annotations - where SKOS annotations ` +
+    `(skos:definition, skos:example, skos:scopeNote) are present they are used; otherwise plain rdfs:comment / rdfs:label is used instead.`;
+
+  document.getElementById('classes-lead').textContent =
+    `${classes.length} class${classes.length===1?'':'es'}, grouped as in the source file where section comments were found (or under a single group otherwise).`;
+  document.getElementById('obj-props-lead').textContent =
+    objectProperties.length
+      ? `${objectProperties.length} object propert${objectProperties.length===1?'y':'ies'} defined by this ontology.`
+      : 'This ontology does not define any of its own object properties (it may still use imported ones - see §7).';
+  document.getElementById('dt-props-lead').textContent =
+    datatypeProperties.length
+      ? `${datatypeProperties.length} datatype propert${datatypeProperties.length===1?'y':'ies'} defined by this ontology.`
+      : 'This ontology does not define any of its own datatype properties.';
+  document.getElementById('ext-reuse-lead').textContent =
+    `${externalReuse.length} external term${externalReuse.length===1?'':'s'} referenced from outside the "${localPrefix}:" namespace` +
+    `, with definitions resolved against any --ref file(s) supplied at generation time.`;
+
+  // register partial + compile TOC
+  Handlebars.registerPartial('entityCard', document.getElementById('tpl-entity-card').innerHTML);
+  document.getElementById('toc').innerHTML =
+    Handlebars.compile(document.getElementById('tpl-toc').innerHTML)({sections});
+
+  // namespace table
+  const nsTpl = Handlebars.compile(document.getElementById('tpl-ns-row').innerHTML);
+  document.getElementById('ns-table-body').innerHTML = namespaces.map(n => nsTpl(n)).join('');
+
+  // class groups (fallback to a single "All Classes" group if no sections detected)
+  const sectionList = sections.length ? sections : ['All Classes'];
+  const bySection = {};
+  sectionList.forEach(s => bySection[s] = []);
+  classes.forEach(c => { const s = c.section && bySection[c.section] ? c.section : sectionList[0]; bySection[s].push(c); });
+  const groupTpl = Handlebars.compile(document.getElementById('tpl-class-group').innerHTML);
+  document.getElementById('class-groups').innerHTML = sectionList
+    .map(title => groupTpl({title, classes: bySection[title] || []}))
+    .join('');
+
+  // object / datatype property lists (reuse the same entity card, isProperty=true)
+  const cardTpl = Handlebars.compile('{{#each items}}{{> entityCard this}}{{/each}}');
+  document.getElementById('obj-property-list').innerHTML =
+    objectProperties.length
+      ? cardTpl({items: objectProperties.map(p => ({...p, isProperty:true}))})
+      : '<p class="empty-note">— none —</p>';
+  document.getElementById('dt-property-list').innerHTML =
+    datatypeProperties.length
+      ? cardTpl({items: datatypeProperties.map(p => ({...p, isProperty:true}))})
+      : '<p class="empty-note">— none —</p>';
+
+  // external reuse table
+  const extTpl = Handlebars.compile(document.getElementById('tpl-ext-row').innerHTML);
+  document.getElementById('ext-table-body').innerHTML =
+    externalReuse.length ? extTpl({rows: externalReuse}) : '';
+  if (!externalReuse.length) {
+    document.querySelector('#sec-ext-reuse table').style.display = 'none';
+    document.getElementById('ext-reuse-lead').textContent = 'This ontology does not reference any external terms.';
+  }
+
+  // individuals per class (only shown if an --instances file was supplied and had content)
+  const indivEntries = Object.entries(individualCounts || {}).sort((a,b) => b[1]-a[1]);
+  if (indivEntries.length) {
+    document.getElementById('individuals-lead').textContent =
+      `Instance counts per class, from the optional ABox file supplied at generation time.`;
+    document.getElementById('individuals-table').style.display = '';
+    const indivTpl = Handlebars.compile(document.getElementById('tpl-individuals-row').innerHTML);
+    document.getElementById('individuals-table-body').innerHTML =
+      indivTpl({rows: indivEntries.map(([id,count]) => ({id, count}))});
+  } else {
+    document.getElementById('individuals-lead').textContent =
+      'No ABox / instances file was supplied when this documentation was generated, so no individual counts are available.';
+  }
+
+  // references (derived from owl:imports)
+  const refsList = document.getElementById('references-list');
+  if (ontology.imports.length) {
+    refsList.innerHTML = ontology.imports.map(i => `<li><code class="mono">${i}</code></li>`).join('');
+  } else {
+    refsList.innerHTML = '<li class="empty-note" style="list-style:none;">No owl:imports declared.</li>';
+  }
+
+  // filter box
+  const filterInput = document.getElementById('class-filter');
+  const countEl = document.getElementById('class-filter-count');
+  const allCards = () => Array.from(document.querySelectorAll('#class-groups .card'));
+  function applyFilter(){
+    const q = filterInput.value.trim().toLowerCase();
+    let visible = 0;
+    allCards().forEach(card => {
+      const match = !q || card.dataset.search.includes(q);
+      card.style.display = match ? '' : 'none';
+      if (match) visible++;
+    });
+    document.querySelectorAll('.group-title').forEach(gt => {
+      let sib = gt.nextElementSibling, anyVisible = false;
+      while (sib && !sib.classList.contains('group-title')) {
+        if (sib.classList.contains('card') && sib.style.display !== 'none') anyVisible = true;
+        sib = sib.nextElementSibling;
+      }
+      gt.style.display = anyVisible ? '' : 'none';
+    });
+    countEl.textContent = q ? `${visible} of ${classes.length} shown` : '';
+  }
+  filterInput.addEventListener('input', applyFilter);
+
+  /* ============ Mermaid diagrams, generated from the same JSON via Handlebars ============ */
+  mermaid.initialize({
+    startOnLoad:false, theme:'base',
+    // htmlLabels:false is *intended* to make Mermaid render node labels
+    // as native SVG <text> instead of HTML wrapped in <foreignObject>
+    // (see e.g. mermaid-js/mermaid issue #7565, cline/cline issue
+    // #7398 - foreignObject text can blur under CSS-transform scaling
+    // in a way native SVG text doesn't). Left in place since it's
+    // harmless and may still matter for other diagram types, but be
+    // aware it does NOT take effect here: direct inspection of the
+    // rendered output (both classDiagram class/namespace labels and
+    // flowchart node/edge labels) shows every label is still a
+    // <foreignObject><div><span>, not <text>, on the pinned Mermaid
+    // 10.9.1 CDN build this project uses - so don't rely on this
+    // setting alone if blur, or the large-scale rendering issues
+    // documented in the README ("Diagram readability: start legible,
+    // zoom out to see it all"), resurface.
+    htmlLabels:false,
+    themeVariables:{
+      primaryColor:'#E7EFF5', primaryBorderColor:'#1D4E78', primaryTextColor:'#13202B',
+      lineColor:'#4C5F70', fontFamily:'ui-monospace,Consolas,monospace', fontSize:'13px',
+      tertiaryColor:'#F6E9D8'
+    }
+  });
+
+  const MAX_DIAGRAM_EDGES = 70;
+  const nodeId = id => id.replace(/[^A-Za-z0-9]/g, '_');
+  // Like nodeId, but collapses runs of non-alphanumerics into a single
+  // underscore and trims them from the ends, so e.g. "ADAS and its
+  // components (cf. VSS Vehicle.ADAS)" becomes the readable
+  // "ADAS_and_its_components_cf_VSS_Vehicle_ADAS" rather than a
+  // double-underscore-riddled mess - used for namespace/subgraph ids,
+  // which (for classDiagram namespaces specifically) double as the
+  // only visible box title Mermaid renders, since classDiagram
+  // namespaces - unlike flowchart subgraphs - don't support a separate
+  // quoted display label in this Mermaid version.
+  const slug = s => (String(s).trim().replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'ns');
+  const escapeLabel = s => String(s).replace(/"/g, "'");
+
+  // Large ontologies (60-90+ classes) render as an unreadable hairball
+  // if every node is dumped flat into one diagram. To fix that, nodes
+  // are clustered into Mermaid namespaces (classDiagram)/subgraphs
+  // (flowchart) that mirror the same grouping already used for the
+  // reference cards in §4: local classes cluster by their comment-
+  // header section, external terms cluster by vocabulary prefix (all
+  // "gist:..." terms together, etc.) - so the diagram gains the same
+  // visual structure a reader already relies on elsewhere on the page,
+  // instead of one undifferentiated mass of boxes and crossing edges.
+  const sectionByLocalId = new Map(classes.map(c => [c.id, c.section || 'General']));
+  function clusterFor(curie){
+    const section = sectionByLocalId.get(curie);
+    if (section) return {key: 'local:' + section, label: section};
+    const prefix = curie.includes(':') ? curie.split(':')[0] : '';
+    return {key: 'ext:' + prefix, label: prefix ? `External · ${prefix}` : 'External'};
+  }
+  // Builds the namespace/subgraph list for exactly the node curies used
+  // by a (possibly truncated) edge set, so no empty or edge-less
+  // cluster boxes appear.
+  function buildClusters(nodeCuries){
+    const clusters = new Map(); // key -> {label, ids:Set}
+    nodeCuries.forEach(curie => {
+      const {key, label} = clusterFor(curie);
+      if (!clusters.has(key)) clusters.set(key, {label, ids: new Set()});
+      clusters.get(key).ids.add(curie);
+    });
+    // De-duplicate namespace/subgraph ids after slugging - two distinct
+    // section titles could in principle collapse to the same slug, and
+    // (for classDiagram, where the id doubles as the visible box title)
+    // a slugged section title could in principle collide with a class
+    // node id. Reserve both up front.
+    const usedIds = new Set(Array.from(nodeCuries).map(nodeId));
+    return Array.from(clusters.values())
+      .sort((a, b) => a.label.localeCompare(b.label))
+      .map(v => {
+        let nsId = slug(v.label);
+        for (let n = 2; usedIds.has(nsId); n++) nsId = `${slug(v.label)}_${n}`;
+        usedIds.add(nsId);
+        return {
+          nsId,
+          nsLabel: escapeLabel(v.label),
+          members: Array.from(v.ids).sort().map(id => ({id: nodeId(id), label: escapeLabel(id)}))
+        };
+      });
+  }
+
+  const classDiagramTpl = Handlebars.compile(
+`classDiagram
+{{#each clusters}}
+  namespace {{nsId}} {
+{{#each members}}
+    class {{id}}["{{label}}"]
+{{/each}}
+  }
+{{/each}}
+{{#each edges}}
+  {{parent}} {{{arrow}}} {{child}}
+{{/each}}`
+  );
+  // Solid arrow for an edge backed by a real rdfs:domain/rdfs:range
+  // axiom; dashed for one where either end had to fall back to
+  // gist:domainIncludes/gist:rangeIncludes - a non-logical annotation
+  // hint, not an OWL constraint - so the diagram doesn't visually
+  // overstate what the ontology actually asserts.
+  const graphTpl = Handlebars.compile(
+`graph LR
+{{#each clusters}}
+  subgraph {{nsId}} ["{{nsLabel}}"]
+{{#each members}}
+    {{id}}["{{label}}"]
+{{/each}}
+  end
+{{/each}}
+{{#each edges}}
+  {{from}} {{{arrow}}} {{to}}
+{{/each}}`
+  );
+
+  // 2.1 local class hierarchy: subClassOf/equivalentClass edges where BOTH ends are local
+  const localIds = new Set(classes.map(c => c.id));
+  const localEdges = [];
+  classes.forEach(c => {
+    (c.subClassOf || []).forEach(s => { if (localIds.has(s)) localEdges.push({parent:nodeId(s), parentCurie:s, child:nodeId(c.id), childCurie:c.id, arrow:'<|--'}); });
+    if (c.equivalentClass) {
+      const m = c.equivalentClass.match(/\b[A-Za-z][A-Za-z0-9_-]*:[A-Za-z0-9_-]+/);
+      if (m && localIds.has(m[0]) && m[0] !== c.id) localEdges.push({parent:nodeId(m[0]), parentCurie:m[0], child:nodeId(c.id), childCurie:c.id, arrow:'<|..'});
+    }
+  });
+  document.getElementById('local-diagram-note').textContent =
+    localEdges.length
+      ? (localEdges.length > MAX_DIAGRAM_EDGES
+          ? `Showing the first ${MAX_DIAGRAM_EDGES} of ${localEdges.length} local subclass/equivalentClass relationships, grouped by section (truncated for readability - see §4 for the complete list).`
+          : `All ${localEdges.length} local subclass/equivalentClass relationships, grouped by section.`)
+      : 'No local class-to-class subClassOf relationships were found (classes may all derive directly from external terms - see §2.2).';
+  {
+    const shown = localEdges.slice(0, MAX_DIAGRAM_EDGES);
+    const nodesUsed = new Set(shown.flatMap(e => [e.parentCurie, e.childCurie]));
+    document.getElementById('diagram-local-hierarchy').textContent =
+      shown.length ? classDiagramTpl({clusters: buildClusters(nodesUsed), edges: shown}) : 'classDiagram\n  note "no local hierarchy edges found"';
+  }
+
+  // 2.2 external alignment: local class -> its direct external superclass/equivalentClass target
+  const externalEdges = [];
+  classes.forEach(c => {
+    (c.subClassOf || []).forEach(s => { if (!localIds.has(s)) externalEdges.push({parent:nodeId(s), parentCurie:s, child:nodeId(c.id), childCurie:c.id, arrow:'<|--'}); });
+    if (c.equivalentClass) {
+      const m = c.equivalentClass.match(/\b[A-Za-z][A-Za-z0-9_-]*:[A-Za-z0-9_-]+/);
+      if (m && !localIds.has(m[0])) externalEdges.push({parent:nodeId(m[0]), parentCurie:m[0], child:nodeId(c.id), childCurie:c.id, arrow:'<|..'});
+    }
+  });
+  document.getElementById('external-diagram-note').textContent =
+    externalEdges.length
+      ? (externalEdges.length > MAX_DIAGRAM_EDGES
+          ? `Showing the first ${MAX_DIAGRAM_EDGES} of ${externalEdges.length} local-to-external relationships, grouped by section/vocabulary.`
+          : `All ${externalEdges.length} local-to-external class relationships, grouped by section/vocabulary.`)
+      : 'No local class was found to subclass or equivalent-class an external term.';
+  {
+    const shown = externalEdges.slice(0, MAX_DIAGRAM_EDGES);
+    const nodesUsed = new Set(shown.flatMap(e => [e.parentCurie, e.childCurie]));
+    document.getElementById('diagram-external-alignment').textContent =
+      shown.length ? classDiagramTpl({clusters: buildClusters(nodesUsed), edges: shown}) : 'classDiagram\n  note "no external alignment edges found"';
+  }
+
+  // 2.3 object properties: domain --property--> range. Falls back to
+  // gist:domainIncludes/gist:rangeIncludes when rdfs:domain/rdfs:range
+  // is absent - gist itself, and ontologies following its convention,
+  // routinely annotate a property's expected domain/range this way
+  // instead of asserting rdfs:domain/range as an OWL axiom, so without
+  // this fallback most gist-derived object properties would be invisible
+  // here. An edge is dashed if either end only resolved via that
+  // annotation-hint fallback, solid if both ends are real OWL axioms.
+  const propEdges = [];
+  let hintEdgeCount = 0;
+  objectProperties.forEach(p => {
+    const domainVals = p.domain.length ? p.domain : (p.domainIncludes || []);
+    const domainIsHint = !p.domain.length && domainVals.length > 0;
+    const rangeVals = p.range.length ? p.range : (p.rangeIncludes || []);
+    const rangeIsHint = !p.range.length && rangeVals.length > 0;
+    const arrow = (domainIsHint || rangeIsHint) ? `-. "${p.id}" .->` : `-- "${p.id}" -->`;
+    (domainVals.length ? domainVals : ['?']).forEach(d => {
+      (rangeVals.length ? rangeVals : ['?']).forEach(r => {
+        if (d !== '?' && r !== '?') {
+          if (domainIsHint || rangeIsHint) hintEdgeCount++;
+          propEdges.push({from: nodeId(d), fromCurie:d, to: nodeId(r), toCurie:r, arrow});
+        }
+      });
+    });
+  });
+  document.getElementById('props-diagram-note').textContent =
+    propEdges.length
+      ? `${propEdges.length} object propert${propEdges.length===1?'y':'ies'} with a resolvable domain and range, grouped by section/vocabulary` +
+        (hintEdgeCount ? ` (${hintEdgeCount} shown dashed: resolved via gist:domainIncludes/rangeIncludes, a non-logical annotation hint, not both real rdfs:domain/range).` : '.')
+      : 'No object property in this ontology declares an rdfs:domain/range or gist:domainIncludes/rangeIncludes pair, so no property graph could be generated.';
+  {
+    const shown = propEdges.slice(0, MAX_DIAGRAM_EDGES);
+    const nodesUsed = new Set(shown.flatMap(e => [e.fromCurie, e.toCurie]));
+    document.getElementById('diagram-properties').textContent =
+      shown.length ? graphTpl({clusters: buildClusters(nodesUsed), edges: shown}) : 'graph LR\n  A["no domain/range object properties found"]';
+  }
+
+  await mermaid.run({querySelector:'.mermaid'});
+  initAllDiagramZoom();
+}
+
+/* ============ Diagram pan/zoom ============
+   Vanilla JS, no extra library - wheel to zoom (centered on the cursor),
+   drag to pan, buttons for +/-/reset/fit, and a native CSS resize
+   handle (bottom-right corner of the viewport) for changing its height.
+   Must run after mermaid.run() has actually inserted an <svg> into each
+   .mermaid div - calling this before that finishes would find nothing
+   to attach to. */
+function initDiagramZoom(viewport){
+  const content = viewport.querySelector('.mermaid');
+  const toolbar = document.querySelector(`[data-diagram-toolbar="${viewport.dataset.diagramViewport}"]`);
+  if (!content || !toolbar) return;
+
+  let scale = 1, tx = 0, ty = 0;
+  // MAX_SCALE has to comfortably clear the largest nativeScale a real
+  // diagram needs (viewBoxWidth / ~300 CSS-px fallback base - see
+  // computeScales() below), or a big diagram's legible-start view gets
+  // clamped back down below native size. A 5000-viewBox-unit-wide
+  // diagram needs ~17x; 60 leaves headroom well beyond that.
+  const MIN_SCALE = 0.15, MAX_SCALE = 60;
+
+  function apply(){
+    content.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+    const label = toolbar.querySelector('[data-zoom-label]');
+    if (label) label.textContent = Math.round(scale * 100) + '%';
+  }
+
+  function zoomAt(clientX, clientY, factor){
+    const rect = viewport.getBoundingClientRect();
+    const px = clientX - rect.left, py = clientY - rect.top;
+    const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale * factor));
+    // keep the point under the cursor fixed while scaling
+    tx = px - (px - tx) * (newScale / scale);
+    ty = py - (py - ty) * (newScale / scale);
+    scale = newScale;
+    apply();
+  }
+
+  function reset(){
+    scale = 1; tx = 0; ty = 0;
+    apply();
+  }
+
+  // Mermaid's rendered <svg> has width:100% and no fixed height, and
+  // its parent .mermaid div is `position:absolute` with no explicit
+  // width (needed so it can be freely transform:scale()'d without
+  // disturbing page layout) - so the "100%" has no definite containing
+  // block to resolve against, and the browser silently falls back to
+  // the generic 300x150 CSS default-replaced-element size for the
+  // svg's actual laid-out (pre-transform) box, regardless of the
+  // diagram's true complexity. (Tried fixing that by explicitly
+  // setting the svg's/container's CSS width/height in px from its own
+  // viewBox after render - don't: past a few hundred px it silently
+  // breaks Chromium's painting of Mermaid's foreignObject-based labels,
+  // even though the DOM/layout stays fully correct, so the diagram
+  // paints as a blank box. That's a real rendering bug in this
+  // environment, not a logic bug, and re-triggering it is easy to do
+  // by accident - only ever scale via CSS `transform` on the
+  // untouched, still-300x150-based element, never resize the svg or
+  // its container directly.)
+  //
+  // Working *with* that fallback instead: at the current transform
+  // `scale`, svg.getBoundingClientRect() reports `base * scale`, where
+  // `base` (~300x150) is constant regardless of scale - so
+  // `svgBox.width / scale` recovers that constant `base`. Two useful
+  // numbers fall out of it:
+  //   - fitScale = viewport / base -> shrinks the *whole* diagram
+  //     (whatever its true size) into view, because the browser has
+  //     already effectively pre-fitted the entire diagram into `base`
+  //     for us; this is what the explicit "Fit" button uses.
+  //   - nativeScale = viewBoxSize / base -> the scale at which 1
+  //     viewBox unit lands on 1 real CSS px, i.e. the diagram's own
+  //     declared font-size (13px etc.) renders at its true, legible
+  //     size. Used for the initial legible-start view below.
+  function computeScales(){
+    const svg = content.querySelector('svg');
+    if (!svg) return null;
+    const svgBox = svg.getBoundingClientRect();
+    if (svgBox.width === 0 || svgBox.height === 0) return null;
+    const baseW = svgBox.width / scale, baseH = svgBox.height / scale;
+    const vpBox = viewport.getBoundingClientRect();
+    const fitScale = Math.min((vpBox.width - 24) / baseW, (vpBox.height - 24) / baseH);
+    const vb = svg.viewBox && svg.viewBox.baseVal;
+    const nativeScale = (vb && vb.width > 0) ? (vb.width / baseW) : fitScale;
+    return { fitScale, nativeScale, baseW, baseH, vpW: vpBox.width, vpH: vpBox.height };
+  }
+
+  // Explicit "Fit" button: shrink the whole diagram into view, however
+  // small that makes the text - the user asked to see everything.
+  function fit(){
+    const scales = computeScales();
+    if (scales === null) { reset(); return; }
+    scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scales.fitScale));
+    tx = 12; ty = 12;
+    apply();
+  }
+
+  // Initial view on load: never open smaller than "native" (1 viewBox
+  // unit = 1 real px, i.e. the theme's declared font-size - already
+  // legible), even if that means a large diagram overflows the
+  // viewport and has to be panned or explicitly "Fit" to see in full.
+  // A diagram small enough to fit at native size or larger still opens
+  // fitted/zoomed-in (native and fit scale coincide once native
+  // exceeds fit), same as before. This is deliberately the opposite
+  // default of fit(): start legible and let the user zoom OUT (or pan,
+  // or hit Fit) to see the whole picture, rather than starting zoomed
+  // out from an already-shrunk, illegible full view and having to zoom
+  // IN to read anything.
+  //
+  // Centers the view rather than pinning it to the top-left corner
+  // (which is what fit()/reset() do): at a large scale, top-left-
+  // pinned + heavily panned combinations of translate+scale on this
+  // foreignObject-heavy content reproducibly render as a blank
+  // viewport in testing here - the DOM/layout is correct (confirmed by
+  // measurement) but nothing paints. Centering keeps the visible
+  // window much closer to the middle of the scaled-up layer instead of
+  // its far corner, which reliably avoids the blank result - so this
+  // is a defensive choice, not just a cosmetic one.
+  function fitLegibleStart(){
+    const scales = computeScales();
+    if (scales === null) { reset(); return; }
+    scale = Math.max(MIN_SCALE, Math.min(Math.max(scales.fitScale, scales.nativeScale), MAX_SCALE));
+    tx = (scales.vpW - scales.baseW * scale) / 2;
+    ty = (scales.vpH - scales.baseH * scale) / 2;
+    apply();
+  }
+
+  toolbar.querySelector('[data-zoom-in]').addEventListener('click', () => {
+    const r = viewport.getBoundingClientRect();
+    zoomAt(r.left + r.width / 2, r.top + r.height / 2, 1.25);
+  });
+  toolbar.querySelector('[data-zoom-out]').addEventListener('click', () => {
+    const r = viewport.getBoundingClientRect();
+    zoomAt(r.left + r.width / 2, r.top + r.height / 2, 0.8);
+  });
+  toolbar.querySelector('[data-zoom-reset]').addEventListener('click', reset);
+  toolbar.querySelector('[data-zoom-fit]').addEventListener('click', fit);
+
+  viewport.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    zoomAt(e.clientX, e.clientY, e.deltaY < 0 ? 1.1 : 0.9);
+  }, { passive: false });
+
+  let panning = false, startX = 0, startY = 0, startTx = 0, startTy = 0;
+  viewport.addEventListener('mousedown', (e) => {
+    panning = true;
+    viewport.classList.add('is-panning');
+    startX = e.clientX; startY = e.clientY; startTx = tx; startTy = ty;
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!panning) return;
+    tx = startTx + (e.clientX - startX);
+    ty = startTy + (e.clientY - startY);
+    apply();
+  });
+  window.addEventListener('mouseup', () => {
+    panning = false;
+    viewport.classList.remove('is-panning');
+  });
+
+  apply();
+  requestAnimationFrame(fitLegibleStart);
+}
+
+function initAllDiagramZoom(){
+  document.querySelectorAll('[data-diagram-viewport]').forEach(initDiagramZoom);
+}
+
+/* ============ Resilient library loading ============
+   Both CDN scripts used to be static <script src> tags in <head>. That
+   fails completely silently - blank stat blocks, no class/property
+   cards, no visible error - if cdnjs.cloudflare.com is unreachable for
+   any reason (corporate firewall, ad-blocker, offline use, or a
+   sandboxed environment with restricted network access, which is
+   exactly what surfaced this during testing: the page loaded, every
+   count showed "–", and the browser console alone said "Handlebars is
+   not defined"). This loader tries a fallback CDN automatically, and
+   if both fail, shows a clear, actionable banner instead of a silently
+   blank page. */
+function loadScript(src){
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('failed to load ' + src));
+    document.head.appendChild(s);
+  });
+}
+
+async function loadWithFallback(urls, libName){
+  let lastErr = null;
+  for (const url of urls){
+    try { await loadScript(url); return; }
+    catch (e) { lastErr = e; }
+  }
+  throw new Error(`Could not load ${libName} from any source (tried: ${urls.join(', ')}). Last error: ${lastErr ? lastErr.message : 'unknown'}`);
+}
+
+function showLoadError(message){
+  const banner = document.getElementById('load-error-banner');
+  banner.style.display = 'block';
+  banner.innerHTML =
+    '<strong>This page could not fully load.</strong><br>' + message +
+    '<br><br>This page needs internet access to load Handlebars.js and Mermaid.js from a CDN ' +
+    '(cdnjs.cloudflare.com, falling back to cdn.jsdelivr.net). If you are on a restricted network, ' +
+    'offline, or behind a firewall/ad-blocker that blocks those domains, that is almost certainly why - ' +
+    'the ontology data itself loaded fine, only the rendering libraries did not. See the generator\'s ' +
+    'README for how to download handlebars.min.js / mermaid.min.js once and reference them by a local ' +
+    'relative path instead of a CDN, if you need this page to work fully offline.';
+}
+
+async function boot(){
+  try {
+    await loadWithFallback([
+      'https://cdnjs.cloudflare.com/ajax/libs/handlebars.js/4.7.8/handlebars.min.js',
+      'https://cdn.jsdelivr.net/npm/handlebars@4.7.8/dist/handlebars.min.js'
+    ], 'Handlebars.js');
+    await loadWithFallback([
+      'https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js',
+      'https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js'
+    ], 'Mermaid.js');
+  } catch (e) {
+    showLoadError(e.message);
+    return;
+  }
+  try {
+    await renderDocumentation();
+  } catch (e) {
+    showLoadError('The rendering libraries loaded, but rendering the documentation itself failed: ' + e.message);
+    throw e;
+  }
+}
+
+boot();
+</script>
+</body>
+</html>

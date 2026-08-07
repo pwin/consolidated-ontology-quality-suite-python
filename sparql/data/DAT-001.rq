@@ -1,0 +1,35 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX oq: <https://semantechs.co.uk/ontology-quality/>
+
+# DAT-001: Literal lexical form invalid for its datatype (heuristic: date, integer, boolean)
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Violation ;
+    sh:focusNode ?s ;
+    sh:resultPath ?p ;
+    sh:value ?lit ;
+    sh:sourceConstraintComponent oq:DAT-001 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  ?s ?p ?lit .
+  FILTER(isLiteral(?lit))
+  BIND(DATATYPE(?lit) AS ?dt)
+  {
+    FILTER(?dt = xsd:date)
+    FILTER(!REGEX(STR(?lit), "^-?[0-9]{4}-[0-9]{2}-[0-9]{2}(Z|[+-][0-9]{2}:[0-9]{2})?$"))
+  } UNION {
+    FILTER(?dt = xsd:integer)
+    FILTER(!REGEX(STR(?lit), "^[+-]?[0-9]+$"))
+  } UNION {
+    FILTER(?dt = xsd:boolean)
+    FILTER(!REGEX(STR(?lit), "^(true|false|1|0)$"))
+  }
+  BIND(CONCAT("Literal '", STR(?lit), "' on ", STR(?s), " (via ", STR(?p),
+              ") does not match the lexical pattern expected for datatype ", STR(?dt), ".") AS ?msg)
+}

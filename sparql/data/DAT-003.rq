@@ -1,0 +1,31 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX oq: <https://semantechs.co.uk/ontology-quality/>
+
+# DAT-003: Duplicate literal values for the same subject/predicate
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Info ;
+    sh:focusNode ?s ;
+    sh:resultPath ?p ;
+    sh:sourceConstraintComponent oq:DAT-003 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  {
+    SELECT ?s ?p ?strval (COUNT(?lit) AS ?n)
+    WHERE {
+      ?s ?p ?lit .
+      FILTER(isLiteral(?lit))
+      BIND(STR(?lit) AS ?strval)
+    }
+    GROUP BY ?s ?p ?strval
+    HAVING (COUNT(?lit) > 1)
+  }
+  BIND(CONCAT("Subject ", STR(?s), " has ", STR(?n), " duplicate literal values ('", ?strval,
+              "') for property ", STR(?p), "; consider de-duplication.") AS ?msg)
+}

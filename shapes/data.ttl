@@ -1,0 +1,101 @@
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix oq:   <https://semantechs.co.uk/ontology-quality/> .
+
+# ---------------------------------------------------------------------------
+# DAT-001: Literal lexical form invalid for its datatype (heuristic).
+# ---------------------------------------------------------------------------
+oq:DAT-001
+  a sh:NodeShape ;
+  sh:target [
+    a sh:SPARQLTarget ;
+    sh:select "SELECT DISTINCT ?this WHERE { ?this ?p ?o . FILTER(isLiteral(?o)) }" ;
+  ] ;
+  sh:sparql [
+    a sh:SPARQLConstraint ;
+    sh:severity sh:Violation ;
+    sh:message "A literal on {$this} does not match the lexical pattern expected for its datatype." ;
+    sh:select """
+      PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+      SELECT $this ?path ?value
+      WHERE {
+        $this ?path ?value .
+        FILTER(isLiteral(?value))
+        BIND(DATATYPE(?value) AS ?dt)
+        {
+          FILTER(?dt = xsd:date)
+          FILTER(!REGEX(STR(?value), "^-?[0-9]{4}-[0-9]{2}-[0-9]{2}(Z|[+-][0-9]{2}:[0-9]{2})?$"))
+        } UNION {
+          FILTER(?dt = xsd:integer)
+          FILTER(!REGEX(STR(?value), "^[+-]?[0-9]+$"))
+        } UNION {
+          FILTER(?dt = xsd:boolean)
+          FILTER(!REGEX(STR(?value), "^(true|false|1|0)$"))
+        }
+      }
+    """ ;
+  ] .
+
+# ---------------------------------------------------------------------------
+# DAT-002: Dangling IRI reference (heuristic).
+# ---------------------------------------------------------------------------
+oq:DAT-002
+  a sh:NodeShape ;
+  sh:target [
+    a sh:SPARQLTarget ;
+    sh:select "SELECT DISTINCT ?this WHERE { ?this ?p ?o . FILTER(isIRI(?o)) }" ;
+  ] ;
+  sh:sparql [
+    a sh:SPARQLConstraint ;
+    sh:severity sh:Warning ;
+    sh:message "{$this} references an IRI ({?value}) that is never used as a subject nor as a class." ;
+    sh:select """
+      PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+      PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+      PREFIX owl: <http://www.w3.org/2002/07/owl#>
+      SELECT $this ?path ?value
+      WHERE {
+        $this ?path ?value .
+        FILTER(isIRI(?value))
+        FILTER(?path != rdf:type)
+        FILTER(?path != rdfs:seeAlso)
+        FILTER NOT EXISTS { ?value ?p2 ?o2 }
+        FILTER NOT EXISTS { ?o2b a ?value }
+        FILTER(!STRSTARTS(STR(?value), "http://www.w3.org/"))
+        FILTER NOT EXISTS { [] owl:versionIRI ?value }
+      }
+    """ ;
+  ] .
+
+# ---------------------------------------------------------------------------
+# DAT-003: Duplicate literal values for the same subject/predicate.
+# ---------------------------------------------------------------------------
+oq:DAT-003
+  a sh:NodeShape ;
+  sh:target [
+    a sh:SPARQLTarget ;
+    sh:select "SELECT DISTINCT ?this WHERE { ?this ?p ?o . FILTER(isLiteral(?o)) }" ;
+  ] ;
+  sh:sparql [
+    a sh:SPARQLConstraint ;
+    sh:severity sh:Info ;
+    sh:message "{$this} has duplicate literal values for property {?path}." ;
+    sh:select """
+      SELECT $this ?path
+      WHERE {
+        {
+          SELECT $this ?path ?strval (COUNT(?lit) AS ?n)
+          WHERE {
+            $this ?path ?lit .
+            FILTER(isLiteral(?lit))
+            BIND(STR(?lit) AS ?strval)
+          }
+          GROUP BY $this ?path ?strval
+          HAVING (COUNT(?lit) > 1)
+        }
+      }
+    """ ;
+  ] .

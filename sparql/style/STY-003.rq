@@ -1,0 +1,22 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX oq: <https://semantechs.co.uk/ontology-quality/>
+
+# STY-003: Label missing a language tag
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Info ;
+    sh:focusNode ?e ;
+    sh:sourceConstraintComponent oq:STY-003 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  ?e rdfs:label ?l .
+  FILTER(LANG(?l) = "")
+  BIND(CONCAT("Label '", STR(?l), "' on ", STR(?e),
+              "' has no language tag; add e.g. @en for internationalisation clarity.") AS ?msg)
+}

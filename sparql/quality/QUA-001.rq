@@ -1,0 +1,23 @@
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX oq: <https://semantechs.co.uk/ontology-quality/>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+
+# QUA-001: Class or property missing rdfs:label
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Warning ;
+    sh:focusNode ?e ;
+    sh:sourceConstraintComponent oq:QUA-001 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  { ?e a owl:Class } UNION { ?e a owl:ObjectProperty } UNION { ?e a owl:DatatypeProperty }
+  FILTER(isIRI(?e))
+  FILTER NOT EXISTS { ?e rdfs:label|skos:prefLabel ?l }
+  BIND(CONCAT("Term ", STR(?e), " has no rdfs:label or skos:prefLabel, reducing human readability and documentation quality.") AS ?msg)
+}

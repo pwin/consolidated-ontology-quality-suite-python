@@ -1,0 +1,39 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX oq: <https://semantechs.co.uk/ontology-quality/>
+
+# DAT-002: Dangling IRI reference (heuristic)
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Warning ;
+    sh:focusNode ?s ;
+    sh:resultPath ?p ;
+    sh:value ?o ;
+    sh:sourceConstraintComponent oq:DAT-002 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  ?s ?p ?o .
+  FILTER(isIRI(?o))
+  FILTER(?p != rdf:type)
+  # rdfs:seeAlso is explicitly meant to reference something that may not be
+  # (or even be intended to be) resolvable within this graph -- often a
+  # plain external web page, not RDF at all.
+  FILTER(?p != rdfs:seeAlso)
+  FILTER NOT EXISTS { ?o ?p2 ?o2 }
+  FILTER NOT EXISTS { ?o2b a ?o }
+  FILTER(!STRSTARTS(STR(?o), "http://www.w3.org/"))
+  # An ontology's own (or an imported ontology's) owl:versionIRI is a
+  # legitimate, well-known self-identifying reference, not a dangling one --
+  # it's routinely the target of many terms' rdfs:isDefinedBy without ever
+  # being used as a subject itself. Caught as a real bug: this single
+  # pattern alone produced 218 of 220 DAT-002 findings against a real
+  # gist-importing ontology, all pointing at gist's own versionIRI.
+  FILTER NOT EXISTS { [] owl:versionIRI ?o }
+  BIND(CONCAT("Reference target ", STR(?o), " (object of ", STR(?s), " ", STR(?p),
+              ") is never used as a subject nor as a class, suggesting a dangling/unresolved reference.") AS ?msg)
+}

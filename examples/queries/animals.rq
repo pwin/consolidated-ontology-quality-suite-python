@@ -1,0 +1,18 @@
+PREFIX ex: <https://example.org/demo/>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+# Triplifies examples/csv/animals.csv. `ex:species` is deliberately never
+# declared in examples/ontology/domain.ttl, so both the `sketch` stage (query
+# shape vs ontology) and the `data` stage (real oxi-gen output vs ontology)
+# should each report a CNF-002 finding for it.
+CONSTRUCT {
+  ?animal a ex:Mammal ;
+    rdfs:label ?name ;
+    ex:hasBirthDate ?birthDate ;
+    ex:species ?species .
+}
+WHERE {
+  BIND(IRI(CONCAT("https://example.org/demo/animal-", ?id)) AS ?animal)
+  BIND(STRDT(?birth_date, xsd:date) AS ?birthDate)
+}

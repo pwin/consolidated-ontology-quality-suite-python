@@ -1,0 +1,14 @@
+PREFIX ex: <https://example.org/vehicle-demo/>
+PREFIX gist: <https://w3id.org/semanticarts/ns/ontology/gist/>
+
+# Deliberately misaligned with taxonomy.ttl: ex:Gasoline is not a declared
+# ex:FuelType individual anywhere (the taxonomy uses ex:Petrol) -- either a
+# stale term from before a taxonomy rename, or a typo. See
+# docs/MODELLING_PATTERN_CONSISTENCY.md and transform-fixed.rq for the
+# corrected version.
+CONSTRUCT {
+  ?vehicle a ex:Vehicle ;
+    gist:isCategorizedBy ex:Gasoline .
+} WHERE {
+  BIND(IRI(CONCAT("https://example.org/vehicle-demo/vehicle-", ?id)) AS ?vehicle)
+}

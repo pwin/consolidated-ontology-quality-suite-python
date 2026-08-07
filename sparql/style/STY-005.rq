@@ -1,0 +1,35 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX oq: <https://semantechs.co.uk/ontology-quality/>
+
+# STY-005: Inconsistent local-name separator style
+# There is no single natural focus node for a graph-wide statistic, so this
+# check reports against the synthetic anchor oq:Graph, mirroring EFF-002.
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Warning ;
+    sh:focusNode oq:Graph ;
+    sh:value ?separators ;
+    sh:sourceConstraintComponent oq:STY-005 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  {
+    SELECT (COUNT(DISTINCT ?separator) AS ?num) (GROUP_CONCAT(DISTINCT ?separator; SEPARATOR="|") AS ?separators)
+    WHERE {
+      ?focus a ?concept .
+      FILTER(?concept IN (owl:Class, owl:DatatypeProperty, owl:ObjectProperty))
+      BIND(REPLACE(STR(?focus), "^.*[#/]", "") AS ?localName)
+      BIND(REPLACE(?localName, "[a-zA-Z0-9]+([^a-zA-Z0-9:#/ ])[a-zA-Z0-9]+.*", "$1") AS ?separator)
+      FILTER(BOUND(?separator))
+      FILTER(REGEX(?separator, "[^a-zA-Z0-9:#/ ]"))
+    }
+  }
+  FILTER(?num > 1)
+  BIND(CONCAT("The ontology mixes ", STR(?num), " different local-name separator styles (", ?separators,
+              "); pick a single separator convention (e.g. hyphens or underscores) consistently.") AS ?msg)
+}

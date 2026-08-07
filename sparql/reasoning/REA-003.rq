@@ -1,0 +1,21 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+PREFIX oq: <https://semantechs.co.uk/ontology-quality/>
+
+# REA-003: owl:IrreflexiveProperty asserted (or entailed) as a self-loop.
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Violation ;
+    sh:focusNode ?s ;
+    sh:resultPath ?p ;
+    sh:sourceConstraintComponent oq:REA-003 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  ?p a owl:IrreflexiveProperty .
+  ?s ?p ?s .
+  BIND(CONCAT("Irreflexive property ", STR(?p), " is asserted (or entailed) as a self-loop on ", STR(?s),
+              ", violating its owl:IrreflexiveProperty axiom.") AS ?msg)
+}

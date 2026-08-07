@@ -1,0 +1,21 @@
+@prefix ex: <https://example.org/vehicle-demo/> .
+@prefix gist: <https://w3id.org/semanticarts/ns/ontology/gist/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+ex:DemoOntology a owl:Ontology ;
+  owl:versionInfo "1.0.0" ;
+  rdfs:comment "Small self-contained fixture for docs/MODELLING_PATTERN_CONSISTENCY.md. gist:Category/gist:isCategorizedBy are stubbed locally below rather than pulled in via owl:imports, purely to keep this example small and fast -- a real project would import gistCore instead and declare neither." .
+
+# --- Real gist terms, stubbed locally for this example only ---------------
+gist:Category a owl:Class .
+gist:isCategorizedBy a owl:ObjectProperty ;
+  rdfs:range gist:Category .
+
+# --- This ontology's own vocabulary ----------------------------------------
+ex:Vehicle a owl:Class ;
+  rdfs:label "Vehicle" .
+
+ex:FuelType a owl:Class ;
+  rdfs:subClassOf gist:Category ;
+  rdfs:label "Fuel Type" .

@@ -1,0 +1,19 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+PREFIX oq: <https://semantechs.co.uk/ontology-quality/>
+
+# QUA-005: No resource in the graph is declared `a owl:Ontology` at all --
+# the ontology has no identifying IRI, distinct from QUA-002 (which only
+# fires once an owl:Ontology resource exists but lacks metadata on it).
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Warning ;
+    sh:focusNode oq:Graph ;
+    sh:sourceConstraintComponent oq:QUA-005 ;
+    sh:resultMessage "No resource in this graph is declared 'a owl:Ontology' -- the ontology has no identifying IRI at all, which harms provenance, versioning, and any tooling that expects one (e.g. owl:imports resolution, catalog/registry lookups)." .
+}
+WHERE {
+  FILTER NOT EXISTS { ?o a owl:Ontology }
+}

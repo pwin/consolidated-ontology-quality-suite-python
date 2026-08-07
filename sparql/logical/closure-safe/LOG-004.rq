@@ -1,0 +1,47 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX oq: <https://semantechs.co.uk/ontology-quality/>
+
+# LOG-004: Property has more than one inverse
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Violation ;
+    sh:focusNode ?focus ;
+    sh:resultPath owl:inverseOf ;
+    sh:value ?p1, ?p2 ;
+    sh:sourceConstraintComponent oq:LOG-004 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  {
+    ?focus owl:inverseOf ?p1, ?p2 .
+  } UNION {
+    ?focus owl:inverseOf ?p1 .
+    ?p2 owl:inverseOf ?focus .
+  } UNION {
+    ?p1 owl:inverseOf ?focus .
+    ?p2 owl:inverseOf ?focus .
+  }
+  FILTER(?p1 != ?p2)
+  # A blank node here is an inline anonymous inverse-property expression
+  # (e.g. `owl:onProperty [ owl:inverseOf ?focus ]` inside a restriction) --
+  # a completely standard OWL2 idiom for writing "a restriction on the
+  # inverse of ?focus" without naming a separate inverse property. Every
+  # occurrence mints a fresh blank node even though all of them denote the
+  # exact same relation (?focus's inverse), so counting them as distinct
+  # declared inverses is a false positive, not a real contradiction. Only a
+  # named (IRI) property genuinely declared as a *second, different*
+  # inverse is the real thing this check exists to catch. Caught as a real
+  # bug: 100% of this check's 54 raw findings against a real vehicle
+  # ontology importing gist 14.1.0 were blank-node artifacts of this kind
+  # -- gist:isDirectPartOf/isGovernedBy/isMemberOf each have zero actual
+  # named inverses declared, only this inline idiom used repeatedly.
+  FILTER(isIRI(?p1))
+  FILTER(isIRI(?p2))
+  BIND(CONCAT("Property ", STR(?focus), " has two distinct declared inverses (", STR(?p1),
+              " and ", STR(?p2), "), which is contradictory since an owl:inverseOf pairing must be unique.") AS ?msg)
+}

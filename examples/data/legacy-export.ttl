@@ -1,0 +1,97 @@
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix ex:   <https://example.org/demo/> .
+
+# --- Well-formed instance ---------------------------------------------------
+ex:rex a ex:Mammal ;
+  rdfs:label "Rex"@en ;
+  ex:hasBirthDate "2019-05-01"^^xsd:date .
+
+# --- Post-closure logical inconsistency -> REA-001 --------------------------
+# ex:Reptile is rdfs:subClassOf ex:Animal AND owl:disjointWith ex:Animal (see
+# ontology/domain.ttl, LOG-001). Typing an individual as ex:Reptile means an
+# owlrl closure entails it's also an ex:Animal (via subClassOf), which
+# contradicts the disjointness axiom -- only visible after reasoning, not from
+# the raw triples alone.
+ex:zed a ex:Reptile ;
+  rdfs:label "Zed"@en .
+
+# --- Instance typed with an undeclared class -> STR-001 --------------------
+ex:fido a ex:UndeclaredCreatureType ;
+  rdfs:label "Fido"@en .
+
+# --- Undeclared predicate used -> STR-002 -----------------------------------
+ex:fido ex:undeclaredPredicate "some value" .
+
+# --- Functional property violated: two distinct birth dates -> LOG-002 -----
+ex:rex ex:hasBirthDate "2019-06-15"^^xsd:date .
+
+# --- Deprecated term still used -> QUA-003 ----------------------------------
+ex:rex ex:legacyStatus "active" .
+
+# --- Invalid literal lexical form for xsd:date -> DAT-001 -------------------
+ex:milo a ex:Mammal ;
+  rdfs:label "Milo"@en ;
+  ex:hasBirthDate "15/06/2019" .
+
+# --- Dangling reference: ex:ghostOwner is never described elsewhere -> DAT-002
+ex:milo ex:hasOwner ex:ghostOwner .
+
+# --- Duplicate literal values for the same subject/predicate -> DAT-003 -----
+ex:rex rdfs:comment "A friendly dog."@en .
+ex:rex rdfs:comment "A friendly dog."@en .
+
+# --- High fan-out on one property -> EFF-003 (51 values) -------------------
+ex:milo ex:hasTag "tag01" .
+ex:milo ex:hasTag "tag02" .
+ex:milo ex:hasTag "tag03" .
+ex:milo ex:hasTag "tag04" .
+ex:milo ex:hasTag "tag05" .
+ex:milo ex:hasTag "tag06" .
+ex:milo ex:hasTag "tag07" .
+ex:milo ex:hasTag "tag08" .
+ex:milo ex:hasTag "tag09" .
+ex:milo ex:hasTag "tag10" .
+ex:milo ex:hasTag "tag11" .
+ex:milo ex:hasTag "tag12" .
+ex:milo ex:hasTag "tag13" .
+ex:milo ex:hasTag "tag14" .
+ex:milo ex:hasTag "tag15" .
+ex:milo ex:hasTag "tag16" .
+ex:milo ex:hasTag "tag17" .
+ex:milo ex:hasTag "tag18" .
+ex:milo ex:hasTag "tag19" .
+ex:milo ex:hasTag "tag20" .
+ex:milo ex:hasTag "tag21" .
+ex:milo ex:hasTag "tag22" .
+ex:milo ex:hasTag "tag23" .
+ex:milo ex:hasTag "tag24" .
+ex:milo ex:hasTag "tag25" .
+ex:milo ex:hasTag "tag26" .
+ex:milo ex:hasTag "tag27" .
+ex:milo ex:hasTag "tag28" .
+ex:milo ex:hasTag "tag29" .
+ex:milo ex:hasTag "tag30" .
+ex:milo ex:hasTag "tag31" .
+ex:milo ex:hasTag "tag32" .
+ex:milo ex:hasTag "tag33" .
+ex:milo ex:hasTag "tag34" .
+ex:milo ex:hasTag "tag35" .
+ex:milo ex:hasTag "tag36" .
+ex:milo ex:hasTag "tag37" .
+ex:milo ex:hasTag "tag38" .
+ex:milo ex:hasTag "tag39" .
+ex:milo ex:hasTag "tag40" .
+ex:milo ex:hasTag "tag41" .
+ex:milo ex:hasTag "tag42" .
+ex:milo ex:hasTag "tag43" .
+ex:milo ex:hasTag "tag44" .
+ex:milo ex:hasTag "tag45" .
+ex:milo ex:hasTag "tag46" .
+ex:milo ex:hasTag "tag47" .
+ex:milo ex:hasTag "tag48" .
+ex:milo ex:hasTag "tag49" .
+ex:milo ex:hasTag "tag50" .
+ex:milo ex:hasTag "tag51" .

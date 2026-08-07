@@ -1,0 +1,30 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+PREFIX oq: <https://semantechs.co.uk/ontology-quality/>
+
+# QUA-008: The ontology IRI, or its owl:versionIRI, doesn't use the https://
+# scheme.
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Warning ;
+    sh:focusNode ?o ;
+    sh:value ?id ;
+    sh:sourceConstraintComponent oq:QUA-008 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  {
+    ?o a owl:Ontology .
+    BIND(?o AS ?id)
+    BIND("ontology" AS ?kind)
+  } UNION {
+    ?o a owl:Ontology ;
+      owl:versionIRI ?id .
+    BIND("version" AS ?kind)
+  }
+  FILTER(!STRSTARTS(STR(?id), "https://"))
+  BIND(CONCAT("The ", ?kind, " IRI ", STR(?id), " (for ontology ", STR(?o),
+              ") does not use the https:// scheme.") AS ?msg)
+}

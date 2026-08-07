@@ -1,0 +1,21 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+PREFIX oq: <https://semantechs.co.uk/ontology-quality/>
+
+# REA-004: An individual is inferred to be a member of owl:Nothing, the
+# empty class -- a direct unsatisfiability signal, normally only reachable
+# after owlrl (or a real DL reasoner's) closure has materialized it.
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Violation ;
+    sh:focusNode ?i ;
+    sh:sourceConstraintComponent oq:REA-004 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  ?i a owl:Nothing .
+  BIND(CONCAT("Individual ", STR(?i), " is inferred to be a member of owl:Nothing (the empty class), ",
+              "meaning at least one class it is typed with is unsatisfiable given the ontology's axioms.") AS ?msg)
+}

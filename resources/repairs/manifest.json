@@ -1,0 +1,36 @@
+{
+  "_comment": "Repair templates for the mechanically-safe subset of registry.json + MDL-00x checks. Each template is a real SPARQL 1.1 Update, run against the target document's own quads via Oxigraph. checks/repairEngine.ts binds ?focusNode/?path/?value (from the finding's ResultRow, UNDEF if not applicable), ?derivedLabel (humanized local name of focusNode), and every ProjectStandards field as pre-bound variables before executing -- see checks/repairEngine.ts's module doc comment for the full variable contract. 'kind':'insert' templates are applied as a safe text append (preserves formatting); 'kind':'replace' templates are applied by reserializing the whole document (the delta can't in general be spliced into arbitrary existing Turtle syntax without a real parser-preserving editor).",
+  "checks": {
+    "STR-001": { "kind": "insert", "template": "STR-001.ru", "title": "Declare the undeclared class" },
+    "STR-002": { "kind": "insert", "template": "STR-002.ru", "title": "Declare the undeclared property (as rdf:Property)" },
+    "STR-005": { "kind": "insert", "template": "STR-005.ru", "title": "Declare the domain value as a class" },
+    "STR-007": { "kind": "insert", "template": "STR-007.ru", "title": "Declare the predicate (as rdf:Property)" },
+    "STR-008": { "kind": "insert", "template": "STR-008.ru", "title": "Declare the range value as a class" },
+    "QUA-001": { "kind": "insert", "template": "QUA-001.ru", "title": "Add a label derived from the local name" },
+    "QUA-002": { "kind": "insert", "template": "QUA-002.ru", "title": "Add owl:versionInfo from project standards" },
+    "QUA-004": { "kind": "insert", "template": "QUA-004.ru", "title": "Add a skos:prefLabel derived from the local name" },
+    "QUA-005": { "kind": "insert", "template": "QUA-005.ru", "title": "Declare an owl:Ontology resource from project standards" },
+    "QUA-007": { "kind": "insert", "template": "QUA-007.ru", "title": "Add owl:versionIRI" },
+    "LOG-003": {
+      "kind": "replace",
+      "templatesByPolicy": { "keepEquivalentClass": "LOG-003.keepEquivalentClass.ru", "keepSubClassOf": "LOG-003.keepSubClassOf.ru" },
+      "policyStandardsKey": "redundantEquivalencePolicy",
+      "title": "Remove the redundant axiom (per project policy)"
+    },
+    "MDL-001": { "kind": "replace", "template": "MDL-001.ru", "title": "Remove the named inverse property" },
+    "MDL-002": {
+      "kind": "replace",
+      "templatesByPolicy": { "subClassOf": "MDL-002.subClassOf.ru", "closeMatch": "MDL-002.closeMatch.ru" },
+      "policyStandardsKey": "equivalentClassPolicy",
+      "title": "Replace owl:equivalentClass (per project policy)"
+    },
+    "MDL-003": { "kind": "replace", "template": "MDL-003.ru", "title": "Model as a Category instead (per project standards)" },
+    "STY-003": { "kind": "replace", "template": "STY-003.ru", "title": "Add the project's default language tag" },
+    "PRJ-REQUIRED": {
+      "kind": "insert",
+      "template": "PRJ-REQUIRED.ru",
+      "title": "Add a value derived from the local name",
+      "_comment": "Only fires when the missing predicate is rdfs:label or skos:prefLabel -- structural predicates (rdfs:comment, rdfs:domain, rdfs:range, ...) have no safe auto-generated value and are left as a flagged finding with no Quick Fix offered."
+    }
+  }
+}

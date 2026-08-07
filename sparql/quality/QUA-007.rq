@@ -1,0 +1,20 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+PREFIX oq: <https://semantechs.co.uk/ontology-quality/>
+
+# QUA-007: Ontology missing owl:versionIRI.
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Info ;
+    sh:focusNode ?o ;
+    sh:sourceConstraintComponent oq:QUA-007 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  ?o a owl:Ontology .
+  FILTER NOT EXISTS { ?o owl:versionIRI ?v }
+  BIND(CONCAT("Ontology ", STR(?o), " has no owl:versionIRI, making it harder for consumers/tools to pin, ",
+              "cache-bust, or detect exactly which version of the ontology they're using.") AS ?msg)
+}

@@ -1,0 +1,86 @@
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix oq:   <https://semantechs.co.uk/ontology-quality/> .
+
+# ---------------------------------------------------------------------------
+# STY-001: Class local name not UpperCamelCase.
+# ---------------------------------------------------------------------------
+oq:STY-001
+  a sh:NodeShape ;
+  sh:targetClass owl:Class ;
+  sh:sparql [
+    a sh:SPARQLConstraint ;
+    sh:severity sh:Warning ;
+    sh:message "The local name of class {$this} does not follow UpperCamelCase (PascalCase)." ;
+    sh:select """
+      SELECT $this
+      WHERE {
+        FILTER(isIRI($this))
+        BIND(REPLACE(STR($this), "^.*[#/]", "") AS ?local)
+        FILTER(!REGEX(?local, "^[A-Z][A-Za-z0-9]*$"))
+      }
+    """ ;
+  ] .
+
+# ---------------------------------------------------------------------------
+# STY-002: Property local name not lowerCamelCase.
+# ---------------------------------------------------------------------------
+oq:STY-002-obj
+  a sh:NodeShape ;
+  sh:targetClass owl:ObjectProperty ;
+  sh:sparql [
+    a sh:SPARQLConstraint ;
+    sh:severity sh:Warning ;
+    sh:message "The local name of property {$this} does not follow lowerCamelCase." ;
+    sh:select """
+      SELECT $this
+      WHERE {
+        FILTER(isIRI($this))
+        BIND(REPLACE(STR($this), "^.*[#/]", "") AS ?local)
+        FILTER(!REGEX(?local, "^[a-z][A-Za-z0-9]*$"))
+      }
+    """ ;
+  ] ;
+  oq:checkId "STY-002" .
+
+oq:STY-002-data
+  a sh:NodeShape ;
+  sh:targetClass owl:DatatypeProperty ;
+  sh:sparql [
+    a sh:SPARQLConstraint ;
+    sh:severity sh:Warning ;
+    sh:message "The local name of property {$this} does not follow lowerCamelCase." ;
+    sh:select """
+      SELECT $this
+      WHERE {
+        FILTER(isIRI($this))
+        BIND(REPLACE(STR($this), "^.*[#/]", "") AS ?local)
+        FILTER(!REGEX(?local, "^[a-z][A-Za-z0-9]*$"))
+      }
+    """ ;
+  ] ;
+  oq:checkId "STY-002" .
+
+# ---------------------------------------------------------------------------
+# STY-003: Label missing a language tag.
+# sh:targetSubjectsOf is native SHACL: every $this that is subject of an
+# rdfs:label triple.
+# ---------------------------------------------------------------------------
+oq:STY-003
+  a sh:NodeShape ;
+  sh:targetSubjectsOf rdfs:label ;
+  sh:sparql [
+    a sh:SPARQLConstraint ;
+    sh:severity sh:Info ;
+    sh:message "A label on {$this} has no language tag." ;
+    sh:select """
+      PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+      SELECT $this ?value
+      WHERE {
+        $this rdfs:label ?value .
+        FILTER(LANG(?value) = "")
+      }
+    """ ;
+  ] .

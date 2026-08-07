@@ -1,0 +1,30 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX oq: <https://semantechs.co.uk/ontology-quality/>
+
+# STY-004: skos:prefLabel does not match local name
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Warning ;
+    sh:focusNode ?focus ;
+    sh:resultPath skos:prefLabel ;
+    sh:value ?label ;
+    sh:sourceConstraintComponent oq:STY-004 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  VALUES ?type { owl:Class owl:DatatypeProperty owl:ObjectProperty owl:AnnotationProperty }
+  ?focus a ?type ;
+    skos:prefLabel ?label .
+  FILTER(!STRSTARTS(STR(?focus), "http://www.w3.org/"))
+  BIND(LCASE(REPLACE(REPLACE(STR(?focus), "^.*[/#]", ""), "_", "")) AS ?flatUri)
+  BIND(LCASE(REPLACE(STR(?label), "[^A-Za-z0-9]", "")) AS ?flatLabel)
+  FILTER(?flatUri != ?flatLabel)
+  BIND(CONCAT("Term ", STR(?focus), " has skos:prefLabel '", STR(?label),
+              "' which does not match its local name, suggesting the label and IRI have drifted apart.") AS ?msg)
+}

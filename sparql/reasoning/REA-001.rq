@@ -1,0 +1,30 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+PREFIX oq: <https://semantechs.co.uk/ontology-quality/>
+
+# REA-001: Individual is a member of two classes declared disjoint. Intended
+# to run against an owlrl-materialized closure (see reasoning/backends/
+# owlrl_backend.py) so that subclass/equivalence-induced memberships are
+# caught too, not just directly-asserted rdf:type triples -- but the pattern
+# is valid SPARQL against any graph, closed or not.
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Violation ;
+    sh:focusNode ?i ;
+    sh:value ?c1, ?c2 ;
+    sh:sourceConstraintComponent oq:REA-001 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  ?i a ?c1, ?c2 .
+  # owl:disjointWith is semantically symmetric, but owlrl's closure does not
+  # necessarily materialize the reverse triple -- match either asserted
+  # direction rather than assuming both, and dedupe with the STR() ordering
+  # filter (safe here since the UNION already covers both orderings).
+  { ?c1 owl:disjointWith ?c2 } UNION { ?c2 owl:disjointWith ?c1 }
+  FILTER(STR(?c1) < STR(?c2))
+  BIND(CONCAT("Individual ", STR(?i), " is (directly or by inference) a member of both ", STR(?c1),
+              " and ", STR(?c2), ", which are declared owl:disjointWith each other -- the ontology plus data is logically inconsistent.") AS ?msg)
+}

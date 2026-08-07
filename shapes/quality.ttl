@@ -1,0 +1,121 @@
+@prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:     <http://www.w3.org/2002/07/owl#> .
+@prefix sh:      <http://www.w3.org/ns/shacl#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix oq:      <https://semantechs.co.uk/ontology-quality/> .
+
+# ---------------------------------------------------------------------------
+# QUA-001: Class or property missing rdfs:label.
+# Originally native SHACL core (one shape per target class, each with a
+# minCount 1 on rdfs:label only) -- switched to sh:sparql to also accept
+# skos:prefLabel as an equally valid label, matching the .rq twin
+# (sparql/quality/QUA-001.rq's `rdfs:label|skos:prefLabel` property-path
+# alternation). The native-only form checked rdfs:label alone, so it
+# silently diverged from the SPARQL formulation for any ontology (gist
+# included) that documents its terms with skos:prefLabel instead -- caught
+# as a real bug: every one of 386 SHACL-sourced QUA-001 findings against a
+# real vehicle ontology importing gist 14.1.0 was a term that *does* have a
+# skos:prefLabel, just not rdfs:label. (A nested sh:or-of-sh:property
+# native form could express the same "either path" logic, but its
+# validation results report the innermost blank-node property shape as
+# sh:sourceShape, one level of sh:or-list nesting deeper than
+# registry.py's resolve_check_id walks up through sh:property -- sh:sparql
+# avoids that resolution gap entirely, the same reasoning STR-003 above
+# was fixed with.)
+#
+# The initial sh:sparql rewrite introduced a second, separate bug: its
+# target omitted the .rq twin's `FILTER(isIRI(?e))`, so it matched every
+# blank-node owl:Class too -- every anonymous class expression
+# (owl:Restriction, unionOf/intersectionOf members, etc.), which every
+# non-trivial ontology has many of and which can never meaningfully have a
+# label. Caught immediately by the vehicle+gist regression test this
+# suite's own test suite added: 97 of 98 SHACL-only findings were blank
+# nodes.
+# ---------------------------------------------------------------------------
+oq:QUA-001
+  a sh:NodeShape ;
+  sh:target [
+    a sh:SPARQLTarget ;
+    sh:select """
+      PREFIX owl: <http://www.w3.org/2002/07/owl#>
+      SELECT DISTINCT ?this WHERE {
+        { ?this a owl:Class } UNION { ?this a owl:ObjectProperty } UNION { ?this a owl:DatatypeProperty }
+        FILTER(isIRI(?this))
+      }
+    """ ;
+  ] ;
+  sh:sparql [
+    a sh:SPARQLConstraint ;
+    sh:severity sh:Warning ;
+    sh:message "{$this} has no rdfs:label or skos:prefLabel." ;
+    sh:select """
+      PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+      PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+      SELECT $this
+      WHERE {
+        FILTER NOT EXISTS { $this rdfs:label|skos:prefLabel ?l }
+      }
+    """ ;
+  ] ;
+  oq:checkId "QUA-001" .
+
+# ---------------------------------------------------------------------------
+# QUA-002: Ontology missing versioning/title metadata.
+# Whole-ontology-header check -> SHACL-SPARQL. Must accept skos:prefLabel as
+# an alternative to rdfs:label, matching the .rq twin
+# (sparql/quality/QUA-002.rq's `rdfs:label|skos:prefLabel`) -- this shape
+# originally checked rdfs:label alone, silently diverging from its own
+# SPARQL formulation for any SKOS-labeled ontology (gist included). Caught
+# via `--engine sparql` vs `--engine both` disagreeing by exactly one
+# finding against a real vehicle ontology importing gist 14.1.0.
+# ---------------------------------------------------------------------------
+oq:QUA-002
+  a sh:NodeShape ;
+  sh:targetClass owl:Ontology ;
+  sh:sparql [
+    a sh:SPARQLConstraint ;
+    sh:severity sh:Info ;
+    sh:message "Ontology {$this} lacks owl:versionInfo, dcterms:title and rdfs:label/skos:prefLabel metadata." ;
+    sh:select """
+      PREFIX owl: <http://www.w3.org/2002/07/owl#>
+      PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+      PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+      PREFIX dcterms: <http://purl.org/dc/terms/>
+      SELECT $this
+      WHERE {
+        FILTER NOT EXISTS { $this owl:versionInfo ?v }
+        FILTER NOT EXISTS { $this dcterms:title ?t }
+        FILTER NOT EXISTS { $this rdfs:label|skos:prefLabel ?l }
+      }
+    """ ;
+  ] .
+
+# ---------------------------------------------------------------------------
+# QUA-003: Deprecated term still in active use.
+# ---------------------------------------------------------------------------
+oq:QUA-003
+  a sh:NodeShape ;
+  sh:target [
+    a sh:SPARQLTarget ;
+    sh:select """
+      PREFIX owl: <http://www.w3.org/2002/07/owl#>
+      SELECT DISTINCT ?this WHERE {
+        ?term owl:deprecated true .
+        { ?this ?term ?o } UNION { ?this a ?term }
+      }
+    """ ;
+  ] ;
+  sh:sparql [
+    a sh:SPARQLConstraint ;
+    sh:severity sh:Warning ;
+    sh:message "{$this} still uses a term that is declared owl:deprecated true." ;
+    sh:select """
+      PREFIX owl: <http://www.w3.org/2002/07/owl#>
+      SELECT $this ?path
+      WHERE {
+        ?path owl:deprecated true .
+        { $this ?path ?o } UNION { $this a ?path }
+      }
+    """ ;
+  ] .

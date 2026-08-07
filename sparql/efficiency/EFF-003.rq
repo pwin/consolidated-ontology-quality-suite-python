@@ -1,0 +1,27 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX oq: <https://semantechs.co.uk/ontology-quality/>
+
+# EFF-003: Excessive property fan-out on a single subject (> 50 values).
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Info ;
+    sh:focusNode ?s ;
+    sh:resultPath ?p ;
+    sh:sourceConstraintComponent oq:EFF-003 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  {
+    SELECT ?s ?p (COUNT(?o) AS ?n)
+    WHERE { ?s ?p ?o . FILTER(?p != rdf:type) }
+    GROUP BY ?s ?p
+    HAVING (COUNT(?o) > 50)
+  }
+  BIND(CONCAT("Subject ", STR(?s), " has ", STR(?n), " values for property ", STR(?p),
+              " (> 50), which may indicate a list/collection anti-pattern hurting query efficiency.") AS ?msg)
+}

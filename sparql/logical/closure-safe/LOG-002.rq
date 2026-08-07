@@ -1,0 +1,25 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX oq: <https://semantechs.co.uk/ontology-quality/>
+
+# LOG-002: owl:FunctionalProperty violated by data
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Violation ;
+    sh:focusNode ?s ;
+    sh:resultPath ?p ;
+    sh:sourceConstraintComponent oq:LOG-002 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  ?p a owl:FunctionalProperty .
+  ?s ?p ?o1 .
+  ?s ?p ?o2 .
+  FILTER(STR(?o1) < STR(?o2))
+  BIND(CONCAT("Subject ", STR(?s), " has more than one distinct value for functional property ",
+              STR(?p), ", violating its functional-property axiom.") AS ?msg)
+}

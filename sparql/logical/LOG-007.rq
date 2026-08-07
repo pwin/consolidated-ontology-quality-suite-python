@@ -1,0 +1,26 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX oq: <https://semantechs.co.uk/ontology-quality/>
+
+# LOG-007: Transitive property has unequal domain and range
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Violation ;
+    sh:focusNode ?focus ;
+    sh:resultPath rdfs:domain, rdfs:range ;
+    sh:value ?domain, ?range ;
+    sh:sourceConstraintComponent oq:LOG-007 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  ?focus a owl:TransitiveProperty ;
+    rdfs:domain ?domain ;
+    rdfs:range ?range .
+  FILTER(?domain != ?range)
+  BIND(CONCAT("Transitive property ", STR(?focus), " has domain ", STR(?domain), " different from range ",
+              STR(?range), ", which is inconsistent for a transitive relation.") AS ?msg)
+}

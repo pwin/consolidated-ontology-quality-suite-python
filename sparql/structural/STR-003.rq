@@ -1,0 +1,34 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX oq: <https://semantechs.co.uk/ontology-quality/>
+
+# STR-003: Property missing both domain and range
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Warning ;
+    sh:focusNode ?p ;
+    sh:sourceConstraintComponent oq:STR-003 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  { ?p a owl:ObjectProperty } UNION { ?p a owl:DatatypeProperty }
+  FILTER NOT EXISTS { ?p rdfs:domain ?d }
+  FILTER NOT EXISTS { ?p rdfs:range ?r }
+  # gist:domainIncludes/gist:rangeIncludes (Semantic Arts' gist ontology
+  # deliberately avoids rdfs:domain/range on most properties in favor of
+  # these annotation properties -- see ontology_evaluation.py's own
+  # domainIncludes/rangeIncludes handling) count as equally satisfying "has
+  # a domain/range" here. Without this, every gist-based ontology floods
+  # this check with findings for properties that are, in fact, constrained
+  # -- just not via rdfs:domain/range specifically. Matched by local name,
+  # not a hardcoded gist namespace IRI, since gist has published under more
+  # than one over the years.
+  FILTER NOT EXISTS { ?p ?dip [] . FILTER(STRENDS(STR(?dip), "domainIncludes")) }
+  FILTER NOT EXISTS { ?p ?rip [] . FILTER(STRENDS(STR(?rip), "rangeIncludes")) }
+  BIND(CONCAT("Property ", STR(?p),
+              " declares neither rdfs:domain/range nor gist-style domainIncludes/rangeIncludes annotations, weakening structural precision.") AS ?msg)
+}

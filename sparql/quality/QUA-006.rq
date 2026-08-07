@@ -1,0 +1,35 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+PREFIX oq: <https://semantechs.co.uk/ontology-quality/>
+
+# QUA-006: The ontology's own identifying IRI is used verbatim as the
+# namespace IRI for its own concepts (i.e. a class/property IRI, stripped of
+# its local name, is identical to the ontology IRI string). Best practice is
+# for the two to be distinct -- e.g. an ontology IRI with no trailing '#'/'/'
+# and a namespace IRI with one -- so tooling and humans can tell "the
+# ontology as a resource" apart from "a term it defines".
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Warning ;
+    sh:focusNode ?o ;
+    sh:value ?concept ;
+    sh:sourceConstraintComponent oq:QUA-006 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  ?o a owl:Ontology .
+  {
+    { ?concept a owl:Class }
+    UNION { ?concept a owl:ObjectProperty }
+    UNION { ?concept a owl:DatatypeProperty }
+    UNION { ?concept a owl:AnnotationProperty }
+    UNION { ?concept a rdf:Property }
+  }
+  FILTER(isIRI(?concept))
+  BIND(REPLACE(STR(?concept), "^(.*[/#])[^/#]*$", "$1") AS ?ns)
+  FILTER(?ns = STR(?o))
+  BIND(CONCAT("Ontology ", STR(?o), " is used verbatim as the namespace IRI for its own concept ", STR(?concept),
+              " -- the ontology's identifying IRI and the namespace IRI minting its concepts should be distinct.") AS ?msg)
+}

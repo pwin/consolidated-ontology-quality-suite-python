@@ -1,0 +1,88 @@
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix oq:   <https://semantechs.co.uk/ontology-quality/> .
+
+# ---------------------------------------------------------------------------
+# EFF-001: Class hierarchy chain too deep (>= 6 hops).
+# ---------------------------------------------------------------------------
+oq:EFF-001
+  a sh:NodeShape ;
+  sh:targetClass owl:Class ;
+  sh:sparql [
+    a sh:SPARQLConstraint ;
+    sh:severity sh:Warning ;
+    sh:message "{$this} sits at the bottom of a subClassOf chain at least 6 hops deep." ;
+    sh:select """
+      PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+      SELECT $this ?value
+      WHERE {
+        $this rdfs:subClassOf ?c1 .
+        ?c1 rdfs:subClassOf ?c2 .
+        ?c2 rdfs:subClassOf ?c3 .
+        ?c3 rdfs:subClassOf ?c4 .
+        ?c4 rdfs:subClassOf ?c5 .
+        ?c5 rdfs:subClassOf ?value .
+        FILTER($this != ?c1 && ?c1 != ?c2 && ?c2 != ?c3 && ?c3 != ?c4 && ?c4 != ?c5 && ?c5 != ?value)
+        FILTER($this != ?c2 && $this != ?c3 && $this != ?c4 && $this != ?c5 && $this != ?value)
+      }
+    """ ;
+  ] .
+
+# ---------------------------------------------------------------------------
+# EFF-002: Excessive blank-node ratio (> 20% of all nodes).
+# Graph-wide statistic -> anchored on the synthetic node oq:Graph.
+# ---------------------------------------------------------------------------
+oq:EFF-002
+  a sh:NodeShape ;
+  sh:targetNode oq:Graph ;
+  sh:sparql [
+    a sh:SPARQLConstraint ;
+    sh:severity sh:Warning ;
+    sh:message "More than 20% of graph nodes are blank nodes." ;
+    sh:select """
+      SELECT $this
+      WHERE {
+        {
+          SELECT (COUNT(?node) AS ?total) (SUM(?isbn) AS ?bnodes)
+          WHERE {
+            SELECT DISTINCT ?node (IF(isBlank(?node), 1, 0) AS ?isbn)
+            WHERE {
+              ?s ?p ?o .
+              { BIND(?s AS ?node) } UNION { BIND(?o AS ?node) FILTER(isIRI(?o) || isBlank(?o)) }
+            }
+          }
+        }
+        FILTER(?total > 0)
+        FILTER((?bnodes * 1.0 / ?total) > 0.2)
+      }
+    """ ;
+  ] .
+
+# ---------------------------------------------------------------------------
+# EFF-003: Excessive property fan-out on a single subject (> 50 values).
+# ---------------------------------------------------------------------------
+oq:EFF-003
+  a sh:NodeShape ;
+  sh:target [
+    a sh:SPARQLTarget ;
+    sh:select "SELECT DISTINCT ?this WHERE { ?this ?p ?o }" ;
+  ] ;
+  sh:sparql [
+    a sh:SPARQLConstraint ;
+    sh:severity sh:Info ;
+    sh:message "{$this} has more than 50 values for the same property ({?path})." ;
+    sh:select """
+      PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+      SELECT $this ?path
+      WHERE {
+        {
+          SELECT $this ?path (COUNT(?o) AS ?n)
+          WHERE { $this ?path ?o . FILTER(?path != rdf:type) }
+          GROUP BY $this ?path
+          HAVING (COUNT(?o) > 50)
+        }
+      }
+    """ ;
+  ] .

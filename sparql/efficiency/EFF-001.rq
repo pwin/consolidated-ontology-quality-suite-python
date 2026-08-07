@@ -1,0 +1,32 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX oq: <https://semantechs.co.uk/ontology-quality/>
+
+# EFF-001: Class hierarchy chain too deep (>= 6 hops).
+# Standard SPARQL 1.1 has no bounded-repeat path operator, so depth is
+# detected via an explicit chain of hops. Add/remove "?cN rdfs:subClassOf ?cN+1"
+# lines to change the threshold.
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Warning ;
+    sh:focusNode ?c0 ;
+    sh:value ?c6 ;
+    sh:sourceConstraintComponent oq:EFF-001 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  ?c0 rdfs:subClassOf ?c1 .
+  ?c1 rdfs:subClassOf ?c2 .
+  ?c2 rdfs:subClassOf ?c3 .
+  ?c3 rdfs:subClassOf ?c4 .
+  ?c4 rdfs:subClassOf ?c5 .
+  ?c5 rdfs:subClassOf ?c6 .
+  FILTER(?c0 != ?c1 && ?c1 != ?c2 && ?c2 != ?c3 && ?c3 != ?c4 && ?c4 != ?c5 && ?c5 != ?c6)
+  FILTER(?c0 != ?c2 && ?c0 != ?c3 && ?c0 != ?c4 && ?c0 != ?c5 && ?c0 != ?c6)
+  BIND(CONCAT("Class ", STR(?c0), " has a subClassOf chain at least 6 hops deep (reaching ",
+              STR(?c6), "), increasing reasoning/traversal cost.") AS ?msg)
+}

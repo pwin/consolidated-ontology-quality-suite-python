@@ -1,0 +1,24 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX oq: <https://semantechs.co.uk/ontology-quality/>
+
+# LOG-003: Redundant equivalentClass + subClassOf pair
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Warning ;
+    sh:focusNode ?c ;
+    sh:value ?d ;
+    sh:sourceConstraintComponent oq:LOG-003 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  ?c owl:equivalentClass ?d .
+  ?c rdfs:subClassOf ?d .
+  FILTER(?c != ?d)
+  BIND(CONCAT("Class ", STR(?c), " is declared both owl:equivalentClass and rdfs:subClassOf of ",
+              STR(?d), " -- redundant, and may mask an unintended equivalence cycle.") AS ?msg)
+}

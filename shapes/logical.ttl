@@ -1,0 +1,70 @@
+@prefix rdf:   <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:   <http://www.w3.org/2002/07/owl#> .
+@prefix sh:    <http://www.w3.org/ns/shacl#> .
+@prefix oq:    <https://semantechs.co.uk/ontology-quality/> .
+
+# ---------------------------------------------------------------------------
+# LOG-001: Class disjoint with its own ancestor.
+# Native SHACL core: sh:disjoint compares the values reached via the
+# property-path (transitive rdfs:subClassOf, using sh:oneOrMorePath) against
+# the values of owl:disjointWith on the same focus node. A non-empty
+# intersection is exactly the contradiction we want to flag.
+# ---------------------------------------------------------------------------
+oq:LOG-001
+  a sh:NodeShape ;
+  rdfs:label "LOG-001: class disjoint with its own ancestor" ;
+  sh:targetClass owl:Class ;
+  sh:property [
+    sh:path [ sh:oneOrMorePath rdfs:subClassOf ] ;
+    sh:disjoint owl:disjointWith ;
+    sh:severity sh:Violation ;
+    sh:message "{$this} is disjoint with one of its own transitive superclasses, making it logically unsatisfiable." ;
+  ] .
+
+# ---------------------------------------------------------------------------
+# LOG-002: owl:FunctionalProperty violated by data.
+# The property path is only known at data-load time (whichever property is
+# declared owl:FunctionalProperty), so this is expressed with SHACL-SPARQL.
+# ---------------------------------------------------------------------------
+oq:LOG-002
+  a sh:NodeShape ;
+  rdfs:label "LOG-002: functional property violated by data" ;
+  sh:target [
+    a sh:SPARQLTarget ;
+    sh:select """
+      PREFIX owl: <http://www.w3.org/2002/07/owl#>
+      SELECT DISTINCT ?this WHERE { ?p a owl:FunctionalProperty . ?this ?p ?o }
+    """ ;
+  ] ;
+  sh:sparql [
+    a sh:SPARQLConstraint ;
+    sh:severity sh:Violation ;
+    sh:message "{$this} has more than one distinct value for a property declared owl:FunctionalProperty." ;
+    sh:select """
+      PREFIX owl: <http://www.w3.org/2002/07/owl#>
+      SELECT $this ?path
+      WHERE {
+        ?path a owl:FunctionalProperty .
+        $this ?path ?o1 .
+        $this ?path ?o2 .
+        FILTER(STR(?o1) < STR(?o2))
+      }
+    """ ;
+  ] .
+
+# ---------------------------------------------------------------------------
+# LOG-003: Redundant equivalentClass + subClassOf pair.
+# Native SHACL core: sh:disjoint is violated (i.e. flagged) exactly when the
+# two value sets overlap, which is what we want to warn about here.
+# ---------------------------------------------------------------------------
+oq:LOG-003
+  a sh:NodeShape ;
+  rdfs:label "LOG-003: redundant equivalentClass + subClassOf pair" ;
+  sh:targetClass owl:Class ;
+  sh:property [
+    sh:path owl:equivalentClass ;
+    sh:disjoint rdfs:subClassOf ;
+    sh:severity sh:Warning ;
+    sh:message "{$this} is declared both owl:equivalentClass and rdfs:subClassOf of the same class, which is redundant." ;
+  ] .

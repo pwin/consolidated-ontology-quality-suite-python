@@ -1,0 +1,31 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX oq: <https://semantechs.co.uk/ontology-quality/>
+
+# STR-002: Undefined property used
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Violation ;
+    sh:focusNode ?s ;
+    sh:resultPath ?p ;
+    sh:sourceConstraintComponent oq:STR-002 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  ?s ?p ?o .
+  FILTER(?p != rdf:type)
+  FILTER NOT EXISTS { ?p a rdf:Property }
+  FILTER NOT EXISTS { ?p a owl:ObjectProperty }
+  FILTER NOT EXISTS { ?p a owl:DatatypeProperty }
+  FILTER NOT EXISTS { ?p a owl:AnnotationProperty }
+  FILTER(!STRSTARTS(STR(?p), "http://www.w3.org/1999/02/22-rdf-syntax-ns#"))
+  FILTER(!STRSTARTS(STR(?p), "http://www.w3.org/2000/01/rdf-schema#"))
+  FILTER(!STRSTARTS(STR(?p), "http://www.w3.org/2002/07/owl#"))
+  BIND(CONCAT("Property ", STR(?p), " is used on ", STR(?s),
+              " but is never declared as rdf:Property/owl:ObjectProperty/",
+              "owl:DatatypeProperty/owl:AnnotationProperty.") AS ?msg)
+}

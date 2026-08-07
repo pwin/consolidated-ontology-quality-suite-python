@@ -1,0 +1,24 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+PREFIX oq: <https://semantechs.co.uk/ontology-quality/>
+
+# REA-002: owl:AsymmetricProperty holds in both directions between the same pair.
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Violation ;
+    sh:focusNode ?s ;
+    sh:resultPath ?p ;
+    sh:value ?o ;
+    sh:sourceConstraintComponent oq:REA-002 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  ?p a owl:AsymmetricProperty .
+  ?s ?p ?o .
+  ?o ?p ?s .
+  FILTER(?s != ?o)
+  BIND(CONCAT("Asymmetric property ", STR(?p), " holds in both directions between ", STR(?s),
+              " and ", STR(?o), ", violating its owl:AsymmetricProperty axiom.") AS ?msg)
+}

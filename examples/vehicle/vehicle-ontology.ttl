@@ -1,0 +1,1038 @@
+@prefix : <https://example.org/ontology/vehicle/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix gist: <https://w3id.org/semanticarts/ns/ontology/gist/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix vehd: <https://example.org/id/vehicle/> .
+@prefix veho: <https://example.org/ontology/vehicle/> .
+@prefix vehx: <https://example.org/vocab/vehicle/> .
+@prefix gistd: <https://w3id.org/semanticarts/ns/data/gist/> .
+@prefix vann: <http://purl.org/vocab/vann/> .
+@base <https://example.org/ontology/vehicle/> .
+
+<https://example.org/ontology/vehicle> rdf:type owl:Ontology ;
+                                              owl:versionIRI <https://example.org/ontology/vehicle/1.0.7> ;
+                                              owl:imports <https://w3id.org/semanticarts/ontology/gistCore14.1.0> ;
+                                              rdfs:comment "An OWL 2 DL extension of Semantic Arts' gist 14.1.0 upper ontology, covering vehicles, vehicle prototypes, powertrains, manufacturing, markets, telemetry, sales, and traffic/safety events. All terms defined here are outside the gist namespace, per gist's licensing requirement, and every superclass, disjointness and property re-used from gist has been checked against the released gistCore14.1.0.ttl file."@en ;
+                                              rdfs:label "Vehicle Domain Ontology"@en ;
+                                              vann:preferredNamespacePrefix "veho"@en;
+                                              vann:preferredNamespaceUri "https://example.org/ontology/vehicle/"^^xsd:anyURI ;
+                                              skos:historyNote """
+                                              Version 1.0.7 from 2026-07-20
+                                              """ ;
+                                              .
+
+#################################################################
+#    Object Properties
+#################################################################
+
+###  https://example.org/ontology/vehicle/hasInjuredParty
+veho:hasInjuredParty rdf:type owl:ObjectProperty ;
+                     rdfs:subPropertyOf gist:hasParticipant ;
+                     rdfs:range gist:Person ;
+                     rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                     skos:definition "Relates an accident event to a person who was injured in it."@en ;
+                     skos:prefLabel "has injured party"@en .
+
+
+###  https://example.org/ontology/vehicle/hasMarket
+veho:hasMarket rdf:type owl:ObjectProperty ;
+               rdfs:subPropertyOf gist:hasParticipant ;
+               rdfs:domain veho:ProductionAllocation ;
+               rdfs:range veho:Market ;
+               rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+               skos:definition "Relates a production allocation to a market that the allocated production supplies."@en ;
+               skos:prefLabel "has market"@en .
+
+
+###  https://example.org/ontology/vehicle/hasPower
+veho:hasPower rdf:type owl:ObjectProperty ;
+              rdfs:subPropertyOf gist:hasMagnitude ;
+              skos:prefLabel "has power"@en .
+
+
+###  https://example.org/ontology/vehicle/hasUsablePower
+veho:hasUsablePower rdf:type owl:ObjectProperty ;
+                    rdfs:subPropertyOf gist:hasMagnitude ;
+                    skos:prefLabel "has usable power"@en .
+
+
+###  https://example.org/ontology/vehicle/hasVehicleInvolved
+veho:hasVehicleInvolved rdf:type owl:ObjectProperty ;
+                        rdfs:subPropertyOf gist:hasParticipant ;
+                        rdfs:range veho:Vehicle ;
+                        rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                        skos:definition "Relates a traffic or accident event to a vehicle that took part in it."@en ;
+                        skos:prefLabel "has vehicle involved"@en .
+
+
+#################################################################
+#    Classes
+#################################################################
+
+###  http://www.w3.org/2004/02/skos/core#Concept
+skos:Concept rdf:type owl:Class .
+
+
+###  https://example.org/ontology/vehicle/AccidentEvent
+veho:AccidentEvent rdf:type owl:Class ;
+                   rdfs:subClassOf veho:TrafficEvent ,
+                                   [ rdf:type owl:Restriction ;
+                                     owl:onProperty gist:hasMagnitude ;
+                                     owl:someValuesFrom gist:Magnitude
+                                   ] ;
+                   rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                   skos:definition "A traffic event resulting in a collision, injury, or property damage."@en ;
+                   skos:example "A rear-end collision at an intersection."@en ;
+                   skos:prefLabel "Accident Event"@en ;
+                   skos:scopeNote "Casualty and damage counts are represented as gist:Magnitude values (e.g. a Magnitude whose Aspect is 'injury count'), following the same generic pattern used elsewhere in this ontology, rather than a bespoke Road Accident Ontology structure."@en .
+
+
+###  https://example.org/ontology/vehicle/AdaptiveCruiseControlModule
+veho:AdaptiveCruiseControlModule rdf:type owl:Class ;
+                                 rdfs:subClassOf veho:AdasComponent ;
+                                 owl:disjointWith veho:CollisionAvoidanceModule ,
+                                                  veho:LaneKeepingAssistModule ;
+                                 rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                                 skos:definition "The module that maintains a set speed and follow distance from a vehicle ahead."@en ;
+                                 skos:prefLabel "Adaptive Cruise Control Module"@en ;
+                                 skos:scopeNote "Cf. VSS Vehicle.ADAS.CruiseControl."@en .
+
+
+###  https://example.org/ontology/vehicle/AdasComponent
+veho:AdasComponent rdf:type owl:Class ;
+                   rdfs:subClassOf veho:VehicleComponent ,
+                                   [ rdf:type owl:Restriction ;
+                                     owl:onProperty gist:isPartOf ;
+                                     owl:someValuesFrom veho:AdasSystem
+                                   ] ;
+                   owl:disjointWith veho:BodyComponent ,
+                                    veho:CabinComponent ,
+                                    veho:ChassisComponent ,
+                                    veho:PowerTrainComponent ;
+                   rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                   skos:definition "A component that is inherently part of a vehicle's Advanced Driver Assistance System."@en ;
+                   skos:prefLabel "ADAS Component"@en .
+
+
+###  https://example.org/ontology/vehicle/AdasSystem
+veho:AdasSystem rdf:type owl:Class ;
+                rdfs:subClassOf veho:VehicleSystem ;
+                owl:disjointWith veho:Body ,
+                                 veho:Cabin ,
+                                 veho:Chassis ,
+                                 veho:PowerTrain ;
+                rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                skos:definition "The system of Advanced Driver Assistance components of a vehicle."@en ;
+                skos:prefLabel "ADAS"@en ;
+                skos:scopeNote "Corresponds to the VSS Vehicle.ADAS branch, described in VSS documentation as covering all Advanced Driver Assist Systems data. Named AdasSystem, rather than reusing the acronym ADAS directly as a class name, to keep the label readable alongside its sibling systems."@en .
+
+
+###  https://example.org/ontology/vehicle/AssemblyPlant
+veho:AssemblyPlant rdf:type owl:Class ;
+                   rdfs:subClassOf gist:Organization ;
+                   rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                   skos:definition "An organizational unit that assembles vehicles at a physical facility."@en ;
+                   skos:example "The Castle Bromwich plant."@en ;
+                   skos:prefLabel "Assembly Plant"@en ;
+                   skos:scopeNote "Modeled as an Organization, not a physical Equipment or building, so that it can be the assignee in a gist:Assignment and can have members/employees. Its physical site is related via gist:hasPhysicalLocation to a gist:GeoLocation."@en .
+
+
+###  https://example.org/ontology/vehicle/Battery
+veho:Battery rdf:type owl:Class ;
+             rdfs:subClassOf  veho:PowerTrainComponent ,
+                             [ rdf:type owl:Restriction ;
+                               owl:onProperty gist:conformsTo ;
+                               owl:someValuesFrom gist:Specification
+                             ] ;
+             owl:disjointWith veho:ElectricMotor ,
+                              veho:Engine ,
+                              veho:Transmission ;
+             rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+             skos:definition "An energy-storage component that supplies electrical power to a vehicle's electric motor(s)."@en ;
+             skos:prefLabel "Battery"@en .
+
+
+###  https://example.org/ontology/vehicle/BatterySpecification
+veho:BatterySpecification
+	a owl:Class ;
+	owl:equivalentClass [
+		a owl:Class ;
+		owl:intersectionOf (
+			gist:Specification
+			[
+				a owl:Restriction ;
+				owl:onProperty gist:isCategorizedBy ;
+				owl:someValuesFrom veho:BatteryType ;
+			]
+			[
+				a owl:Restriction ;
+				owl:onProperty gist:requires ;
+				owl:someValuesFrom [
+					a owl:Class ;
+					owl:intersectionOf (
+						veho:Battery
+						[
+							a owl:Restriction ;
+							owl:onProperty veho:hasPower ;
+							owl:someValuesFrom gist:Magnitude ;
+						]
+						[
+							a owl:Restriction ;
+							owl:onProperty veho:hasUsablePower ;
+							owl:someValuesFrom gist:Magnitude ;
+						]
+					) ;
+				] ;
+			]
+		) ;
+	] ;
+	rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+	skos:definition "The design intent for a category of battery: the vehicle form (via BatteryType) it is built for, and a single exemplar battery required to carry both a rated power and a usable power magnitude."@en ;
+	skos:example "The specification for Manufacturer X's 150 kW / 135 kW usable EV traction battery."@en ;
+	skos:prefLabel "Battery Specification"@en ;
+	.
+
+
+###  https://example.org/ontology/vehicle/BatteryType
+veho:BatteryType rdf:type owl:Class ;
+                 rdfs:subClassOf gist:EquipmentType ;
+                 rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                 skos:definition "A category representing different types of battery."@en ;
+                 skos:example "Batteries such as EB580 (85.5)."@en ;
+                 skos:prefLabel "Battery Type"@en .
+
+
+###  https://example.org/ontology/vehicle/Body
+veho:Body rdf:type owl:Class ;
+          rdfs:subClassOf veho:VehicleSystem ;
+          owl:disjointWith veho:Cabin ,
+                           veho:Chassis ,
+                           veho:PowerTrain ;
+          rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+          skos:definition "The system of exterior body components of a vehicle."@en ;
+          skos:prefLabel "Body"@en ;
+          skos:scopeNote "Corresponds to the VSS Vehicle.Body branch, described in VSS documentation as covering all body components."@en .
+
+
+###  https://example.org/ontology/vehicle/BodyComponent
+veho:BodyComponent rdf:type owl:Class ;
+                   rdfs:subClassOf veho:VehicleComponent ,
+                                   [ rdf:type owl:Restriction ;
+                                     owl:onProperty gist:isPartOf ;
+                                     owl:someValuesFrom veho:Body
+                                   ] ;
+                   owl:disjointWith veho:CabinComponent ,
+                                    veho:ChassisComponent ,
+                                    veho:PowerTrainComponent ;
+                   rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                   skos:definition "A component that is inherently part of a vehicle's exterior body."@en ;
+                   skos:prefLabel "Body Component"@en .
+
+
+###  https://example.org/ontology/vehicle/Brake
+veho:Brake rdf:type owl:Class ;
+           rdfs:subClassOf veho:ChassisComponent ;
+           owl:disjointWith veho:SteeringSystem ,
+                            veho:Suspension ,
+                            veho:Wheel ;
+           rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+           skos:definition "A component that slows or stops a vehicle by applying friction to a wheel."@en ;
+           skos:prefLabel "Brake"@en ;
+           skos:scopeNote "Cf. VSS Vehicle.Chassis.Axle.Row1.Wheel.Left.Brake."@en .
+
+
+###  https://example.org/ontology/vehicle/Cabin
+veho:Cabin rdf:type owl:Class ;
+           rdfs:subClassOf veho:VehicleSystem ;
+           owl:disjointWith veho:Chassis ,
+                            veho:PowerTrain ;
+           rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+           skos:definition "The system of in-cabin components of a vehicle, including doors."@en ;
+           skos:prefLabel "Cabin"@en ;
+           skos:scopeNote "Corresponds to the VSS Vehicle.Cabin branch, described in VSS documentation as covering all in-cabin components, including doors."@en .
+
+
+###  https://example.org/ontology/vehicle/CabinComponent
+veho:CabinComponent rdf:type owl:Class ;
+                    rdfs:subClassOf veho:VehicleComponent ,
+                                    [ rdf:type owl:Restriction ;
+                                      owl:onProperty gist:isPartOf ;
+                                      owl:someValuesFrom veho:Cabin
+                                    ] ;
+                    owl:disjointWith veho:ChassisComponent ,
+                                     veho:PowerTrainComponent ;
+                    rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                    skos:definition "A component that is inherently part of a vehicle's cabin."@en ;
+                    skos:prefLabel "Cabin Component"@en .
+
+
+###  https://example.org/ontology/vehicle/Chassis
+veho:Chassis rdf:type owl:Class ;
+             rdfs:subClassOf veho:VehicleSystem ;
+             owl:disjointWith veho:PowerTrain ;
+             rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+             skos:definition "The system concerning a vehicle's steering, suspension, wheels, and brakes."@en ;
+             skos:prefLabel "Chassis"@en ;
+             skos:scopeNote "Corresponds to the VSS Vehicle.Chassis branch, described in VSS documentation as covering steering, suspension, wheels, and brakes."@en .
+
+
+###  https://example.org/ontology/vehicle/ChassisComponent
+veho:ChassisComponent rdf:type owl:Class ;
+                      rdfs:subClassOf veho:VehicleComponent ,
+                                      [ rdf:type owl:Restriction ;
+                                        owl:onProperty gist:isPartOf ;
+                                        owl:someValuesFrom veho:Chassis
+                                      ] ;
+                      owl:disjointWith veho:PowerTrainComponent ;
+                      rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                      skos:definition "A component that is inherently part of a vehicle's chassis."@en ;
+                      skos:prefLabel "Chassis Component"@en .
+
+
+###  https://example.org/ontology/vehicle/CollisionAvoidanceModule
+veho:CollisionAvoidanceModule rdf:type owl:Class ;
+                              rdfs:subClassOf veho:AdasComponent ;
+                              owl:disjointWith veho:LaneKeepingAssistModule ;
+                              rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                              skos:definition "The module that detects an imminent collision risk and warns or brakes automatically."@en ;
+                              skos:prefLabel "Collision Avoidance Module"@en ;
+                              skos:scopeNote "Cf. VSS Vehicle.ADAS.CollisionAvoidance."@en .
+
+
+###  https://example.org/ontology/vehicle/Dealer
+veho:Dealer rdf:type owl:Class ;
+            rdfs:subClassOf gist:Organization ;
+            rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+            skos:definition "An organization that sells vehicles to end customers."@en ;
+            skos:prefLabel "Dealer"@en .
+
+
+###  https://example.org/ontology/vehicle/Door
+veho:Door rdf:type owl:Class ;
+          rdfs:subClassOf veho:CabinComponent ;
+          owl:disjointWith veho:HvacSystem ,
+                           veho:InfotainmentSystem ,
+                           veho:Seat ,
+                           veho:Sunroof ;
+          rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+          skos:definition "A hinged or sliding barrier providing entry to or exit from a vehicle's cabin."@en ;
+          skos:prefLabel "Door"@en ;
+          skos:scopeNote "Cf. VSS Vehicle.Cabin.Door.Row1.Left."@en .
+
+
+###  https://example.org/ontology/vehicle/ElectricMotor
+veho:ElectricMotor rdf:type owl:Class ;
+                   rdfs:subClassOf veho:PowerTrainComponent ;
+                   owl:disjointWith veho:Engine ,
+                                    veho:Transmission ;
+                   rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                   skos:definition "A motor that converts electrical energy from a battery into mechanical power."@en ;
+                   skos:prefLabel "Electric Motor"@en .
+
+
+###  https://example.org/ontology/vehicle/ElectricPowerTrain
+veho:ElectricPowerTrain rdf:type owl:Class ;
+                        rdfs:subClassOf veho:PowerTrain ;
+                        owl:disjointWith veho:HybridPowerTrain ,
+                                         veho:InternalCombustionPowerTrain ;
+                        rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                        skos:definition "A powertrain driven solely by one or more electric motors drawing on a battery."@en ;
+                        skos:prefLabel "Electric Power Train"@en .
+
+
+###  https://example.org/ontology/vehicle/ElectricVehicleModel
+veho:ElectricVehicleModel rdf:type owl:Class ;
+                          owl:equivalentClass [ owl:intersectionOf ( veho:VehicleModel
+                                                                     [ rdf:type owl:Restriction ;
+                                                                       owl:onProperty gist:requires ;
+                                                                       owl:someValuesFrom veho:ElectricPowerTrain
+                                                                     ]
+                                                                   ) ;
+                                                rdf:type owl:Class
+                                              ] ;
+                          owl:disjointWith veho:HybridVehicleModel ,
+                                           veho:InternalCombustionVehicleModel ;
+                          rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                          skos:definition "A vehicle model specification that requires an all-electric powertrain."@en ;
+                          skos:prefLabel "Electric Vehicle Model"@en .
+
+
+###  https://example.org/ontology/vehicle/Engine
+veho:Engine rdf:type owl:Class ;
+            rdfs:subClassOf veho:PowerTrainComponent ;
+            owl:disjointWith veho:Transmission ;
+            rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+            skos:definition "An internal-combustion engine that converts fuel into mechanical power."@en ;
+            skos:prefLabel "Engine"@en .
+
+
+###  https://example.org/ontology/vehicle/ExteriorLight
+veho:ExteriorLight rdf:type owl:Class ;
+                   rdfs:subClassOf veho:BodyComponent ;
+                   owl:disjointWith veho:Hood ,
+                                    veho:Mirror ,
+                                    veho:Trunk ,
+                                    veho:Windshield ;
+                   rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                   skos:definition "A light fitted to a vehicle's exterior body, such as a headlamp, tail lamp, or turn indicator."@en ;
+                   skos:prefLabel "Exterior Light"@en ;
+                   skos:scopeNote "Cf. VSS Vehicle.Body.Lights.Beam.Low."@en .
+
+
+###  https://example.org/ontology/vehicle/FullySpecifiedVehicleModel
+veho:FullySpecifiedVehicleModel rdf:type owl:Class ;
+                                owl:equivalentClass [ owl:intersectionOf ( veho:VehicleModel
+                                                                           [ rdf:type owl:Restriction ;
+                                                                             owl:onProperty gist:requires ;
+                                                                             owl:someValuesFrom veho:AdasSystem
+                                                                           ]
+                                                                           [ rdf:type owl:Restriction ;
+                                                                             owl:onProperty gist:requires ;
+                                                                             owl:someValuesFrom veho:Body
+                                                                           ]
+                                                                           [ rdf:type owl:Restriction ;
+                                                                             owl:onProperty gist:requires ;
+                                                                             owl:someValuesFrom veho:Cabin
+                                                                           ]
+                                                                           [ rdf:type owl:Restriction ;
+                                                                             owl:onProperty gist:requires ;
+                                                                             owl:someValuesFrom veho:Chassis
+                                                                           ]
+                                                                           [ rdf:type owl:Restriction ;
+                                                                             owl:onProperty gist:requires ;
+                                                                             owl:someValuesFrom veho:PowerTrain
+                                                                           ]
+                                                                         ) ;
+                                                      rdf:type owl:Class
+                                                    ] ;
+                                rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                                skos:definition "A vehicle model specification that requires at least one of each of the five vehicle systems (powertrain, chassis, body, cabin, ADAS), rather than only some of them."@en ;
+                                skos:prefLabel "Fully Specified Vehicle Model"@en ;
+                                skos:scopeNote "Generalizes the same gist:requires pattern used by veho:HybridVehicleModel/veho:ElectricVehicleModel/veho:InternalCombustionVehicleModel from one system (PowerTrain) to all five VSS-derived systems, giving a single class that lets a reasoner distinguish a fully worked-out specification from a partial or draft one (e.g. a VehicleModel individual asserted with only a PowerTrain requirement, and nothing yet for Chassis/Body/Cabin/AdasSystem, would not be classified as FullySpecifiedVehicleModel). Not disjoint with the three powertrain-type classes above - a model is typically both, e.g. a fully specified model that also happens to require a hybrid powertrain."@en .
+
+
+###  https://example.org/ontology/vehicle/Hood
+veho:Hood rdf:type owl:Class ;
+          rdfs:subClassOf veho:BodyComponent ;
+          owl:disjointWith veho:Mirror ,
+                           veho:Trunk ,
+                           veho:Windshield ;
+          rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+          skos:definition "The hinged panel covering a vehicle's front-mounted engine or storage compartment."@en ;
+          skos:prefLabel "Hood"@en ;
+          skos:scopeNote "Cf. VSS Vehicle.Body.Hood."@en .
+
+
+###  https://example.org/ontology/vehicle/HvacSystem
+veho:HvacSystem rdf:type owl:Class ;
+                rdfs:subClassOf veho:CabinComponent ;
+                owl:disjointWith veho:InfotainmentSystem ,
+                                 veho:Seat ,
+                                 veho:Sunroof ;
+                rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                skos:definition "The heating, ventilation, and air-conditioning system of a vehicle's cabin."@en ;
+                skos:prefLabel "HVAC System"@en ;
+                skos:scopeNote "Cf. VSS Vehicle.Cabin.HVAC.Row1.Left."@en .
+
+
+###  https://example.org/ontology/vehicle/HybridPowerTrain
+veho:HybridPowerTrain rdf:type owl:Class ;
+                      rdfs:subClassOf veho:PowerTrain ;
+                      owl:disjointWith veho:InternalCombustionPowerTrain ;
+                      rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                      skos:definition "A powertrain combining an internal-combustion engine with one or more electric motors."@en ;
+                      skos:prefLabel "Hybrid Power Train"@en .
+
+
+###  https://example.org/ontology/vehicle/HybridVehicleModel
+veho:HybridVehicleModel rdf:type owl:Class ;
+                        owl:equivalentClass [ owl:intersectionOf ( veho:VehicleModel
+                                                                   [ rdf:type owl:Restriction ;
+                                                                     owl:onProperty gist:requires ;
+                                                                     owl:someValuesFrom veho:HybridPowerTrain
+                                                                   ]
+                                                                 ) ;
+                                              rdf:type owl:Class
+                                            ] ;
+                        owl:disjointWith veho:InternalCombustionVehicleModel ;
+                        rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                        skos:definition "A vehicle model specification that requires a hybrid powertrain."@en ;
+                        skos:prefLabel "Hybrid Vehicle Model"@en .
+
+
+###  https://example.org/ontology/vehicle/InfotainmentSystem
+veho:InfotainmentSystem rdf:type owl:Class ;
+                        rdfs:subClassOf veho:CabinComponent ;
+                        owl:disjointWith veho:Seat ,
+                                         veho:Sunroof ;
+                        rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                        skos:definition "The in-cabin system providing media, navigation, and connectivity features."@en ;
+                        skos:prefLabel "Infotainment System"@en ;
+                        skos:scopeNote "Cf. VSS Vehicle.Cabin.Infotainment.Navigation. This is also the natural home for the 'navigation system' feature referenced in commerce-oriented ontologies such as the Used Cars Ontology and Car Option Ontology, reused here via gist:isCategorizedBy some veho:VehicleFeature rather than a bespoke sales-ontology class."@en .
+
+
+###  https://example.org/ontology/vehicle/InternalCombustionPowerTrain
+veho:InternalCombustionPowerTrain rdf:type owl:Class ;
+                                  rdfs:subClassOf veho:PowerTrain ;
+                                  rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                                  skos:definition "A powertrain driven solely by an internal-combustion engine."@en ;
+                                  skos:prefLabel "Internal Combustion Power Train"@en .
+
+
+###  https://example.org/ontology/vehicle/InternalCombustionVehicleModel
+veho:InternalCombustionVehicleModel rdf:type owl:Class ;
+                                    owl:equivalentClass [ owl:intersectionOf ( veho:VehicleModel
+                                                                               [ rdf:type owl:Restriction ;
+                                                                                 owl:onProperty gist:requires ;
+                                                                                 owl:someValuesFrom veho:InternalCombustionPowerTrain
+                                                                               ]
+                                                                             ) ;
+                                                          rdf:type owl:Class
+                                                        ] ;
+                                    rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                                    skos:definition "A vehicle model specification that requires an internal-combustion-only powertrain."@en ;
+                                    skos:prefLabel "Internal Combustion Vehicle Model"@en ;
+                                    skos:scopeNote "These three subclasses are safe as equivalentClass definitions for the same reason veho:VehiclePrototype/veho:ProductionVehicle were fixed to be safe earlier in this ontology's development: their distinguishing fillers (HybridPowerTrain, ElectricPowerTrain, InternalCombustionPowerTrain) are themselves pairwise disjoint, so a VehicleModel cannot satisfy more than one of these three definitions at once, and the owl:disjointWith declarations above are therefore provable, not just asserted."@en .
+
+
+###  https://example.org/ontology/vehicle/LaneKeepingAssistModule
+veho:LaneKeepingAssistModule rdf:type owl:Class ;
+                             rdfs:subClassOf veho:AdasComponent ;
+                             rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                             skos:definition "The module that detects lane markings and helps keep a vehicle within its lane."@en ;
+                             skos:prefLabel "Lane Keeping Assist Module"@en ;
+                             skos:scopeNote "Cf. VSS Vehicle.ADAS.LaneDepartureDetection."@en .
+
+
+###  https://example.org/ontology/vehicle/LifecycleStage
+veho:LifecycleStage rdf:type owl:Class ;
+                    rdfs:subClassOf gist:Category ;
+                    rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                    skos:definition "A category indicating a vehicle's position in its development and production lifecycle."@en ;
+                    skos:example "Prototype, pre-production, production, end-of-life."@en ;
+                    skos:prefLabel "Lifecycle Stage"@en ;
+                    skos:scopeNote "Instances of this category must, per gist:Category's own definition, be related to an allocating Organization or Person via gist:isAllocatedBy. This class is intentionally left as a non-disjoint umbrella; its two subclasses below carry the disjointness that VehiclePrototype and ProductionVehicle depend on."@en .
+
+
+###  https://example.org/ontology/vehicle/Market
+veho:Market rdf:type owl:Class ;
+            rdfs:subClassOf gist:GeoRegion ;
+            rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+            skos:definition "A geographic region in which a vehicle model is offered for sale, homologated, or regulated."@en ;
+            skos:example "North America, the European Union, Japan."@en ;
+            skos:prefLabel "Market"@en ;
+            skos:scopeNote "Modeled as a gist:GeoRegion rather than a gist:Category because automotive markets are, in practice, defined by geographic and regulatory boundaries rather than by an informal business taxonomy. gist:GeoRegion is disjoint with gist:Organization, so a Market can never also be typed as a Dealer, Manufacturer, or Plant. Per gist:GeoRegion's own equivalentClass definition, every Market is also expected to carry an area gist:Magnitude - see the example data for a fully compliant instance."@en .
+
+
+###  https://example.org/ontology/vehicle/MechanicalFailureAccident
+veho:MechanicalFailureAccident rdf:type owl:Class ;
+                               owl:equivalentClass [ owl:intersectionOf ( veho:AccidentEvent
+                                                                          [ rdf:type owl:Restriction ;
+                                                                            owl:onProperty gist:isTriggeredBy ;
+                                                                            owl:someValuesFrom veho:MechanicalFailureEvent
+                                                                          ]
+                                                                        ) ;
+                                                     rdf:type owl:Class
+                                                   ] ;
+                               rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                               skos:definition "An accident event whose contingent cause was a mechanical failure, as opposed to driver error, weather, or another vehicle."@en ;
+                               skos:prefLabel "Mechanical Failure Accident"@en ;
+                               skos:scopeNote "gist:isTriggeredBy ('relates a contingency ... to the event that gives rise to it') is gist's own causal-contingency property, already used elsewhere in gist for contingent obligations; reused here for accident causation rather than introducing a bespoke 'hasCause' property. Safe to make equivalentClass: no other class here matches 'AccidentEvent that isTriggeredBy some MechanicalFailureEvent', so this correctly auto-classifies only accidents with an asserted mechanical-failure trigger, leaving accidents triggered by other causes (or with no recorded cause) untouched."@en .
+
+
+###  https://example.org/ontology/vehicle/MechanicalFailureEvent
+veho:MechanicalFailureEvent rdf:type owl:Class ;
+                            rdfs:subClassOf gist:Event ;
+                            rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                            skos:definition "An event in which a vehicle component fails to perform its intended function."@en ;
+                            skos:example "A brake failure, a tire blowout, a steering system malfunction."@en ;
+                            skos:prefLabel "Mechanical Failure Event"@en .
+
+
+###  https://example.org/ontology/vehicle/Mirror
+veho:Mirror rdf:type owl:Class ;
+            rdfs:subClassOf veho:BodyComponent ;
+            owl:disjointWith veho:Trunk ,
+                             veho:Windshield ;
+            rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+            skos:definition "A mirror mounted on a vehicle's exterior body for driver visibility."@en ;
+            skos:prefLabel "Mirror"@en ;
+            skos:scopeNote "Cf. VSS Vehicle.Body.Mirrors.Left."@en .
+
+
+###  https://example.org/ontology/vehicle/PowerTrain
+veho:PowerTrain rdf:type owl:Class ;
+                rdfs:subClassOf veho:VehicleSystem ;
+                rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                skos:definition "The system of components that generates power and delivers it to a vehicle's wheels."@en ;
+                skos:example "An internal-combustion engine and transmission; a battery and electric motor."@en ;
+                skos:prefLabel "Power Train"@en ;
+                skos:scopeNote "Corresponds to the VSS Vehicle.Powertrain branch. Disjoint with its four sibling systems (Chassis, Body, Cabin, AdasSystem), mirroring the fact that VSS's branches partition the vehicle tree."@en .
+
+
+###  https://example.org/ontology/vehicle/PowerTrainComponent
+veho:PowerTrainComponent rdf:type owl:Class ;
+                         rdfs:subClassOf veho:VehicleComponent ,
+                                         [ rdf:type owl:Restriction ;
+                                           owl:onProperty gist:isPartOf ;
+                                           owl:someValuesFrom veho:PowerTrain
+                                         ] ;
+                         rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                         skos:definition "A component that is inherently part of a powertrain."@en ;
+                         skos:prefLabel "Power Train Component"@en ;
+                         skos:scopeNote "This is an abstract class, following the same pattern gist itself uses for gist:Component: it is not directly instantiated. Subclasses such as Engine, Transmission, Battery, and ElectricMotor are meaningful within this domain. Kept pairwise disjoint with the other four *Component classes so a single part cannot be simultaneously classified under two different vehicle systems."@en .
+
+
+###  https://example.org/ontology/vehicle/ProductionAllocation
+veho:ProductionAllocation rdf:type owl:Class ;
+                          rdfs:subClassOf gist:Assignment ;
+                          rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                          skos:definition "An assignment of a vehicle model to an assembly plant for production, together with the market(s) that plant's output will supply."@en ;
+                          skos:example "The 2023 Ford Explorer is assigned to the Oakville Assembly Complex to supply the North American market."@en ;
+                          skos:prefLabel "Production Allocation"@en ;
+                          skos:scopeNote "Because gist:isAssignmentOf and gist:isAssignmentTo are not themselves subproperties of gist:hasParticipant, an instance of this class must also carry at least two hasParticipant-subproperty assertions (such as gist:hasGiver and veho:hasMarket) to satisfy the minimum-two-participant restriction inherited from gist:TemporalRelation."@en .
+
+
+###  https://example.org/ontology/vehicle/ProductionLifecycleStage
+veho:ProductionLifecycleStage rdf:type owl:Class ;
+                              rdfs:subClassOf veho:LifecycleStage ;
+                              owl:disjointWith veho:PrototypeLifecycleStage ;
+                              rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                              skos:definition "A lifecycle stage covering a vehicle from full production onward: production or end-of-life."@en ;
+                              skos:example "Production, end-of-life."@en ;
+                              skos:prefLabel "Production Lifecycle Stage"@en .
+
+
+###  https://example.org/ontology/vehicle/ProductionVehicle
+veho:ProductionVehicle rdf:type owl:Class ;
+                       owl:equivalentClass [ owl:intersectionOf ( veho:Vehicle
+                                                                  [ rdf:type owl:Restriction ;
+                                                                    owl:onProperty gist:conformsTo ;
+                                                                    owl:someValuesFrom veho:VehicleModel
+                                                                  ]
+                                                                  [ rdf:type owl:Restriction ;
+                                                                    owl:onProperty gist:isCategorizedBy ;
+                                                                    owl:someValuesFrom veho:ProductionLifecycleStage
+                                                                  ]
+                                                                ) ;
+                                             rdf:type owl:Class
+                                           ] ;
+                       owl:disjointWith veho:VehiclePrototype ;
+                       rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                       skos:definition "A vehicle manufactured for sale or use, as opposed to a prototype built for testing."@en ;
+                       skos:prefLabel "Production Vehicle"@en .
+
+
+###  https://example.org/ontology/vehicle/PrototypeLifecycleStage
+veho:PrototypeLifecycleStage rdf:type owl:Class ;
+                             rdfs:subClassOf veho:LifecycleStage ;
+                             rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                             skos:definition "A lifecycle stage covering a vehicle's development prior to full production: prototype or pre-production."@en ;
+                             skos:example "Prototype, pre-production."@en ;
+                             skos:prefLabel "Prototype Lifecycle Stage"@en .
+
+
+###  https://example.org/ontology/vehicle/RegulatedMarket
+veho:RegulatedMarket rdf:type owl:Class ;
+                     owl:equivalentClass [ owl:intersectionOf ( veho:Market
+                                                                [ rdf:type owl:Restriction ;
+                                                                  owl:onProperty gist:isUnderJurisdictionOf ;
+                                                                  owl:someValuesFrom gist:GovernmentOrganization
+                                                                ]
+                                                              ) ;
+                                           rdf:type owl:Class
+                                         ] ;
+                     rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                     skos:definition "A market whose vehicle sales are subject to a specific government authority's regulations (e.g. emissions, safety, homologation)."@en ;
+                     skos:example "The North American market, regulated in part by the US National Highway Traffic Safety Administration."@en ;
+                     skos:prefLabel "Regulated Market"@en ;
+                     skos:scopeNote "Safe to make equivalentClass: no other class here matches 'Market that isUnderJurisdictionOf some GovernmentOrganization'."@en .
+
+
+###  https://example.org/ontology/vehicle/Seat
+veho:Seat rdf:type owl:Class ;
+          rdfs:subClassOf veho:CabinComponent ;
+          owl:disjointWith veho:Sunroof ;
+          rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+          skos:definition "A seat within a vehicle's cabin."@en ;
+          skos:prefLabel "Seat"@en ;
+          skos:scopeNote "Cf. VSS Vehicle.Cabin.Seat.Row1.Pos1. Material or trim variants (e.g. leather seating, as modeled by ontologies such as the Car Option Ontology) are represented here via gist:isCategorizedBy some veho:VehicleFeature rather than as separate subclasses, to avoid multiplying classes for every trim combination."@en .
+
+
+###  https://example.org/ontology/vehicle/Sensor
+veho:Sensor rdf:type owl:Class ;
+            rdfs:subClassOf gist:Component ,
+                            gist:Equipment ,
+                            [ rdf:type owl:Restriction ;
+                              owl:onProperty gist:isPartOf ;
+                              owl:someValuesFrom veho:Vehicle
+                            ] ;
+            rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+            skos:definition "A device fitted to a vehicle that measures a physical quantity and produces a signal reading."@en ;
+            skos:example "A GPS receiver, a fuel-level sensor, a wheel-speed sensor."@en ;
+            skos:prefLabel "Sensor"@en .
+
+
+###  https://example.org/ontology/vehicle/SteeringSystem
+veho:SteeringSystem rdf:type owl:Class ;
+                    rdfs:subClassOf veho:ChassisComponent ;
+                    owl:disjointWith veho:Suspension ,
+                                     veho:Wheel ;
+                    rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                    skos:definition "The component that allows a driver or automated system to control the vehicle's direction."@en ;
+                    skos:prefLabel "Steering System"@en ;
+                    skos:scopeNote "Cf. VSS Vehicle.Chassis.SteeringWheel and Vehicle.Chassis.Axle.Row1.SteeringAngle."@en .
+
+
+###  https://example.org/ontology/vehicle/Subsidiary
+veho:Subsidiary rdf:type owl:Class ;
+                owl:equivalentClass [ owl:intersectionOf ( gist:Organization
+                                                           [ rdf:type owl:Restriction ;
+                                                             owl:onProperty gist:isMemberOf ;
+                                                             owl:someValuesFrom veho:VehicleManufacturer
+                                                           ]
+                                                         ) ;
+                                      rdf:type owl:Class
+                                    ] ;
+                rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                skos:definition "An organization that is a member of (owned or controlled by) a vehicle manufacturer."@en ;
+                skos:example "An assembly plant that is part of a manufacturer's corporate group."@en ;
+                skos:prefLabel "Subsidiary"@en ;
+                skos:scopeNote "Uses gist:isMemberOf, whose range includes gist:Organization, rather than gist:owns; isMemberOf better captures corporate-group membership (which may or may not entail direct ownership), while gist:owns is used elsewhere in this ontology (see the example data) for the more specific relationship of a person or organization owning a particular vehicle. Safe to make equivalentClass: no other class here matches 'Organization that isMemberOf some VehicleManufacturer'."@en .
+
+
+###  https://example.org/ontology/vehicle/Sunroof
+veho:Sunroof rdf:type owl:Class ;
+             rdfs:subClassOf veho:CabinComponent ;
+             rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+             skos:definition "A panel in a vehicle's roof that can be opened to admit light or air."@en ;
+             skos:prefLabel "Sunroof"@en ;
+             skos:scopeNote "Cf. VSS Vehicle.Cabin.Sunroof. Frequently listed as an optional feature in sales-oriented ontologies (e.g. the Car Option Ontology); the option/package aspect is represented via gist:isCategorizedBy some veho:VehicleFeature rather than a separate class, so 'has a sunroof' and 'sunroof is part of the standard/optional package' can both be expressed without conflating the physical part with its sales categorization."@en .
+
+
+###  https://example.org/ontology/vehicle/Suspension
+veho:Suspension rdf:type owl:Class ;
+                rdfs:subClassOf veho:ChassisComponent ;
+                owl:disjointWith veho:Wheel ;
+                rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                skos:definition "The system of components connecting a vehicle's body to its wheels, absorbing shocks from the road."@en ;
+                skos:prefLabel "Suspension"@en ;
+                skos:scopeNote "Cf. VSS Vehicle.Chassis.Axle.Row1.Wheel.Left.Suspension."@en .
+
+
+###  https://example.org/ontology/vehicle/TelemetryEvent
+veho:TelemetryEvent rdf:type owl:Class ;
+                    rdfs:subClassOf gist:PhysicalEvent ,
+                                    [ rdf:type owl:Restriction ;
+                                      owl:onProperty gist:hasMagnitude ;
+                                      owl:someValuesFrom gist:Magnitude
+                                    ] ,
+                                    [ rdf:type owl:Restriction ;
+                                      owl:onProperty gist:hasParticipant ;
+                                      owl:someValuesFrom veho:Vehicle
+                                    ] ;
+                    owl:disjointWith veho:TrafficEvent ;
+                    rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                    skos:definition "An event in which a sensor on a vehicle produces a reading of some measurable aspect at a point in time and place."@en ;
+                    skos:example "A GPS sensor recording vehicle speed of 97.5 km/h at a given location and time."@en ;
+                    skos:prefLabel "Telemetry Event"@en ;
+                    skos:scopeNote "This replaces the separate ObservableSignal / ActuatableSignal class hierarchy used in ontologies such as VSSo (the Vehicle Signal Specification Ontology) with gist's generic Magnitude and Aspect pattern: the reading itself is a gist:Magnitude whose gist:hasAspect identifies which signal it is (e.g. vehicle speed, fuel level). Kept as a primitive class (subClassOf, not equivalentClass): 'PhysicalEvent and hasParticipant some Vehicle and hasMagnitude some Magnitude' is also true of veho:AccidentEvent (which has both a vehicle participant and an injury-count Magnitude), so treating that intersection as sufficient would incorrectly classify accidents as telemetry events too. Disjoint with veho:TrafficEvent to keep the two event families from overlapping."@en .
+
+
+###  https://example.org/ontology/vehicle/TrafficEvent
+veho:TrafficEvent rdf:type owl:Class ;
+                  rdfs:subClassOf gist:PhysicalEvent ,
+                                  [ rdf:type owl:Restriction ;
+                                    owl:onProperty gist:hasParticipant ;
+                                    owl:someValuesFrom veho:Vehicle
+                                  ] ;
+                  rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                  skos:definition "A physical event involving one or more vehicles occurring at a location on a road network."@en ;
+                  skos:example "A lane change, a near-miss, a traffic stop."@en ;
+                  skos:prefLabel "Traffic Event"@en .
+
+
+###  https://example.org/ontology/vehicle/Transmission
+veho:Transmission rdf:type owl:Class ;
+                  rdfs:subClassOf veho:PowerTrainComponent ;
+                  rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                  skos:definition "A component that transmits power from an engine or motor to a vehicle's wheels, typically varying torque and speed."@en ;
+                  skos:prefLabel "Transmission"@en .
+
+
+###  https://example.org/ontology/vehicle/Trunk
+veho:Trunk rdf:type owl:Class ;
+           rdfs:subClassOf veho:BodyComponent ;
+           owl:disjointWith veho:Windshield ;
+           rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+           skos:definition "The enclosed storage compartment of a vehicle's body."@en ;
+           skos:prefLabel "Trunk"@en ;
+           skos:scopeNote "Cf. VSS Vehicle.Body.Trunk.Rear."@en .
+
+
+###  https://example.org/ontology/vehicle/Vehicle
+veho:Vehicle rdf:type owl:Class ;
+             owl:equivalentClass [ owl:intersectionOf ( gist:Equipment
+                                                        [ rdf:type owl:Restriction ;
+                                                          owl:onProperty gist:isCategorizedBy ;
+                                                          owl:someValuesFrom veho:VehicleType
+                                                        ]
+                                                      ) ;
+                                   rdf:type owl:Class
+                                 ] ;
+             rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+             skos:definition "A self-propelled piece of equipment designed to transport people or cargo on roads."@en ;
+             skos:example "A car, truck, bus, or motorcycle."@en ;
+             skos:prefLabel "Vehicle"@en ;
+             skos:scopeNote "Because gist:Equipment is equivalent to (gist:PhysicalIdentifiableItem and isCategorizedBy some gist:EquipmentType), and veho:VehicleType is a subclass of gist:EquipmentType, every veho:Vehicle is automatically inferred to be a gist:Equipment; the additional restriction here narrows the equipment type to vehicle types specifically."@en .
+
+
+###  https://example.org/ontology/vehicle/VehicleArchitecture
+veho:VehicleArchitecture rdf:type owl:Class ;
+                         rdfs:subClassOf gist:Category ;
+                         rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                         skos:definition "A category representing a shared engineering platform - the common body structure, powertrain layout, and electrical architecture - that a vehicle model's specification is built on."@en ;
+                         skos:example "Volkswagen Group's MEB electric-vehicle platform, shared across the ID.3, ID.4, and ID.Buzz series."@en ;
+                         skos:prefLabel "Vehicle Architecture"@en ;
+                         skos:scopeNote "Applied to veho:VehicleModel individuals via gist:isCategorizedBy, the same mechanism used for veho:VehicleSeries and veho:VehicleGeneration. Distinct from those two: a VehicleGeneration is scoped to a single nameplate (related to its VehicleSeries via gist:hasDirectBroader, per veho:VehicleGeneration's own scope note), whereas a VehicleArchitecture is frequently reused across unrelated nameplates, series, or even manufacturers under a shared platform program, so no hasBroader relationship to a single Series is assumed here. As with VehicleGeneration, finer platform variants (e.g. an updated 'MEB Evo' revision of a base 'MEB' platform) can be related using gist:hasDirectBroader without a bespoke property. Not disjoint with VehicleSeries, VehicleGeneration, or the other gist:Category subclasses in this ontology: a single VehicleModel is expected to carry isCategorizedBy assertions to a Series, a Generation, and an Architecture simultaneously, each capturing a different, independent grouping."@en .
+
+
+###  https://example.org/ontology/vehicle/VehicleComponent
+veho:VehicleComponent rdf:type owl:Class ;
+                      rdfs:subClassOf gist:Component ,
+                                      gist:Equipment ,
+                                      [ rdf:type owl:Restriction ;
+                                        owl:onProperty gist:isPartOf ;
+                                        owl:someValuesFrom veho:VehicleSystem
+                                      ] ;
+                      owl:disjointWith veho:VehicleSystem ;
+                      rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                      skos:definition "A part that is inherently part of one of a vehicle's systems."@en ;
+                      skos:example "An engine, a wheel, a seat, a door, a headlamp."@en ;
+                      skos:prefLabel "Vehicle Component"@en ;
+                      skos:scopeNote "Generalizes the leaf/near-leaf nodes of the VSS tree (e.g. Vehicle.Chassis.Axle.Row1.Wheel, Vehicle.Body.Hood, Vehicle.Cabin.Seat) as an abstract gist:Component. Left as a primitive class: 'Equipment and Component and isPartOf some VehicleSystem' is deliberately broad, since it must cover every kind of part across every system; the system-specific subclasses below (PowerTrainComponent, ChassisComponent, BodyComponent, CabinComponent, AdasComponent) narrow it further and are themselves kept pairwise disjoint."@en .
+
+
+###  https://example.org/ontology/vehicle/VehicleFeature
+veho:VehicleFeature rdf:type owl:Class ;
+                    rdfs:subClassOf gist:Category ;
+                    rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                    skos:definition "A category representing an optional or packaged feature that a vehicle or vehicle component may be marketed with."@en ;
+                    skos:example "Leather seating, panoramic sunroof package, navigation package."@en ;
+                    skos:prefLabel "Vehicle Feature"@en ;
+                    skos:scopeNote "Reuses gist:Category (with its required gist:isAllocatedBy) rather than introducing a parallel class hierarchy for sales options, replacing the role played by bespoke classes in the Car Option Ontology and Used Cars Ontology reviewed earlier. Applied to Vehicle or VehicleComponent individuals via gist:isCategorizedBy, alongside veho:VehicleType and veho:LifecycleStage."@en .
+
+
+###  https://example.org/ontology/vehicle/VehicleGeneration
+veho:VehicleGeneration rdf:type owl:Class ;
+                       rdfs:subClassOf gist:Category ;
+                       rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                       skos:definition "A category grouping the model years of a series that share a common platform or design generation."@en ;
+                       skos:example "The sixth-generation of Series X, spanning model years 2020-2025."@en ;
+                       skos:prefLabel "Vehicle Generation"@en ;
+                       skos:scopeNote "An earlier draft of this ontology speculated that a Series-to-Generation hierarchy would need an external vocabulary such as SKOS, since gist:Category itself has no built-in broader/narrower structure. On reviewing gist's full predicate list, that speculation turned out to be unnecessary: gist already provides generic gist:hasBroader and gist:hasDirectBroader object properties, usable on any resource, including Category individuals. A generation therefore relates to its series via gist:hasDirectBroader (this generation's broader category is the series), and a VehicleModel relates to its generation the same way it relates to a series - via gist:isCategorizedBy - since a generation is just a more specific Category than the series it narrows."@en .
+
+
+###  https://example.org/ontology/vehicle/VehicleManufacturer
+veho:VehicleManufacturer rdf:type owl:Class ;
+                         rdfs:subClassOf gist:Organization ;
+                         rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                         skos:definition "An organization that designs and/or manufactures vehicles."@en ;
+                         skos:example "Ford Motor Company, Mercedes-Benz AG, etc"@en ;
+                         skos:prefLabel "Vehicle Manufacturer"@en .
+
+
+###  https://example.org/ontology/vehicle/VehicleModel
+veho:VehicleModel rdf:type owl:Class ;
+                  rdfs:subClassOf gist:Specification ;
+                  rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                  skos:definition "The design intent for a particular vehicle model, at a specific model year: the set of characteristics and constraints that define what it means to be a conforming instance of that model."@en ;
+                  skos:example "The specification for the Manufacturer X series platform."@en ;
+                  skos:prefLabel "Vehicle Model"@en ;
+                  skos:scopeNote "Individual vehicles (including prototypes) relate to their model via gist:conformsTo, whose range includes gist:Intention (of which gist:Specification is a subclass). A VehicleModel represents one model year's specification, not the whole nameplate across years - see veho:VehicleSeries for how successive model years of the same nameplate are related. VehicleModel has no direct relationship to veho:VehicleSystem by default: a VehicleSystem individual (a PowerTrain, Chassis, etc.) relates only to the physical veho:Vehicle it is isPartOf, and that Vehicle relates to its VehicleModel via conformsTo - so a system's model is only reachable indirectly, through an actual built vehicle. That is backwards for describing what a specification calls for before any vehicle conforming to it exists. gist:requires ('the subject needs the object, or makes it necessary, mandatory, or compulsory') closes this gap directly: a VehicleModel can gist:requires a VehicleSystem individual (typically an exemplar/reference system, such as a prototype's powertrain) to state what kind of system any conforming vehicle must have. See veho:HybridVehicleModel, veho:ElectricVehicleModel, and veho:InternalCombustionVehicleModel below for equivalentClass definitions built on this."@en .
+
+
+###  https://example.org/ontology/vehicle/VehiclePrototype
+veho:VehiclePrototype rdf:type owl:Class ;
+                      owl:equivalentClass [ owl:intersectionOf ( veho:Vehicle
+                                                                 [ rdf:type owl:Restriction ;
+                                                                   owl:onProperty gist:conformsTo ;
+                                                                   owl:someValuesFrom veho:VehicleModel
+                                                                 ]
+                                                                 [ rdf:type owl:Restriction ;
+                                                                   owl:onProperty gist:isCategorizedBy ;
+                                                                   owl:someValuesFrom veho:PrototypeLifecycleStage
+                                                                 ]
+                                                               ) ;
+                                            rdf:type owl:Class
+                                          ] ;
+                      rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                      skos:definition "A physical vehicle built to validate or test a vehicle model prior to full production."@en ;
+                      skos:example "A pre-production test mule used for crash testing or durability testing."@en ;
+                      skos:prefLabel "Vehicle Prototype"@en ;
+                      skos:scopeNote "An earlier draft of this class used the generic veho:LifecycleStage as the filler for isCategorizedBy. That was a real modeling bug: because gist:Category's own instances are asserted, not structurally distinguished, a ProductionVehicle categorized by any LifecycleStage instance (e.g. a 'Production' stage) would have satisfied this equivalentClass definition too, and - combined with the owl:disjointWith below - made the ontology inconsistent as soon as both classes had instances. Narrowing the filler to veho:PrototypeLifecycleStage, and making that class disjoint with veho:ProductionLifecycleStage, fixes this: the two vehicle classes are now provably disjoint by construction rather than only by assertion."@en .
+
+
+###  https://example.org/ontology/vehicle/VehicleSaleOffer
+veho:VehicleSaleOffer rdf:type owl:Class ;
+                      owl:equivalentClass [ owl:intersectionOf ( gist:Offer
+                                                                 [ rdf:type owl:Restriction ;
+                                                                   owl:onProperty gist:offersToProvide ;
+                                                                   owl:someValuesFrom veho:Vehicle
+                                                                 ]
+                                                               ) ;
+                                            rdf:type owl:Class
+                                          ] ;
+                      rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                      skos:definition "An offer whose subject matter being provided is a vehicle, typically in exchange for a monetary amount."@en ;
+                      skos:example "A dealer's offer to sell a specific vehicle for $45,000."@en ;
+                      skos:prefLabel "Vehicle Sale Offer"@en ;
+                      skos:scopeNote "Reuses gist:Offer directly rather than introducing a new sales-agreement class hierarchy, replacing the bespoke sales ontologies (Vehicle Sales Ontology, Used Cars Ontology, Car Option Ontology) referenced by VSSo's own related work. Unlike PowerTrain or TelemetryEvent, this is safe to make equivalentClass (not just subClassOf): no other class in this ontology also matches 'Offer whose offersToProvide is a Vehicle', so there is no risk of an unrelated individual being wrongly auto-classified as a vehicle sale offer."@en .
+
+
+###  https://example.org/ontology/vehicle/VehicleSeries
+veho:VehicleSeries rdf:type owl:Class ;
+                   rdfs:subClassOf gist:Category ;
+                   rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                   skos:definition "A category grouping the successive model-year specifications that share a common nameplate or product line."@en ;
+                   skos:example "The Manufacturer X series, spanning many model years and generations."@en ;
+                   skos:prefLabel "Vehicle Series"@en ;
+                   skos:scopeNote "A vehicle series is not itself a Specification: it has no single set of characteristics that all its model years satisfy (a 1991 Explorer and a 2023 Explorer share little at the engineering-specification level). It is instead a gist:Category applied to veho:VehicleModel individuals via gist:isCategorizedBy, following gist:Category's own guidance to use Category rather than owl:Class for groupings whose internal structure is managed outside the ontology (here, by the manufacturer's product-naming decisions rather than by any formal criterion). Successive model-year VehicleModel individuals within the same series are ordered using gist:precedesDirectly (or its transitive superproperty gist:precedes for non-adjacent comparisons), which is exactly the generic ordering relation gist provides for this kind of succession - no new property was needed. A physical vehicle's series membership is available transitively via gist:conformsTo (Vehicle to VehicleModel) followed by gist:isCategorizedBy (VehicleModel to VehicleSeries); this ontology does not add a property-chain shortcut for that join, but one could be added as: veho:isOfSeries a owl:ObjectProperty ; owl:propertyChainAxiom (gist:conformsTo gist:isCategorizedBy) . See veho:VehicleGeneration for the finer-grained level between series and model year."@en .
+
+
+###  https://example.org/ontology/vehicle/VehicleSpecification
+veho:VehicleSpecification
+	a owl:Class ;
+	owl:equivalentClass [
+		a owl:Class ;
+		owl:intersectionOf (
+			gist:Specification
+			[
+				a owl:Restriction ;
+				owl:onProperty gist:isCategorizedBy ;
+				owl:someValuesFrom veho:VehicleType ;
+			]
+			[
+				a owl:Restriction ;
+				owl:onProperty gist:requires ;
+				owl:someValuesFrom [
+					a owl:Class ;
+					owl:intersectionOf (
+						veho:Vehicle
+						[
+							a owl:Restriction ;
+							owl:onProperty gist:hasMagnitude ;
+							owl:someValuesFrom gist:Magnitude ;
+						]
+					) ;
+				] ;
+			]
+		) ;
+	] ;
+	rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+	skos:definition "The design intent for a category of vehicle: the vehicle form (via VehicleType) it is built for, and a single exemplar vehicle required to carry at least one measurable physical or performance characteristic as a gist:Magnitude (e.g. curb weight, overall length, top speed, or range)."@en ;
+	skos:example "The specification sheet for Manufacturer X's mid-size SUV body style, listing curb weight, cargo volume, and top speed."@en ;
+	skos:prefLabel "Vehicle Specification"@en ;
+	skos:scopeNote "Mirrors the veho:BatterySpecification pattern one level up, at the whole-vehicle rather than the component level: gist:hasMagnitude is used generically here (rather than a bespoke subproperty like veho:hasPower) because a vehicle specification sheet typically covers many independent measurable characteristics - mass, dimensions, speed, range - each distinguished at the instance level by its gist:Magnitude's gist:hasAspect, rather than by a fixed set of named properties. Distinct from veho:VehicleModel: a VehicleModel is the full design intent for one nameplate at one model year, reached from a physical Vehicle via gist:conformsTo, and may gist:requires whole VehicleSystem individuals (see veho:VehicleModel's scope note); a VehicleSpecification instead characterizes a vehicle category (via VehicleType) purely in terms of measurable magnitudes, independent of any particular nameplate or model year, the way a published spec sheet or regulatory filing would. The two are not disjoint - a VehicleModel individual that also carries an isCategorizedBy VehicleType assertion and a requires restriction with a magnitude-bearing exemplar will legitimately satisfy both."@en ;
+	.
+
+
+###  https://example.org/ontology/vehicle/VehicleSystem
+veho:VehicleSystem rdf:type owl:Class ;
+                   rdfs:subClassOf gist:Component ,
+                                   gist:Composite ,
+                                   gist:Equipment ,
+                                   [ rdf:type owl:Restriction ;
+                                     owl:onProperty gist:isPartOf ;
+                                     owl:someValuesFrom veho:Vehicle
+                                   ] ;
+                   rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                   skos:definition "A major subsystem of a vehicle, itself made up of more granular components."@en ;
+                   skos:example "Powertrain, Chassis, Body, Cabin, Advanced Driver Assistance System."@en ;
+                   skos:prefLabel "Vehicle System"@en ;
+                   skos:scopeNote "Generalizes the top-level branches of the COVESA Vehicle Signal Specification (VSS) tree - Vehicle.Powertrain, Vehicle.Chassis, Vehicle.Body, Vehicle.Cabin, Vehicle.ADAS - as an abstract gist-based class. Modeled as both gist:Component (part of the vehicle) and gist:Composite (made up of its own parts), matching the reasoning already given for PowerTrain. Kept as a primitive class (subClassOf, not equivalentClass) and disjoint with veho:VehicleComponent for the same reasons documented on PowerTrain/PowerTrainComponent below."@en .
+
+
+###  https://example.org/ontology/vehicle/VehicleTrim
+veho:VehicleTrim rdf:type owl:Class ;
+                 owl:equivalentClass [ owl:intersectionOf ( veho:VehicleModel
+                                                            [ rdf:type owl:Restriction ;
+                                                              owl:onProperty gist:isBasedOn ;
+                                                              owl:someValuesFrom veho:VehicleModel
+                                                            ]
+                                                          ) ;
+                                       rdf:type owl:Class
+                                     ] ;
+                 rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                 skos:definition "A vehicle model specification derived from, and sharing most characteristics with, a base model specification, typically adding or substituting a defined set of features."@en ;
+                 skos:example "The 'X Limited' trim specification is based on the base 'X' specification for the same model year."@en ;
+                 skos:prefLabel "Vehicle Trim"@en ;
+                 skos:scopeNote "Uses gist:isBasedOn ('a foundation for, a starting point for') rather than gist:precedes/precedesDirectly, which are for temporal succession (one model year following another), not derivation within the same model year. Safe to make equivalentClass: no other class in this ontology matches 'VehicleModel that isBasedOn some VehicleModel'."@en .
+
+
+###  https://example.org/ontology/vehicle/VehicleType
+veho:VehicleType rdf:type owl:Class ;
+                 rdfs:subClassOf gist:EquipmentType ;
+                 rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                 skos:definition "A category of vehicle equipment, such as by body style or class."@en ;
+                 skos:example "Sedan, SUV, pickup truck, hatchback."@en ;
+                 skos:prefLabel "Vehicle Type"@en .
+
+
+###  https://example.org/ontology/vehicle/Wheel
+veho:Wheel rdf:type owl:Class ;
+           rdfs:subClassOf veho:ChassisComponent ;
+           rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+           skos:definition "A wheel and tire assembly on which the vehicle rolls."@en ;
+           skos:prefLabel "Wheel"@en ;
+           skos:scopeNote "Cf. VSS Vehicle.Chassis.Axle.Row1.Wheel.Left, etc."@en .
+
+
+###  https://example.org/ontology/vehicle/Windshield
+veho:Windshield rdf:type owl:Class ;
+                rdfs:subClassOf veho:BodyComponent ;
+                rdfs:isDefinedBy <https://example.org/ontology/vehicle> ;
+                skos:definition "The front (or rear) glass panel of a vehicle."@en ;
+                skos:prefLabel "Windshield"@en ;
+                skos:scopeNote "Cf. VSS Vehicle.Body.Windshield.Front."@en .
+
+
+#################################################################
+#    Individuals
+#################################################################
+
+###  https://example.org/id/vehicle/_Aspect_power
+vehd:_Aspect_power rdf:type owl:NamedIndividual ,
+                            gist:Aspect ;
+                   skos:definition "The rate of doing work." ;
+                   skos:prefLabel "power"@en .
+
+
+###  https://example.org/id/vehicle/_Magnitude_Power_90
+vehd:_Magnitude_Power_90 rdf:type owl:NamedIndividual ,
+                                  gist:Magnitude ;
+                         gist:hasAspect vehd:_Aspect_power ;
+                         gist:numericValue 90 .
+
+
+###  https://example.org/id/vehicle/_Magnitude_Power_95
+vehd:_Magnitude_Power_95 rdf:type owl:NamedIndividual ,
+                                  gist:Magnitude ;
+                         gist:hasAspect vehd:_Aspect_power ;
+                         gist:numericValue 95 .
+
+
+###  https://example.org/vocab/vehicle/pBEV95__90_0_
+vehx:pBEV95__90_0_ rdf:type owl:NamedIndividual ,
+                            skos:Concept ,
+                            veho:BatteryType ;
+                   veho:hasPower vehd:_Magnitude_Power_95 ;
+                   veho:hasUsablePower vehd:_Magnitude_Power_90 ;
+                   skos:prefLabel "pBEV95 (90.0)"@en .
+
+
+###  Generated by the OWL API (version 4.5.29.2024-05-13T12:11:03Z) https://github.com/owlcs/owlapi

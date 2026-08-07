@@ -1,0 +1,23 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX oq: <https://semantechs.co.uk/ontology-quality/>
+
+# STY-001: Class local name not UpperCamelCase
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Warning ;
+    sh:focusNode ?c ;
+    sh:sourceConstraintComponent oq:STY-001 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  ?c a owl:Class .
+  FILTER(isIRI(?c))
+  BIND(REPLACE(STR(?c), "^.*[#/]", "") AS ?local)
+  FILTER(!REGEX(?local, "^[A-Z][A-Za-z0-9]*$"))
+  BIND(CONCAT("Class local name '", ?local, "' does not follow UpperCamelCase (PascalCase) naming style.") AS ?msg)
+}

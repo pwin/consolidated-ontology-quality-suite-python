@@ -1,0 +1,23 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX oq: <https://semantechs.co.uk/ontology-quality/>
+
+# LOG-001: Class disjoint with its own ancestor
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Violation ;
+    sh:focusNode ?c ;
+    sh:value ?anc ;
+    sh:sourceConstraintComponent oq:LOG-001 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  ?c rdfs:subClassOf+ ?anc .
+  ?c owl:disjointWith ?anc .
+  BIND(CONCAT("Class ", STR(?c), " is asserted disjoint with its own (transitive) superclass ",
+              STR(?anc), ", which makes ", STR(?c), " logically unsatisfiable.") AS ?msg)
+}

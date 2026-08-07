@@ -1,0 +1,11 @@
+PREFIX ex: <https://example.org/vehicle-demo/>
+PREFIX gist: <https://w3id.org/semanticarts/ns/ontology/gist/>
+
+# The fix for transform.rq's ex:Gasoline gap: ex:Petrol is the taxonomy
+# individual that actually exists in taxonomy.ttl.
+CONSTRUCT {
+  ?vehicle a ex:Vehicle ;
+    gist:isCategorizedBy ex:Petrol .
+} WHERE {
+  BIND(IRI(CONCAT("https://example.org/vehicle-demo/vehicle-", ?id)) AS ?vehicle)
+}

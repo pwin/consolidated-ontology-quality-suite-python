@@ -1,0 +1,76 @@
+@prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:     <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:     <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix ex:      <https://example.org/demo/> .
+
+# --- Ontology header: deliberately missing versionInfo/title -> QUA-002 ----
+ex:DemoOntology a owl:Ontology .
+
+# --- Well-formed class with label -----------------------------------------
+ex:Animal a owl:Class ;
+  rdfs:label "Animal"@en .
+
+ex:Mammal a owl:Class ;
+  rdfs:subClassOf ex:Animal ;
+  rdfs:label "Mammal"@en .
+
+# --- Class with no label -> QUA-001, and non-PascalCase name -> STY-001 ---
+ex:dog_breed a owl:Class ;
+  rdfs:subClassOf ex:Mammal .
+
+# --- Deep hierarchy chain (7 hops) -> EFF-001 ------------------------------
+ex:L1 a owl:Class ; rdfs:subClassOf ex:Animal .
+ex:L2 a owl:Class ; rdfs:subClassOf ex:L1 .
+ex:L3 a owl:Class ; rdfs:subClassOf ex:L2 .
+ex:L4 a owl:Class ; rdfs:subClassOf ex:L3 .
+ex:L5 a owl:Class ; rdfs:subClassOf ex:L4 .
+ex:L6 a owl:Class ; rdfs:subClassOf ex:L5 .
+ex:L7 a owl:Class ; rdfs:subClassOf ex:L6 .
+
+# --- Contradiction: disjoint with own ancestor -> LOG-001 ------------------
+ex:Reptile a owl:Class ;
+  rdfs:label "Reptile"@en ;
+  rdfs:subClassOf ex:Animal ;
+  owl:disjointWith ex:Animal .
+
+# --- Redundant equivalentClass + subClassOf -> LOG-003 ---------------------
+ex:Feline a owl:Class ;
+  rdfs:label "Feline"@en ;
+  rdfs:subClassOf ex:Mammal ;
+  owl:equivalentClass ex:Mammal .
+
+# --- Object property, well formed ------------------------------------------
+ex:hasOwner a owl:ObjectProperty ;
+  rdfs:label "has owner"@en ;
+  rdfs:domain ex:Animal ;
+  rdfs:range ex:Animal .
+
+# --- Object property missing domain/range -> STR-003, and label with no
+# language tag -> STY-003 ---------------------------------------------------
+ex:relatesTo a owl:ObjectProperty ;
+  rdfs:label "relates to" .
+
+# --- Property name not lowerCamelCase -> STY-002 ---------------------------
+ex:Has_Nickname a owl:DatatypeProperty ;
+  rdfs:label "has nickname"@en ;
+  rdfs:domain ex:Animal ;
+  rdfs:range xsd:string .
+
+# --- Functional property (violated in the data graph, see sample-data.ttl)
+ex:hasBirthDate a owl:DatatypeProperty, owl:FunctionalProperty ;
+  rdfs:label "has birth date"@en ;
+  rdfs:domain ex:Animal ;
+  rdfs:range xsd:date .
+
+# --- Deprecated term still used in data (see sample-data.ttl) -> QUA-003 ---
+ex:legacyStatus a owl:DatatypeProperty ;
+  rdfs:label "legacy status"@en ;
+  owl:deprecated true .
+
+# --- Declared so EFF-003 (fan-out) is isolated from STR-002 (undeclared) ---
+ex:hasTag a owl:DatatypeProperty ;
+  rdfs:label "has tag"@en ;
+  rdfs:domain ex:Animal ;
+  rdfs:range xsd:string .

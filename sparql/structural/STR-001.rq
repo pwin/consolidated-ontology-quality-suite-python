@@ -1,0 +1,44 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX oq: <https://semantechs.co.uk/ontology-quality/>
+
+# STR-001: Undefined class used as rdf:type
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Violation ;
+    sh:focusNode ?instance ;
+    sh:value ?class ;
+    sh:sourceConstraintComponent oq:STR-001 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  ?instance a ?class .
+  FILTER(isIRI(?class))
+  FILTER NOT EXISTS { ?class a owl:Class }
+  FILTER NOT EXISTS { ?class a rdfs:Class }
+  FILTER NOT EXISTS { ?class a owl:Restriction }
+  # The built-in RDF/RDFS/OWL2 vocabulary: legitimately used as an rdf:type
+  # value (most commonly on blank-node axioms -- every owl:Restriction-typed
+  # subclass-axiom blank node, every owl:AllDisjointClasses collection, etc.)
+  # without any graph ever asserting e.g. "owl:Restriction a owl:Class"
+  # itself -- that's assumed axiomatically from the OWL2 spec. Missing
+  # owl:Restriction here specifically was caught as a real bug: it flooded
+  # 149 false findings against a vehicle ontology importing gist 14.1.0,
+  # one per anonymous restriction.
+  FILTER(?class NOT IN (
+    owl:Thing, owl:Nothing, rdfs:Resource,
+    owl:Class, rdfs:Class, owl:Restriction, rdfs:Datatype,
+    owl:NamedIndividual, owl:Ontology,
+    owl:ObjectProperty, owl:DatatypeProperty, owl:AnnotationProperty, rdf:Property,
+    owl:FunctionalProperty, owl:InverseFunctionalProperty, owl:TransitiveProperty,
+    owl:SymmetricProperty, owl:AsymmetricProperty, owl:ReflexiveProperty, owl:IrreflexiveProperty,
+    owl:AllDisjointClasses, owl:AllDisjointProperties, owl:AllDifferent,
+    owl:NegativePropertyAssertion, owl:Axiom
+  ))
+  BIND(CONCAT("Instance ", STR(?instance), " is typed with ", STR(?class),
+              " which is never declared as a class in this graph.") AS ?msg)
+}

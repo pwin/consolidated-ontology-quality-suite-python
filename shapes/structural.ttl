@@ -1,0 +1,127 @@
+@prefix rdf:   <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:   <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:   <http://www.w3.org/2001/XMLSchema#> .
+@prefix sh:    <http://www.w3.org/ns/shacl#> .
+@prefix oq:    <https://semantechs.co.uk/ontology-quality/> .
+
+# ---------------------------------------------------------------------------
+# STR-001: Undefined class used as rdf:type
+# Graph-wide / referential-integrity check -> expressed with SHACL-SPARQL
+# (sh:sparql) so it shares the exact same WHERE-pattern logic as
+# sparql/structural/STR-001.rq, just wrapped in SELECT $this instead of
+# CONSTRUCT.
+# ---------------------------------------------------------------------------
+oq:STR-001
+  a sh:NodeShape ;
+  rdfs:label "STR-001: undefined class used as rdf:type" ;
+  sh:target [
+    a sh:SPARQLTarget ;
+    sh:select """
+      PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+      SELECT DISTINCT ?this WHERE { ?this a ?class . FILTER(isIRI(?class)) }
+    """ ;
+  ] ;
+  sh:sparql [
+    a sh:SPARQLConstraint ;
+    sh:severity sh:Violation ;
+    sh:message "{$this} is typed with a class that is never declared (owl:Class/rdfs:Class) in this graph." ;
+    sh:select """
+      PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+      PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+      PREFIX owl:  <http://www.w3.org/2002/07/owl#>
+      SELECT $this ?value
+      WHERE {
+        $this a ?value .
+        FILTER(isIRI(?value))
+        FILTER NOT EXISTS { ?value a owl:Class }
+        FILTER NOT EXISTS { ?value a rdfs:Class }
+        FILTER NOT EXISTS { ?value a owl:Restriction }
+        FILTER(?value NOT IN (
+          owl:Thing, owl:Nothing, rdfs:Resource,
+          owl:Class, rdfs:Class, owl:Restriction, rdfs:Datatype,
+          owl:NamedIndividual, owl:Ontology,
+          owl:ObjectProperty, owl:DatatypeProperty, owl:AnnotationProperty, rdf:Property,
+          owl:FunctionalProperty, owl:InverseFunctionalProperty, owl:TransitiveProperty,
+          owl:SymmetricProperty, owl:AsymmetricProperty, owl:ReflexiveProperty, owl:IrreflexiveProperty,
+          owl:AllDisjointClasses, owl:AllDisjointProperties, owl:AllDifferent,
+          owl:NegativePropertyAssertion, owl:Axiom
+        ))
+      }
+    """ ;
+  ] .
+
+# ---------------------------------------------------------------------------
+# STR-002: Undefined property used
+# ---------------------------------------------------------------------------
+oq:STR-002
+  a sh:NodeShape ;
+  rdfs:label "STR-002: undefined property used" ;
+  sh:target [
+    a sh:SPARQLTarget ;
+    sh:select """
+      SELECT DISTINCT ?this WHERE { ?this ?p ?o }
+    """ ;
+  ] ;
+  sh:sparql [
+    a sh:SPARQLConstraint ;
+    sh:severity sh:Violation ;
+    sh:message "A predicate used on {$this} is never declared as rdf:Property/owl:ObjectProperty/owl:DatatypeProperty/owl:AnnotationProperty." ;
+    sh:select """
+      PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+      PREFIX owl: <http://www.w3.org/2002/07/owl#>
+      SELECT $this ?path
+      WHERE {
+        $this ?path ?o .
+        FILTER(?path != rdf:type)
+        FILTER NOT EXISTS { ?path a rdf:Property }
+        FILTER NOT EXISTS { ?path a owl:ObjectProperty }
+        FILTER NOT EXISTS { ?path a owl:DatatypeProperty }
+        FILTER NOT EXISTS { ?path a owl:AnnotationProperty }
+        FILTER(!STRSTARTS(STR(?path), "http://www.w3.org/1999/02/22-rdf-syntax-ns#"))
+        FILTER(!STRSTARTS(STR(?path), "http://www.w3.org/2000/01/rdf-schema#"))
+        FILTER(!STRSTARTS(STR(?path), "http://www.w3.org/2002/07/owl#"))
+      }
+    """ ;
+  ] .
+
+# ---------------------------------------------------------------------------
+# STR-003: Property missing both domain and range
+# Originally native SHACL core (sh:or of two sh:property/minCount shapes),
+# switched to sh:sparql to also recognize gist:domainIncludes/rangeIncludes
+# (Semantic Arts' gist ontology deliberately avoids rdfs:domain/range on
+# most properties in favor of these annotation properties -- see
+# ontology_evaluation.py's own domainIncludes/rangeIncludes handling) as
+# equally satisfying "has a domain/range", matching the .rq twin
+# (sparql/structural/STR-003.rq). Without this, every gist-based ontology
+# floods this check with findings for properties that are, in fact,
+# constrained -- just not via rdfs:domain/range specifically. Caught
+# against a real vehicle ontology importing gist 14.1.0: 15 of 50 STR-003
+# findings were gist properties using domainIncludes/rangeIncludes.
+# ---------------------------------------------------------------------------
+oq:STR-003
+  a sh:NodeShape ;
+  rdfs:label "STR-003: property missing domain and range" ;
+  sh:target [
+    a sh:SPARQLTarget ;
+    sh:select """
+      PREFIX owl: <http://www.w3.org/2002/07/owl#>
+      SELECT DISTINCT ?this WHERE { { ?this a owl:ObjectProperty } UNION { ?this a owl:DatatypeProperty } }
+    """ ;
+  ] ;
+  sh:sparql [
+    a sh:SPARQLConstraint ;
+    sh:severity sh:Warning ;
+    sh:message "Property {$this} declares neither rdfs:domain/range nor gist-style domainIncludes/rangeIncludes annotations, weakening structural precision." ;
+    sh:select """
+      PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+      SELECT $this
+      WHERE {
+        FILTER NOT EXISTS { $this rdfs:domain ?d }
+        FILTER NOT EXISTS { $this rdfs:range ?r }
+        FILTER NOT EXISTS { $this ?dip [] . FILTER(STRENDS(STR(?dip), "domainIncludes")) }
+        FILTER NOT EXISTS { $this ?rip [] . FILTER(STRENDS(STR(?rip), "rangeIncludes")) }
+      }
+    """ ;
+  ] ;
+  oq:checkId "STR-003" .

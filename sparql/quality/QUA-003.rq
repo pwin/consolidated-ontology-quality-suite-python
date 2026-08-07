@@ -1,0 +1,23 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX oq: <https://semantechs.co.uk/ontology-quality/>
+
+# QUA-003: Deprecated term still in active use
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Warning ;
+    sh:focusNode ?s ;
+    sh:resultPath ?term ;
+    sh:sourceConstraintComponent oq:QUA-003 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  ?term owl:deprecated true .
+  { ?s ?term ?o2 } UNION { ?s a ?term }
+  BIND(CONCAT("Deprecated term ", STR(?term), " is still actively used on ", STR(?s),
+              "; deprecated terms should not appear in current data/ontology usage.") AS ?msg)
+}

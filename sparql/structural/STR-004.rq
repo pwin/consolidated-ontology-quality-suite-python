@@ -1,0 +1,32 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX oq: <https://semantechs.co.uk/ontology-quality/>
+
+# STR-004: Class has no formal definition
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Warning ;
+    sh:focusNode ?focus ;
+    sh:sourceConstraintComponent oq:STR-004 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  ?focus a owl:Class .
+  FILTER(!isBlank(?focus))
+  # External W3C vocabulary (e.g. skos:Concept) is legitimately defined by
+  # its own spec elsewhere, not in this graph -- same exemption STR-001/
+  # STR-002/DAT-002/QUA-004/STY-004 already apply.
+  FILTER(!STRSTARTS(STR(?focus), "http://www.w3.org/"))
+  FILTER NOT EXISTS { ?focus owl:equivalentClass ?x }
+  FILTER NOT EXISTS { ?focus owl:intersectionOf ?x }
+  FILTER NOT EXISTS { ?focus rdfs:subClassOf ?x }
+  FILTER NOT EXISTS { ?focus owl:unionOf ?x }
+  FILTER NOT EXISTS { ?focus owl:oneOf ?x }
+  FILTER NOT EXISTS { ?focus owl:disjointWith|^owl:disjointWith ?x }
+  BIND(CONCAT("Class ", STR(?focus), " has no formal definition (no owl:equivalentClass, ",
+              "owl:intersectionOf, rdfs:subClassOf, owl:unionOf, owl:oneOf or owl:disjointWith axiom).") AS ?msg)
+}

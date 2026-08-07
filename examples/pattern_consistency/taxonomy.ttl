@@ -1,0 +1,17 @@
+@prefix ex: <https://example.org/vehicle-demo/> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+# The controlled vocabulary of ex:FuelType values -- individuals of a
+# gist:Category subclass declared in ontology.ttl, per gist's
+# gist:isCategorizedBy pattern. This is a small, hand-authored stand-in
+# for what would normally be triplified from a data-steward-maintained
+# CSV of controlled terms (see docs/UPDATING.md SS2.2).
+
+ex:Petrol a ex:FuelType ;
+  skos:prefLabel "Petrol"@en .
+
+ex:Diesel a ex:FuelType ;
+  skos:prefLabel "Diesel"@en .
+
+ex:Electric a ex:FuelType ;
+  skos:prefLabel "Electric"@en .
