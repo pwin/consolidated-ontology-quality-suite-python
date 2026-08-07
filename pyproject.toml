@@ -3,6 +3,8 @@ name = "consolidated-ontology-suite-python"
 version = "0.1.0"
 description = "Assess OWL2 DL/RL/QL ontologies, TARQL/oxi-gen CONSTRUCT-query sketches, and the RDF data graphs they triplify -- structural, logical, documentation, efficiency, style, data quality, OWL2 profile membership, and reasoner-based consistency -- plus ontology-version and TARQL/ontology consistency checking with suggested repair diffs, locally or against a live Fuseki triplestore."
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
 dependencies = [
     "rdflib>=7.6.0",
