@@ -26,6 +26,8 @@ from . import config
 from .checks.merge import ResultRow, build_unified_results
 from .checks.registry import Registry
 from .checks.runner import load_graph
+from .checks.shacl_native_runner import run_shacl_native
+from .checks.shacl_native_runner import available as native_shacl_available
 from .checks.shacl_runner import load_shapes_graph, run_shacl
 from .checks.sparql_runner import run_sparql_checks
 from .dataquality import data_quality
@@ -58,7 +60,7 @@ def _capture_stdout(fn, *args, **kwargs) -> str:
     return buf.getvalue()
 
 
-ENGINE_CHOICES = ("both", "sparql", "shacl")
+ENGINE_CHOICES = ("both", "sparql", "shacl", "native", "native+sparql")
 
 
 def run_registry_suite_on_graph(
@@ -93,17 +95,40 @@ def run_registry_suite_on_graph(
       real ~3,300-triple ontology).
     - ``"shacl"`` -- pyshacl only, for symmetry/completeness; not
       recommended given the above (strictly slower, no broader coverage).
+    - ``"native"`` -- the native (Rust) SHACL engine only
+      (`checks/shacl_native_runner.py`), instead of pyshacl. Verified to
+      find the exact same findings pyshacl does on this suite's own shapes
+      (see `tests/test_shacl_native_runner.py`); requires the optional
+      `shacl` package (see that module's docstring -- not on PyPI yet).
+      `inference` is not supported by the native engine and must be
+      `"none"`.
+    - ``"native+sparql"`` -- the native engine *and* the portable SPARQL
+      layer, i.e. the fast analogue of `"both"`: the same cross-validation
+      drift-detection signal, without pyshacl's cost.
 
     If a future check is ever added in SHACL only (no `.rq` twin),
     ``"sparql"`` would silently miss it -- `tests/test_check_coverage.py`
     guards against that by asserting the SHACL-only set stays empty.
     """
-    shapes_graph = load_shapes_graph(shapes_dir) if engine in ("both", "shacl") else Graph()
+    uses_pyshacl = engine in ("both", "shacl")
+    uses_native = engine in ("native", "native+sparql")
+    shapes_graph = load_shapes_graph(shapes_dir) if (uses_pyshacl or uses_native) else Graph()
+
     shacl_results = Graph()
-    if engine in ("both", "shacl"):
+    if uses_pyshacl:
         _conforms, shacl_results, _text = run_shacl(working_graph, shapes_graph, inference=inference)
+    elif uses_native:
+        if not native_shacl_available():
+            raise RuntimeError(
+                f"--engine {engine} needs the optional `shacl` native engine package -- "
+                "see checks/shacl_native_runner.py's module docstring"
+            )
+        if inference != "none":
+            raise ValueError(f"--engine {engine} does not support --inference (got {inference!r})")
+        _conforms, shacl_results, _text = run_shacl_native(working_graph, shapes_graph)
+
     sparql_results = Graph()
-    if engine in ("both", "sparql"):
+    if engine in ("both", "sparql", "native+sparql"):
         sparql_results, _outcomes = run_sparql_checks(working_graph, sparql_dir)
     return build_unified_results(shacl_results, sparql_results, registry, shapes_graph)
 

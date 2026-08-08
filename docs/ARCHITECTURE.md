@@ -93,6 +93,23 @@ or running in CI where speed matters more than catching a SHACL/SPARQL
 formulation drifting apart from itself (a suite-maintenance concern, not
 something that affects a user's own ontology).
 
+There's a third option that gets both the speed *and* the drift-detection
+signal: `--engine native`/`--engine native+sparql`, which run the optional
+native (Rust) SHACL engine (`checks/shacl_native_runner.py`,
+https://github.com/pwin/SHACL_Engine) instead of pyshacl. Measured on the
+exact same ~3,300-triple fixture used above: **0.94s**, vs. pyshacl's
+~193s -- a ~211x speedup, with byte-for-byte identical findings (same 38
+`ResultRow`s, same check ids, zero discrepancies either direction; see
+`tests/test_shacl_native_runner.py`). `--engine native+sparql` is therefore
+strictly better than `--engine both` when the optional `shacl` package is
+available: same cross-validation value, at roughly `--engine sparql`
+speed. It isn't the default only because `shacl` isn't published to PyPI
+yet and isn't a hard dependency of this package -- see
+`shacl_native_runner.py`'s module docstring for how to install it, and for
+why its SHACL-core (non-SPARQL) findings need a `sh:message`-text fallback
+to resolve a check id (blank node identifiers don't survive the Rust/Python
+boundary the way pyshacl's own in-process ones do).
+
 ## Pipeline stages (`ontology_suite/pipeline.py`, driven by `cli.py`)
 
 1. **`ontology`** -- the ontology as authored: `ontology_evaluation.py`'s
