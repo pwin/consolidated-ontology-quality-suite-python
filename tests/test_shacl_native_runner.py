@@ -6,6 +6,7 @@ for how to get it -- not on PyPI yet).
 import rdflib
 import pytest
 
+from ontology_suite import config
 from ontology_suite.checks import shacl_native_runner as native_runner
 from ontology_suite.checks.merge import build_unified_results
 from ontology_suite.checks.registry import Registry
@@ -18,12 +19,12 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.fixture(scope="module")
 def shapes() -> rdflib.Graph:
-    return load_shapes_graph("shapes")
+    return load_shapes_graph(config.DEFAULT_SHAPES_DIR)
 
 
 @pytest.fixture(scope="module")
 def registry() -> Registry:
-    return Registry.load("registry.json")
+    return Registry.load(config.DEFAULT_REGISTRY_PATH)
 
 
 @pytest.fixture

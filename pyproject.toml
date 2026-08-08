@@ -3,9 +3,22 @@ name = "consolidated-ontology-suite-python"
 version = "0.1.0"
 description = "Assess OWL2 DL/RL/QL ontologies, TARQL/oxi-gen CONSTRUCT-query sketches, and the RDF data graphs they triplify -- structural, logical, documentation, efficiency, style, data quality, OWL2 profile membership, and reasoner-based consistency -- plus ontology-version and TARQL/ontology consistency checking with suggested repair diffs, locally or against a live Fuseki triplestore."
 readme = "README.md"
-license = "MIT"
-license-files = ["LICENSE"]
+license = "MIT OR Apache-2.0"
+license-files = ["LICENSE-MIT", "LICENSE-APACHE"]
 requires-python = ">=3.11"
+authors = [{ name = "pwin", email = "pw@inbox.lv" }]
+keywords = ["rdf", "owl", "shacl", "sparql", "ontology", "tarql", "semantic-web", "linked-data"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Quality Assurance",
+]
 dependencies = [
     "rdflib>=7.6.0",
     "pyshacl>=0.25.0",
@@ -15,6 +28,10 @@ dependencies = [
     "owlrl>=6.0.2",
     "owlready2>=0.51",
 ]
+
+[project.urls]
+Repository = "https://github.com/pwin/consolidated-ontology-quality-suite-python"
+Issues = "https://github.com/pwin/consolidated-ontology-quality-suite-python/issues"
 
 [project.optional-dependencies]
 reasoner = [

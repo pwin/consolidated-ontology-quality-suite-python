@@ -10,6 +10,7 @@ from typing import List, Optional
 
 from rdflib import Graph
 
+from .. import config
 from .merge import ResultRow, build_unified_results
 from .registry import Registry
 from .shacl_runner import load_shapes_graph, run_shacl
@@ -44,9 +45,9 @@ def load_graph(*paths: str | Path) -> Graph:
 def run_suite(
     data_path: str | Path,
     ontology_path: Optional[str | Path] = None,
-    shapes_dir: str | Path = "shapes",
-    sparql_dir: str | Path = "sparql",
-    registry_path: str | Path = "registry.json",
+    shapes_dir: str | Path = config.DEFAULT_SHAPES_DIR,
+    sparql_dir: str | Path = config.DEFAULT_SPARQL_DIR,
+    registry_path: str | Path = config.DEFAULT_REGISTRY_PATH,
     inference: str = "none",
 ) -> SuiteRun:
     """Run the full suite and return a unified, deduplicated result set.

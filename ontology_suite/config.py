@@ -2,6 +2,15 @@
 checks live relative to this package, and where to find the sibling tools
 this suite shells out to or points users at (``oxi-gen``, and the companion
 ``turtle-editor-viewer``) rather than vendoring.
+
+The registry/shapes/sparql/templates/repairs resources are bundled *inside*
+the ``ontology_suite`` package itself (``ontology_suite/resources/``), not
+alongside it at the repo root -- they're load-bearing at runtime for
+`checks`/`run`/`docgen`/repair-suggestion functionality, so they need to
+actually ship with an installed wheel (``pip install .``, ``pip install
+git+...``, or a future PyPI release), not just exist in a git checkout.
+``examples/`` stays at the repo root: it's a dev/test convenience only,
+nothing in the installed package depends on it existing at runtime.
 """
 from __future__ import annotations
 
@@ -11,13 +20,14 @@ from pathlib import Path
 from typing import Optional
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+PACKAGE_RESOURCES = Path(__file__).resolve().parent / "resources"
 
-DEFAULT_SHAPES_DIR = REPO_ROOT / "shapes"
-DEFAULT_SPARQL_DIR = REPO_ROOT / "sparql"
-DEFAULT_REGISTRY_PATH = REPO_ROOT / "registry.json"
+DEFAULT_SHAPES_DIR = PACKAGE_RESOURCES / "shapes"
+DEFAULT_SPARQL_DIR = PACKAGE_RESOURCES / "sparql"
+DEFAULT_REGISTRY_PATH = PACKAGE_RESOURCES / "registry.json"
 DEFAULT_EXAMPLES_DIR = REPO_ROOT / "examples"
-DEFAULT_DOCGEN_TEMPLATE = REPO_ROOT / "templates" / "documentation-template.html"
-DEFAULT_REPAIRS_DIR = REPO_ROOT / "resources" / "repairs"
+DEFAULT_DOCGEN_TEMPLATE = PACKAGE_RESOURCES / "templates" / "documentation-template.html"
+DEFAULT_REPAIRS_DIR = PACKAGE_RESOURCES / "repairs"
 
 # oxi-gen is referenced as a sibling repo (same parent directory as this
 # one), not vendored -- see docs/ARCHITECTURE.md.
