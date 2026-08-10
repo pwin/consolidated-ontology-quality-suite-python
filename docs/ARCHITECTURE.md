@@ -161,6 +161,43 @@ A real user ran `ontology-suite run --ontology ... --import-dir ...
 the flags never reached the stage producing most of the findings. Fixed by
 centralizing import resolution in one helper every stage calls.
 
+### Loading files: local, http(s), and gzip (`io_utils.py`)
+
+Every loader in this suite -- `--ontology`, `--data`, `--old`/`--new` (
+`consistency`/`version-diff`), `tarql_sources`/`ontology_paths` (
+`sketch.prefix_alignment`, the `repair`/`consistency` modules), folders
+resolved by `dataquality.data_quality.resolve_input_paths` -- accepts a
+local file path, an http(s) URL, or either gzip-compressed, via the shared
+helpers in `io_utils.py`. Two real gaps that module exists to close, found
+by testing actual behavior rather than assuming it:
+
+1. `pathlib.Path("https://example.org/foo.ttl")` collapses the `//` into a
+   single `/` on Windows (`WindowsPath('https:/example.org/foo.ttl')`),
+   silently turning a valid URL into a nonexistent local path.
+   `checks/runner.py::load_graph` (the `checks` stage's `--data` loader)
+   had exactly this bug -- `ontology-suite checks --data <url>` failed
+   outright. `io_utils` never wraps a source in `Path` before checking
+   whether it's a URL.
+2. `rdflib.Graph.parse()` does not sniff for gzip -- handing it
+   gzip-compressed bytes raises `UnicodeDecodeError`. `io_utils` checks
+   every read for the gzip magic bytes (not just a `.gz` suffix, so a
+   server-side `Content-Encoding: gzip` response under a plain `.ttl` URL
+   is also caught) and transparently decompresses.
+
+**`allow_network`'s asymmetry is deliberate, not a bug.** A source the
+caller names *explicitly* -- `--ontology <url>`, an entry in
+`tarql_sources`/`ontology_paths` -- is something the user already consented
+to by typing it, so it's allowed by default, with no flag needed. A source
+*discovered* while parsing other content is not something the user directly
+asked for; the only case in this suite is an `owl:imports` target found
+inside an ontology file, and that stays gated behind `--allow-network`
+exactly as before -- `ontology_evaluation.resolve_imports` is the only
+caller that ever passes `allow_network=False` to `io_utils`. Repair
+suggestions (`repair/tarql_repair.py`) are the one deliberate exception:
+they write a patch back to the file they read, so they read with a plain
+`Path(...).read_text()`, not `io_utils` -- a URL source there would have
+nothing sensible to write the fix back to.
+
 ## The reasoning layer
 
 - **`reasoning/profile.py`** -- a heuristic, syntactic OWL2 EL/QL/RL

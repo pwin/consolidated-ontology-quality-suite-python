@@ -33,6 +33,11 @@ things that didn't exist in Python before:
   should see, or three-way check a live triplified named graph against its
   ontology graph *and* its local TARQL source file.
 
+Every `--ontology`/`--data`/query-source argument throughout accepts a
+local file, an http(s) URL, or either gzip-compressed, transparently (see
+`ontology_suite/io_utils.py` and `docs/ARCHITECTURE.md`'s "Loading files"
+section).
+
 See `docs/CONSISTENCY_AND_REPAIR.md` for the local-file workflow,
 `docs/FUSEKI.md` for the live-triplestore one, `docs/ARCHITECTURE.md` for
 the inherited pipeline this all sits on top of, and

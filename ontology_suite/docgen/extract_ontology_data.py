@@ -64,6 +64,7 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from .. import io_utils
 from .turtle_parser import parse_turtle, IRI, BNode, Literal, Collection, RDF_TYPE
 
 
@@ -578,7 +579,9 @@ def count_individuals_per_class(instances_graph, ns_to_prefix):
 # ---------------------------------------------------------------------------
 
 def read_normalized(path):
-    return Path(path).read_text(encoding="utf-8").replace("\r\n", "\n").replace("\r", "\n")
+    """Reads `path` (a local file, an http(s) URL, or either gzip-compressed
+    -- see `io_utils`) with line endings normalized to `\\n`."""
+    return io_utils.read_text(path).replace("\r\n", "\n").replace("\r", "\n")
 
 
 def build_ns_maps(prefixes):

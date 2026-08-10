@@ -135,7 +135,11 @@ def suggest_rename_fixes(
 
     suggestions: List[RepairSuggestion] = []
     for path in pa._expand_paths(tarql_paths, pa.DEFAULT_QUERY_GLOBS):
-        text = path.read_text(encoding="utf-8")
+        # deliberately local-only (Path(...), not io_utils.read_text): this
+        # suggestion writes a patch back to `path` via `target_file`, so a
+        # URL source (which _expand_paths would otherwise happily fetch)
+        # wouldn't be something we could ever write the fix back to.
+        text = Path(path).read_text(encoding="utf-8")
         prefixes = extract_prefixes(text)
         new_text = text
         applied: List[TermRename] = []

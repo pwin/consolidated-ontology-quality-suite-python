@@ -31,6 +31,7 @@ from typing import Dict, Iterable, List
 
 import rdflib
 
+from .. import io_utils
 from ..dataquality import data_quality
 from . import graph_quality, tarql_visualiser
 from .tarql_visualiser import DEFAULT_QUERY_GLOBS, extract_prefixes
@@ -39,31 +40,13 @@ DEFAULT_IGNORED_PREFIXES = frozenset({"rdf", "rdfs", "owl", "xsd", "xml"})
 DEFAULT_ONTOLOGY_GLOBS = "*.ttl,*.owl,*.rdf,*.xml,*.n3,*.nt"
 
 
-def _guess_format(path: Path) -> str:
-    return {
-        ".ttl": "turtle", ".turtle": "turtle", ".n3": "n3",
-        ".nt": "nt", ".rdf": "xml", ".owl": "xml", ".xml": "xml",
-        ".jsonld": "json-ld",
-    }.get(path.suffix.lower(), "turtle")
-
-
-def _expand_paths(sources: Iterable[str | Path], patterns: str) -> List[Path]:
-    """Flatten a mix of file paths and folders into an order-preserving,
-    deduplicated file list; folders are globbed with `patterns` (a
-    comma-separated list, same convention as tarql_visualiser's own)."""
-    seen = set()
-    ordered: List[Path] = []
-    for src in sources:
-        src = Path(src)
-        candidates = (
-            sorted(p for pattern in patterns.split(",") for p in src.glob(pattern.strip()))
-            if src.is_dir() else [src]
-        )
-        for p in candidates:
-            if p not in seen:
-                seen.add(p)
-                ordered.append(p)
-    return ordered
+def _expand_paths(sources: Iterable[str | Path], patterns: str) -> List[str]:
+    """Flatten a mix of file paths, folders, and http(s) URLs into an
+    order-preserving, deduplicated source list (folders globbed with
+    `patterns`, a comma-separated list, same convention as
+    tarql_visualiser's own -- see `io_utils.expand_sources`, which this
+    delegates to)."""
+    return io_utils.expand_sources(sources, patterns)
 
 
 @dataclass
@@ -83,7 +66,7 @@ def load_ontology_namespaces(ontology_paths: Iterable[str | Path]) -> OntologyNa
     by_namespace: Dict[str, Dict[str, str]] = {}
     for path in _expand_paths(ontology_paths, DEFAULT_ONTOLOGY_GLOBS):
         graph = rdflib.Graph(bind_namespaces="none")
-        graph.parse(str(path), format=_guess_format(path))
+        io_utils.parse_graph(graph, path)
         for prefix, namespace in graph.namespaces():
             if not prefix:
                 continue  # the bare default `:` prefix isn't comparable across files
@@ -136,7 +119,7 @@ def check_tarql_ontology_prefix_alignment(
     findings: List[PrefixMisalignment] = []
 
     for path in _expand_paths(tarql_sources, query_pattern):
-        text = path.read_text(encoding="utf-8")
+        text = io_utils.read_text(path)
         for prefix, iri in extract_prefixes(text).items():
             if prefix in ignore:
                 continue
@@ -184,7 +167,7 @@ def load_merged_ontology_graph(ontology_paths: Iterable[str | Path]) -> rdflib.G
     main ontology plus each import, explicitly)."""
     merged = rdflib.Graph(bind_namespaces="none")
     for path in _expand_paths(ontology_paths, DEFAULT_ONTOLOGY_GLOBS):
-        merged.parse(str(path), format=_guess_format(path))
+        io_utils.parse_graph(merged, path)
     return merged
 
 

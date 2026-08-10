@@ -100,6 +100,8 @@ from rdflib import OWL, RDF, RDFS, XSD
 from rdflib.namespace import DCTERMS, SKOS
 from rdflib.term import BNode, Literal, URIRef
 
+from .. import io_utils
+
 ANNOTATION_PREDICATES = {RDFS.label, RDFS.comment, SKOS.definition, DCTERMS.description}
 PROPERTY_TYPES = {OWL.ObjectProperty, OWL.DatatypeProperty, OWL.AnnotationProperty, RDF.Property}
 PROPERTY_CHARACTERISTICS = [
@@ -132,18 +134,16 @@ def local_name(uri):
     return text
 
 
-def _guess_format(path):
-    ext = os.path.splitext(path)[1].lower()
-    return {
-        ".ttl": "turtle", ".turtle": "turtle",
-        ".owl": "xml", ".rdf": "xml", ".xml": "xml",
-        ".nt": "nt", ".n3": "n3", ".jsonld": "json-ld",
-    }.get(ext, "turtle")
-
-
-def _parse_file(path):
+def _parse_file(path, *, allow_network: bool = True):
+    """Parses `path` -- a local file, an http(s) URL, or either
+    gzip-compressed -- into a fresh graph. `allow_network` defaults to
+    True here: a path the caller named explicitly (the main `--ontology`
+    argument, or a `--import-dir` candidate) is something the user already
+    consented to by naming it; only `owl:imports` targets *discovered*
+    while resolving imports are gated behind `--allow-network` (see
+    `resolve_imports`, and `io_utils`'s own module docstring)."""
     graph = rdflib.Graph(bind_namespaces="none")
-    graph.parse(path, format=_guess_format(path))
+    io_utils.parse_graph(graph, path, allow_network=allow_network)
     return graph
 
 

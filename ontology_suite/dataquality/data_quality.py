@@ -100,12 +100,19 @@ META_TYPES = {
 
 
 def resolve_input_paths(inputs, patterns=DEFAULT_DATA_GLOBS):
-    """Expand a mix of file and folder inputs into a sorted list of turtle file paths."""
+    """Expand a mix of file, folder, and http(s) URL inputs into a sorted
+    list of turtle file paths/URLs. A folder is also searched for each
+    pattern's gzip-compressed form (`*.ttl.gz` alongside `*.ttl`), so a
+    folder of gzip-compressed data files is discovered too -- `load_data_graph`
+    (via `io_utils`) decompresses them transparently once loaded."""
+    pattern_list = [p.strip() for p in patterns.split(",")]
+    pattern_list += [p + ".gz" for p in pattern_list]
+
     paths = set()
     for item in inputs:
         if os.path.isdir(item):
-            for pattern in patterns.split(","):
-                paths.update(glob.glob(os.path.join(item, pattern.strip())))
+            for pattern in pattern_list:
+                paths.update(glob.glob(os.path.join(item, pattern)))
         else:
             paths.add(item)
     if not paths:

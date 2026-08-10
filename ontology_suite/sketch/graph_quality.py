@@ -26,6 +26,7 @@ import rdflib
 from rdflib import RDF
 from rdflib.term import Literal, URIRef
 
+from .. import io_utils
 from .tarql_visualiser import (
     DEFAULT_BASE,
     DEFAULT_NAMESPACE_CONFLICT_PREDICATE,
@@ -97,7 +98,7 @@ def load_data_graph(path, ignored_predicates=None):
     # `@prefix schema: <http://schema.org/>` - keep only what the file declares.
     ignored = {URIRef(p) for p in (ignored_predicates or default_ignored_predicates())}
     full_graph = rdflib.Graph(bind_namespaces="none")
-    full_graph.parse(path, format="turtle")
+    io_utils.parse_graph(full_graph, path, format="turtle")
 
     data_graph = rdflib.Graph(bind_namespaces="none")
     for prefix, namespace in full_graph.namespaces():

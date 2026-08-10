@@ -16,6 +16,8 @@ import re
 import sys
 from dataclasses import dataclass
 
+from .. import io_utils
+
 PREFIX_LINE_PATTERN = re.compile(r"^\s*PREFIX\s+(\w*):\s*<([^>]*)>", re.IGNORECASE | re.MULTILINE)
 CONSTRUCT_KEYWORD_PATTERN = re.compile(r"\bCONSTRUCT\b", re.IGNORECASE)
 VARIABLE_PATTERN = re.compile(r"\?(\w+)")
@@ -94,9 +96,10 @@ def variables_to_entities(construct_text):
 
 
 def parse_query(path):
-    """Read one query file and pull out its prefixes and turtle-ified CONSTRUCT triples."""
-    with open(path, "r", encoding="utf-8") as f:
-        text = f.read()
+    """Read one query file (a local path, an http(s) URL, or either
+    gzip-compressed) and pull out its prefixes and turtle-ified CONSTRUCT
+    triples."""
+    text = io_utils.read_text(path)
     prefixes = extract_prefixes(text)
     blocks = extract_construct_blocks(text)
     triples = "\n".join(variables_to_entities(block).strip() for block in blocks if block.strip())

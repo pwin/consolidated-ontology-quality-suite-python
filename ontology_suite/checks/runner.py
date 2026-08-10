@@ -10,7 +10,7 @@ from typing import List, Optional
 
 from rdflib import Graph
 
-from .. import config
+from .. import config, io_utils
 from .merge import ResultRow, build_unified_results
 from .registry import Registry
 from .shacl_runner import load_shapes_graph, run_shacl
@@ -28,17 +28,11 @@ class SuiteRun:
 
 
 def load_graph(*paths: str | Path) -> Graph:
+    """Loads and merges one or more local files, http(s) URLs, or
+    gzip-compressed either (see `io_utils`'s own module docstring)."""
     g = Graph()
     for p in paths:
-        p = Path(p)
-        fmt = "turtle"
-        if p.suffix in (".nt",):
-            fmt = "nt"
-        elif p.suffix in (".jsonld",):
-            fmt = "json-ld"
-        elif p.suffix in (".rdf", ".xml", ".owl"):
-            fmt = "xml"
-        g.parse(p, format=fmt)
+        io_utils.parse_graph(g, p)
     return g
 
 
