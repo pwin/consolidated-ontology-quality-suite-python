@@ -32,6 +32,23 @@ user directly asked for, so `ontology_evaluation.resolve_imports` passes
 ``allow_network=False`` unless ``--allow-network`` was explicitly given.
 Both paths go through this module's `allow_network` parameter; only the
 caller's choice of what to pass differs.
+
+Two more edge cases fixed after comparing this module against the sibling
+``New_SHACL_Engine`` project's own (Rust, `ureq`-based) URL loader, which
+handles both more carefully:
+
+- **Query strings and fragments were not stripped before guessing a URL's
+  format** -- ``guess_format("https://ex.org/d.owl?v=2")`` returned
+  ``"turtle"`` (silently wrong) instead of ``"xml"``, since
+  ``os.path.splitext`` saw the extension as ``.owl?v=2``, not ``.owl``.
+- **Fetches were unbounded.** `urllib`'s reader has no size limit of its
+  own -- a malicious or merely huge URL could exhaust memory before
+  `read_bytes` ever returns. `FETCH_LIMIT` below matches the Rust project's
+  own reasoned constant (1 GiB: comfortably past any real ontology/data
+  file, and refusing early is kinder than an out-of-memory kill partway
+  through); checked against a `Content-Length` header first where present,
+  and against the actual bytes read either way, so a response that lies
+  about -- or omits -- its own length is still caught.
 """
 from __future__ import annotations
 
@@ -52,6 +69,7 @@ _EXTENSION_FORMATS = {
     ".jsonld": "json-ld",
 }
 _GZIP_MAGIC = b"\x1f\x8b"
+FETCH_LIMIT = 1 << 30  # 1 GiB
 
 
 def is_url(source: str | Path) -> bool:
@@ -61,20 +79,27 @@ def is_url(source: str | Path) -> bool:
 def guess_format(source: str | Path) -> str:
     """RDF serialization format from `source`'s file extension -- a plain
     string operation (`os.path.splitext`, not `Path.suffix`) so it works
-    identically on a URL or a local path. A trailing `.gz` is stripped
-    first, so `foo.ttl.gz` still guesses `turtle`, not `foo.ttl.gz`'s own
-    (unrecognized) extension."""
+    identically on a URL or a local path. A URL's query string/fragment is
+    stripped first (`d.owl?v=2` and `d.owl#frag` both guess `xml`, not the
+    `turtle` default `.owl?v=2` would otherwise fall through to), then a
+    trailing `.gz`, so `foo.ttl.gz` still guesses `turtle`, not `foo.ttl.gz`'s
+    own (unrecognized) extension."""
     path = str(source)
+    if is_url(path):
+        path = urlparse(path).path
     if path.lower().endswith(".gz"):
         path = path[:-3]
     ext = os.path.splitext(path)[1].lower()
     return _EXTENSION_FORMATS.get(ext, "turtle")
 
 
-def read_bytes(source: str | Path, *, allow_network: bool = True) -> bytes:
+def read_bytes(source: str | Path, *, allow_network: bool = True, limit: int = FETCH_LIMIT) -> bytes:
     """Reads `source` (a local path or an http(s) URL) fully into memory,
     transparently gzip-decompressing if the content is gzip (sniffed from
     its magic bytes, regardless of a `.gz` suffix -- see module docstring).
+    A URL response over `limit` bytes is refused -- checked against
+    `Content-Length` first where the server sends one, and against the
+    actual bytes read either way (see module docstring).
     """
     if is_url(source):
         if not allow_network:
@@ -83,9 +108,14 @@ def read_bytes(source: str | Path, *, allow_network: bool = True) -> bytes:
             )
         try:
             with urllib.request.urlopen(str(source)) as response:  # noqa: S310 - user-provided http(s) URL, by design
-                raw = response.read()
+                declared = response.headers.get("Content-Length")
+                if declared is not None and int(declared) > limit:
+                    raise OSError(f"{source!r} declares {declared} bytes, over the {limit}-byte limit")
+                raw = response.read(limit + 1)
         except urllib.error.URLError as exc:
             raise OSError(f"could not fetch {source!r}: {exc}") from exc
+        if len(raw) > limit:
+            raise OSError(f"{source!r} is over the {limit}-byte fetch limit")
     else:
         with open(source, "rb") as f:
             raw = f.read()

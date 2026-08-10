@@ -49,6 +49,12 @@ def test_guess_format():
     assert io_utils.guess_format("foo.unknown") == "turtle"
 
 
+def test_guess_format_strips_query_string_and_fragment_from_urls():
+    assert io_utils.guess_format("https://ex.org/d.owl?v=2") == "xml"
+    assert io_utils.guess_format("https://ex.org/d.owl#frag") == "xml"
+    assert io_utils.guess_format("https://ex.org/d.nt.gz?dl=1") == "nt"
+
+
 # --- local files, plain and gzip ---------------------------------------------
 
 def test_read_bytes_local_plain(tmp_path):
@@ -92,6 +98,48 @@ def test_parse_graph_url(http_server, tmp_path):
     (tmp_path / "foo.ttl").write_bytes(TTL)
     g = io_utils.parse_graph(rdflib.Graph(), f"{http_server}/foo.ttl")
     assert len(g) == 1
+
+
+def test_read_bytes_url_over_limit_is_refused_via_content_length(http_server, tmp_path):
+    """A truthful, oversized Content-Length is rejected before the body is
+    even read -- SimpleHTTPRequestHandler always sends one for a static
+    file, so this exercises the early-rejection path."""
+    (tmp_path / "big.ttl").write_bytes(TTL * 1000)
+    with pytest.raises(OSError):
+        io_utils.read_bytes(f"{http_server}/big.ttl", limit=10)
+
+
+def test_read_bytes_url_under_limit_still_works(http_server, tmp_path):
+    (tmp_path / "small.ttl").write_bytes(TTL)
+    assert io_utils.read_bytes(f"{http_server}/small.ttl", limit=len(TTL)) == TTL
+
+
+def test_read_bytes_url_over_limit_is_refused_without_content_length():
+    """The early Content-Length check only catches a truthful header --
+    this exercises the second, streaming-read cap that catches a response
+    with no (or a lying) Content-Length."""
+    body = TTL * 1000
+
+    class NoLengthHandler(http.server.BaseHTTPRequestHandler):
+        def log_message(self, format: str, *args) -> None:
+            pass
+
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/turtle")
+            self.end_headers()  # deliberately no Content-Length
+            self.wfile.write(body)
+
+    server = http.server.HTTPServer(("127.0.0.1", 0), NoLengthHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        url = f"http://127.0.0.1:{server.server_address[1]}/big.ttl"
+        with pytest.raises(OSError):
+            io_utils.read_bytes(url, limit=10)
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
 
 
 def test_read_bytes_url_blocked_without_allow_network(http_server, tmp_path):
