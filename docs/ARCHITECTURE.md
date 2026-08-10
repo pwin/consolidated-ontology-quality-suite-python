@@ -97,10 +97,11 @@ There's a third option that gets both the speed *and* the drift-detection
 signal: `--engine native`/`--engine native+sparql`, which run the optional
 native (Rust) SHACL engine (`checks/shacl_native_runner.py`,
 https://github.com/pwin/SHACL_Engine) instead of pyshacl. Measured on the
-exact same ~3,300-triple fixture used above: **0.94s**, vs. pyshacl's
-~193s -- a ~211x speedup, with byte-for-byte identical findings (same 38
-`ResultRow`s, same check ids, zero discrepancies either direction; see
-`tests/test_shacl_native_runner.py`). `--engine native+sparql` is therefore
+exact same ~3,300-triple fixture used above, against `shacl` v0.1.3:
+**0.29s**, vs. pyshacl's ~193s -- a ~665x speedup, with byte-for-byte
+identical findings (same 38 `ResultRow`s, same check ids, zero
+discrepancies either direction; see `tests/test_shacl_native_runner.py`).
+`--engine native+sparql` is therefore
 strictly better than `--engine both` when the optional `shacl` package is
 available: same cross-validation value, at roughly `--engine sparql`
 speed. It isn't the default only because `shacl` isn't published to PyPI

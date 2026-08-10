@@ -5,45 +5,55 @@ own benchmarks: 58-104x on synthetic data against plain constraint
 components; this suite's own shapes lean heavily on SHACL-SPARQL, where the
 gap narrows since both engines then spend their time inside a query
 evaluator -- see docs/ARCHITECTURE.md's pyshacl-vs-portable-SPARQL note for
-the equivalent caveat). Verified to find the exact same 18 findings pyshacl
-does against ``examples/ontology/domain.ttl`` (see
-``tests/test_shacl_native_runner.py``).
+the equivalent caveat). Verified to find the exact same findings pyshacl
+does, both on ``examples/ontology/domain.ttl`` (18/18) and the
+~3,300-triple vehicle-ontology fixture (38/38) -- see
+``tests/test_shacl_native_runner.py``.
 
 ``shacl`` isn't published to PyPI yet: install a prebuilt wheel from a
 SHACL_Engine GitHub Release (matching your platform), or build one with
 ``maturin build --release`` in that repo's ``crates/shacl-python``, then
 ``uv pip install <the wheel>``. Not a hard dependency of this package --
 imported lazily here, same convention as ``shacl_runner.py``'s own pyshacl
-import.
+import. Requires ``shacl>=0.1.3``: earlier versions' bindings returned only
+a flat list of `Result` objects, not the real ``sh:ValidationReport`` graph
+this module now consumes directly (``Report.turtle``, added in that
+version) -- see git history for the previous, more manual approach this
+replaced.
 
 Blank-node sourceShape resolution
 ----------------------------------
-For a finding whose constraint is a SHACL-SPARQL constraint
-(``sh:sparql [...]``), both pyshacl and the native engine report
-``sh:sourceShape`` as the *enclosing named shape* (e.g. ``oq:EFF-001``) --
-matching SHACL-SPARQL's spec semantics, where the constraint is a property
-of the shape that declares it. No blank node is involved; `registry.py`'s
-existing ``resolve_check_id`` handles this unchanged.
+``Report.turtle`` is the real SHACL report graph the spec defines (the
+engine's own round-trip test -- serialise, reparse, compare -- makes this a
+much better bet than reconstructing the same triples by hand from the
+`Result` objects, which this module used to do). Parsing it straight into
+`results_graph` therefore gets every field `checks/merge.py::_extract_rows`
+looks for -- ``sh:resultSeverity``, ``sh:focusNode``, ``sh:resultPath``
+(including a complex path expression's own supporting triples, e.g.
+``sh:oneOrMorePath``, which the old hand-built version never emitted at
+all), ``sh:value``, ``sh:resultMessage``, ``sh:sourceConstraintComponent``,
+and ``sh:sourceShape`` -- for free, with no per-field reconstruction here.
 
-For a finding whose constraint is native SHACL core, nested in an anonymous
-PropertyShape (``sh:property [ sh:disjoint ... ]`` etc.), pyshacl reports
-``sh:sourceShape`` as *that* blank node, and ``resolve_check_id`` walks from
-it back up to the enclosing named/annotated shape -- which only works
-because pyshacl's blank node *is* the very same node already present in the
-``shapes_graph`` object being walked.
+The one thing parsing the report alone can't fix: for a finding whose
+constraint is native SHACL core, nested in an anonymous PropertyShape
+(``sh:property [ sh:disjoint ... ]`` etc.), the engine reports
+``sh:sourceShape`` as *that* blank node -- correct SHACL, but a blank node
+minted by the Rust engine's own independent parse of the shapes graph, which
+shares no identity with the ones rdflib mints parsing the *same* file here
+(blank node identifiers are never stable across independent parses -- the
+same fact ``versioning/diff.py``'s ``_named()`` docstring already documents,
+for the same underlying reason). `registry.py`'s ``resolve_check_id`` needs
+that node to actually be present in ``shapes_graph`` to walk from it, so
+this module re-resolves it by ``sh:message`` text instead: the engine
+returns each result's message *unsubstituted* (literally ``"{$this} is
+disjoint with..."``, not filled in), which is exactly the literal already
+sitting on that same blank/named node in ``shapes_graph`` -- used as an
+alternate key back to *that exact node object*.
 
-The native engine parses shapes independently (in Rust), so the blank node
-identifiers it reports share no identity with the ones rdflib mints parsing
-the *same* file here -- blank node identifiers are never stable across
-independent parses (the same fact ``versioning/diff.py``'s ``_named()``
-docstring already documents, for the same underlying reason). Re-resolving
-by identity is therefore impossible; this module resolves by ``sh:message``
-text instead: the native engine returns each result's message
-*unsubstituted* (literally ``"{$this} is disjoint with..."``, not filled
-in), which is exactly the literal already sitting on that same blank/named
-node in ``shapes_graph`` -- so it's used as an alternate key back to *that
-exact node object*, which ``registry.resolve_check_id`` can then walk from
-correctly, unmodified.
+(For a SHACL-SPARQL constraint -- ``sh:sparql [...]`` -- both pyshacl and
+the native engine report ``sh:sourceShape`` as the *enclosing named shape*
+already, e.g. ``oq:EFF-001``, matching SHACL-SPARQL's spec semantics; no
+blank node, no substitution needed.)
 
 This assumes each ``sh:message`` text in the shapes set is unique per check
 id (true for this suite's own ``shapes/*.ttl`` at the time of writing -- the
@@ -56,12 +66,11 @@ fix, not a new limitation this module introduces.
 """
 from __future__ import annotations
 
-from typing import Dict, Optional, Tuple
+from typing import Dict, Tuple
 
-from rdflib import BNode, Graph, Literal
+from rdflib import BNode, Graph
 from rdflib.namespace import Namespace
 from rdflib.term import Node
-from rdflib.util import from_n3
 
 try:
     import shacl as _native_shacl  # type: ignore[import-not-found]  # not a PyPI package; see module docstring
@@ -72,22 +81,10 @@ else:
     _IMPORT_ERROR = None
 
 SH = Namespace("http://www.w3.org/ns/shacl#")
-_SEVERITY_IRI = {"Violation": SH.Violation, "Warning": SH.Warning, "Info": SH.Info}
 
 
 def available() -> bool:
     return _native_shacl is not None
-
-
-def _parse_term(n3: str) -> Node:
-    """`from_n3` is typed `Optional[Union[Node, str]]` because it also
-    accepts a string `default` for unparseable input -- irrelevant here,
-    since every string this module feeds it comes straight from the native
-    engine's own N-Triples-syntax term serialization (see this module's
-    docstring), never from that fallback path."""
-    term = from_n3(n3)
-    assert isinstance(term, Node)
-    return term
 
 
 def _message_index(shapes_graph: Graph) -> Dict[str, Node]:
@@ -96,10 +93,19 @@ def _message_index(shapes_graph: Graph) -> Dict[str, Node]:
     return {str(message): node for node, message in shapes_graph.subject_objects(SH.message)}
 
 
-def _resolve_source_shape(result, message_index: Dict[str, Node]) -> Optional[Node]:
-    if result.source_shape and not result.source_shape.startswith("_:"):
-        return _parse_term(result.source_shape)  # already a real, directly-named shape IRI -- trust it
-    return message_index.get(result.message)  # blank node reported; resolve via message text instead
+def _resolve_blank_source_shapes(results_graph: Graph, message_index: Dict[str, Node]) -> None:
+    """Rewrites each result's `sh:sourceShape`, in place, from an
+    engine-local blank node to the corresponding real node in
+    `shapes_graph` (found via `sh:resultMessage`) -- see module docstring."""
+    for result_node in list(results_graph.subjects(SH.resultSeverity, None)):
+        source_shape = results_graph.value(result_node, SH.sourceShape)
+        if not isinstance(source_shape, BNode):
+            continue
+        message = results_graph.value(result_node, SH.resultMessage)
+        resolved = message_index.get(str(message)) if message is not None else None
+        if resolved is not None:
+            results_graph.remove((result_node, SH.sourceShape, source_shape))
+            results_graph.add((result_node, SH.sourceShape, resolved))
 
 
 def run_shacl_native(data_graph: Graph, shapes_graph: Graph) -> Tuple[bool, Graph, str]:
@@ -118,22 +124,9 @@ def run_shacl_native(data_graph: Graph, shapes_graph: Graph) -> Tuple[bool, Grap
     shapes = _native_shacl.Shapes.from_turtle(shapes_graph.serialize(format="turtle"))  # type: ignore[attr-defined]
     report = shapes.validate_turtle(data_graph.serialize(format="turtle"))
 
-    message_index = _message_index(shapes_graph)
     results_graph = Graph()
-    for i, result in enumerate(report.results):
-        node = BNode(f"native-result-{i}")
-        results_graph.add((node, SH.resultSeverity, _SEVERITY_IRI.get(result.severity, SH.Info)))
-        results_graph.add((node, SH.resultMessage, Literal(result.message)))
-        results_graph.add((node, SH.sourceConstraintComponent, SH[result.component]))
-        if result.focus_node:
-            results_graph.add((node, SH.focusNode, _parse_term(result.focus_node)))
-        if result.path:
-            results_graph.add((node, SH.resultPath, _parse_term(result.path)))
-        if result.value:
-            results_graph.add((node, SH.value, _parse_term(result.value)))
-        source_shape = _resolve_source_shape(result, message_index)
-        if source_shape is not None:
-            results_graph.add((node, SH.sourceShape, source_shape))
+    results_graph.parse(data=report.turtle, format="turtle")
+    _resolve_blank_source_shapes(results_graph, _message_index(shapes_graph))
 
     text = f"native SHACL engine: conforms={report.conforms}, {len(report.results)} result(s)"
     return report.conforms, results_graph, text
