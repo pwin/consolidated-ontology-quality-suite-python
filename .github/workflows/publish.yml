@@ -1,0 +1,42 @@
+name: Publish to PyPI
+
+# Runs on any pushed version tag (v0.2.0, v0.2.1, ...). Uses PyPI trusted
+# publishing (OIDC) -- see https://docs.pypi.org/trusted-publishers/ -- so no
+# API token is stored as a repo secret; the `pypi` environment below must be
+# registered as this project's trusted publisher on PyPI first
+# (project: ontology-quality-suite, owner: pwin, repo:
+# consolidated-ontology-quality-suite-python, workflow: publish.yml,
+# environment: pypi).
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write  # required for trusted publishing; no token/secret needed
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

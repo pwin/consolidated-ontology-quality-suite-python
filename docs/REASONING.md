@@ -28,7 +28,7 @@ syntactic** approximation, not a certified conformance checker:
 - **Off by default.** The CLI defaults `profiles` to `()` -- no profile is
   checked, and no `REA-010`/`011`/`012` findings appear at all, unless you
   explicitly opt in with `--profile EL` / `--profile QL` / `--profile RL`
-  (repeatable) on `ontology-suite ontology` or `ontology-suite run`. The
+  (repeatable) on `ontology-quality-suite ontology` or `ontology-quality-suite run`. The
   ontology is assumed to be full OWL2 DL by default -- the common case,
   needing no profile-violation noise; ask for a specific profile only when
   you actually care whether the ontology fits it (e.g. before feeding it to

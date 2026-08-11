@@ -1,7 +1,7 @@
 [project]
-name = "consolidated-ontology-suite-python"
-version = "0.2.0"
-description = "Assess OWL2 DL/RL/QL ontologies, TARQL/oxi-gen CONSTRUCT-query sketches, and the RDF data graphs they triplify -- structural, logical, documentation, efficiency, style, data quality, OWL2 profile membership, and reasoner-based consistency -- plus ontology-version and TARQL/ontology consistency checking with suggested repair diffs, locally or against a live Fuseki triplestore."
+name = "ontology-quality-suite"
+version = "0.2.1"
+description = "Ontology Quality Suite -- assess OWL2 DL/RL/QL ontologies, TARQL/oxi-gen CONSTRUCT-query sketches, and the RDF data graphs they triplify -- structural, logical, documentation, efficiency, style, data quality, OWL2 profile membership, and reasoner-based consistency -- plus ontology-version and TARQL/ontology consistency checking with suggested repair diffs, locally or against a live Fuseki triplestore."
 readme = "README.md"
 license = "MIT OR Apache-2.0"
 license-files = ["LICENSE-MIT", "LICENSE-APACHE"]
@@ -44,7 +44,7 @@ dev = [
 ]
 
 [project.scripts]
-ontology-suite = "ontology_suite.cli:main"
+ontology-quality-suite = "ontology_suite.cli:main"
 
 [build-system]
 requires = ["hatchling"]

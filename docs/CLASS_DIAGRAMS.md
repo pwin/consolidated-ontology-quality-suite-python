@@ -27,7 +27,7 @@ needed, just the flag.
 ## Running it
 
 ```
-ontology-suite docgen --ontology examples/ontology/domain.ttl --prefix ex --out-dir out/docgen
+ontology-quality-suite docgen --ontology examples/ontology/domain.ttl --prefix ex --out-dir out/docgen
 ```
 
 ```
@@ -46,7 +46,7 @@ for `ex:Mammal`. Open `ontology-documentation.html`: each class's card has
 a "Class diagram" panel showing the SVG inline, with links to the SVG/PNG/
 Turtle files alongside it.
 
-Flags (on both `ontology-suite docgen` and `ontology-suite run --docgen`):
+Flags (on both `ontology-quality-suite docgen` and `ontology-quality-suite run --docgen`):
 
 - `--no-class-diagrams` -- skip generation entirely (still just the
   HTML+JSON pair, same as before this feature existed).

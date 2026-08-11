@@ -29,15 +29,15 @@ Triplification needs a built `oxi-gen` binary: `cd ../oxi-gen && cargo build --r
 ## Quick start
 
 ```
-ontology-suite ontology  --ontology examples/ontology/domain.ttl
-ontology-suite checks    --ontology examples/ontology/domain.ttl --data examples/data/legacy-export.ttl
-ontology-suite sketch    --queries examples/queries --ontology examples/ontology/domain.ttl
-ontology-suite triplify  --csv-dir examples/csv --queries examples/queries --out-dir out/data
-ontology-suite data      examples/data/legacy-export.ttl out/data/*.ttl --ontology examples/ontology/domain.ttl
-ontology-suite docgen    --ontology examples/ontology/domain.ttl
-ontology-suite run       --ontology examples/ontology/domain.ttl --queries examples/queries \
+ontology-quality-suite ontology  --ontology examples/ontology/domain.ttl
+ontology-quality-suite checks    --ontology examples/ontology/domain.ttl --data examples/data/legacy-export.ttl
+ontology-quality-suite sketch    --queries examples/queries --ontology examples/ontology/domain.ttl
+ontology-quality-suite triplify  --csv-dir examples/csv --queries examples/queries --out-dir out/data
+ontology-quality-suite data      examples/data/legacy-export.ttl out/data/*.ttl --ontology examples/ontology/domain.ttl
+ontology-quality-suite docgen    --ontology examples/ontology/domain.ttl
+ontology-quality-suite run       --ontology examples/ontology/domain.ttl --queries examples/queries \
                          --csv-dir examples/csv --data examples/data/legacy-export.ttl --docgen
-ontology-suite version-diff examples/gist_versions_reference/gistCore14.0.0.ttl \
+ontology-quality-suite version-diff examples/gist_versions_reference/gistCore14.0.0.ttl \
                             examples/gist_versions_reference/gistCore14.1.0.ttl
 ```
 

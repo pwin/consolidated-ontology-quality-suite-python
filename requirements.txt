@@ -18,7 +18,7 @@ iniconfig==2.3.0
 kiwisolver==1.5.0
     # via matplotlib
 matplotlib==3.11.1
-    # via ontology-suite
+    # via ontology-quality-suite
 numpy==2.4.6 ; python_full_version < '3.12'
     # via
     #   contourpy
@@ -30,18 +30,18 @@ numpy==2.5.1 ; python_full_version >= '3.12'
     #   matplotlib
     #   pandas
 owlready2==0.51
-    # via ontology-suite
+    # via ontology-quality-suite
 owlrl==7.6.2
     # via
-    #   ontology-suite
+    #   ontology-quality-suite
     #   pyshacl
-packaging==26.2
+packaging==26.3
     # via
     #   matplotlib
     #   pyshacl
     #   pytest
 pandas==3.0.5
-    # via ontology-suite
+    # via ontology-quality-suite
 pillow==12.3.0
     # via matplotlib
 pluggy==1.6.0
@@ -54,8 +54,8 @@ pyparsing==3.3.2
     # via
     #   matplotlib
     #   rdflib
-pyshacl==0.40.0
-    # via ontology-suite
+pyshacl==0.40.1
+    # via ontology-quality-suite
 pytest==9.1.1
 python-dateutil==2.9.0.post0
     # via
@@ -63,13 +63,13 @@ python-dateutil==2.9.0.post0
     #   pandas
 rdflib==7.6.0
     # via
-    #   ontology-suite
+    #   ontology-quality-suite
     #   owlrl
     #   pyshacl
 six==1.17.0
     # via python-dateutil
 tabulate==0.10.0
-    # via ontology-suite
+    # via ontology-quality-suite
 tzdata==2026.3 ; sys_platform == 'emscripten' or sys_platform == 'win32'
     # via pandas
 wcwidth==0.8.2

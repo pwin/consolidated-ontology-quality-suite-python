@@ -2,16 +2,16 @@
 
 Subcommands mirror the pipeline stages in ``pipeline.py``:
 
-    ontology-suite ontology  --ontology domain.ttl
-    ontology-suite checks    --ontology domain.ttl [--data data.ttl]
-    ontology-suite sketch    --queries queries/ [--ontology domain.ttl]
-    ontology-suite triplify  --csv-dir csv/ --queries queries/
-    ontology-suite data      data.ttl [more.ttl ...] [--ontology domain.ttl]
-    ontology-suite docgen    --ontology domain.ttl [--instances data.ttl] [--ref imported.ttl ...]
-    ontology-suite run       whichever of --ontology/--queries/--csv-dir/--data apply
-    ontology-suite version-diff old.ttl new.ttl
-    ontology-suite consistency --new domain.ttl [--old domain-v1.ttl] [--queries queries/] [--apply-repairs]
-    ontology-suite consistency-remote --query-endpoint URL --manifest graphs.json [--update-endpoint URL]
+    ontology-quality-suite ontology            --ontology domain.ttl
+    ontology-quality-suite checks              --ontology domain.ttl [--data data.ttl]
+    ontology-quality-suite sketch              --queries queries/ [--ontology domain.ttl]
+    ontology-quality-suite triplify            --csv-dir csv/ --queries queries/
+    ontology-quality-suite data                data.ttl [more.ttl ...] [--ontology domain.ttl]
+    ontology-quality-suite docgen              --ontology domain.ttl [--instances data.ttl] [--ref imported.ttl ...]
+    ontology-quality-suite run                 whichever of --ontology/--queries/--csv-dir/--data apply
+    ontology-quality-suite version-diff        old.ttl new.ttl
+    ontology-quality-suite consistency         --new domain.ttl [--old domain-v1.ttl] [--queries queries/] [--apply-repairs]
+    ontology-quality-suite consistency-remote  --query-endpoint URL --manifest graphs.json [--update-endpoint URL]
 
 Each subcommand is independently runnable (matching each ported tool's own
 original standalone CLI) and writes, under ``--out-dir``: ``report.html``,
@@ -124,7 +124,7 @@ def _add_engine_arg(p: argparse.ArgumentParser) -> None:
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="ontology-suite", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser(prog="ontology-quality-suite", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="command", required=True)
 
     ont = sub.add_parser("ontology", help="Evaluate the ontology as authored: OntoQA/OQuaRE, expressivity, OWL2 profile, consistency")

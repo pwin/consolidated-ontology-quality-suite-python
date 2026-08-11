@@ -53,8 +53,8 @@ every `oxi-gen` query that references the changed term.
 Every ontology PR should run, before merge:
 
 ```
-ontology-suite ontology --ontology domain.ttl --out-dir out/ontology-review
-ontology-suite version-diff previous-release.ttl domain.ttl --out-dir out/version-diff
+ontology-quality-suite ontology --ontology domain.ttl --out-dir out/ontology-review
+ontology-quality-suite version-diff previous-release.ttl domain.ttl --out-dir out/version-diff
 ```
 
 `version-diff`'s bump classification (MAJOR/MINOR/PATCH) is the single most
@@ -76,8 +76,8 @@ as an ontology removal, just one layer down.
 
 Because a taxonomy update is "just" a small triplification, it should go
 through the *same* pipeline as any other data update (§2.3), not a bespoke
-process: `ontology-suite triplify` against the taxonomy's own CSV+query,
-then `ontology-suite data` against the ontology to confirm every new
+process: `ontology-quality-suite triplify` against the taxonomy's own CSV+query,
+then `ontology-quality-suite data` against the ontology to confirm every new
 individual's type and any `skos:broader`/`gist:Category`-hierarchy
 assertions actually conform.
 
@@ -98,10 +98,10 @@ Regardless of layer, treat every change as a reviewable unit with:
 1. A stated *reason* (new source system, new business term, a bug in a
    prior axiom) -- this determines expected severity (§3.4), not the other
    way around.
-2. The relevant `ontology-suite` command(s) run and attached to the
+2. The relevant `ontology-quality-suite` command(s) run and attached to the
    review, not re-derived by the reviewer from memory.
 3. For anything touching the ontology or taxonomy: the regenerated
-   `ontology-suite docgen` output, diffed against the previous version, as
+   `ontology-quality-suite docgen` output, diffed against the previous version, as
    the human-readable "what actually changed" artifact -- structural diffs
    in Turtle are hard to read; a rendered class/property table is not.
 
@@ -114,11 +114,11 @@ out in dependency order:
 
 1. Merge and deploy the ontology change (new class/property/axiom).
 2. Add the taxonomy entries that depend on it (new `gist:Category`
-   instances, etc.), validated with `ontology-suite data` against the
+   instances, etc.), validated with `ontology-quality-suite data` against the
    *deployed* ontology.
 3. Only then point `oxi-gen` queries and real CSV ingestion at the new
-   terms -- validate the query shape first with `ontology-suite sketch`
-   (§4.3), then `triplify`, then `ontology-suite data` on the result.
+   terms -- validate the query shape first with `ontology-quality-suite sketch`
+   (§4.3), then `triplify`, then `ontology-quality-suite data` on the result.
 
 Nothing here is time-critical -- an ontology addition that nothing uses
 yet is inert. This is why purely additive ontology changes classify as
@@ -157,7 +157,7 @@ place and call it done, since every existing triple, taxonomy entry, and
 
 ### 3.4 Let `version-diff`'s bump level gate what happens next
 
-`ontology-suite version-diff old.ttl new.ttl` (`docs/VERSIONING.md`)
+`ontology-quality-suite version-diff old.ttl new.ttl` (`docs/VERSIONING.md`)
 gives an evidence-based MAJOR/MINOR/PATCH classification -- use it as a
 gate, not just a report:
 
@@ -183,7 +183,7 @@ break before it ships costs one command and finds the problem in minutes
 instead of in a production incident:
 
 ```
-ontology-suite data existing-data-export.ttl --ontology proposed-new-version.ttl \
+ontology-quality-suite data existing-data-export.ttl --ontology proposed-new-version.ttl \
     --sample 5000 --out-dir out/pre-deploy-check --fail-on Violation
 ```
 
@@ -195,13 +195,13 @@ needs a migration plan before it ships, not after.
 
 ### 4.1 Pre-merge CI gate, per layer
 
-- **Ontology PR:** `ontology-suite ontology` (fails the build on any
+- **Ontology PR:** `ontology-quality-suite ontology` (fails the build on any
   `Violation`; OWL2 profile checks are opt-in per `--profile`, see the
-  ontology's actual expressiveness goals) + `ontology-suite checks` +
+  ontology's actual expressiveness goals) + `ontology-quality-suite checks` +
   `version-diff` against the previous released version.
 - **Taxonomy PR:** treat as a data update (§2.2) -- `triplify` the taxonomy
-  CSV, then `ontology-suite data` against the ontology.
-- **Data-pipeline PR (a changed `oxi-gen` query):** `ontology-suite sketch`
+  CSV, then `ontology-quality-suite data` against the ontology.
+- **Data-pipeline PR (a changed `oxi-gen` query):** `ontology-quality-suite sketch`
   (§4.3) before touching real data.
 
 ### 4.2 Pre-deployment data-compatibility gate
@@ -217,7 +217,7 @@ query's graph shape and diff it against the ontology directly, without
 needing any CSV data at all:
 
 ```
-ontology-suite sketch --queries pipeline/queries/ --ontology proposed-new-version.ttl \
+ontology-quality-suite sketch --queries pipeline/queries/ --ontology proposed-new-version.ttl \
     --out-dir out/query-compat-check
 ```
 
@@ -258,7 +258,7 @@ old *term*.
 
 Two artifacts, two audiences, both already produced by this suite:
 
-- **`ontology-suite docgen`** regenerated and diffed (or just linked,
+- **`ontology-quality-suite docgen`** regenerated and diffed (or just linked,
   before/after) -- the human-readable "what does the ontology actually
   look like now" artifact for domain reviewers and downstream consumers
   who don't read Turtle. Open both versions in
@@ -273,7 +273,7 @@ Two artifacts, two audiences, both already produced by this suite:
 Data can drift out of conformance even when neither the ontology nor the
 taxonomy changes -- an upstream source system quietly starts sending a
 value the ontology's `rdfs:range` doesn't expect, for instance. Schedule
-`ontology-suite data` (with `--sample` if the data graph is large) against
+`ontology-quality-suite data` (with `--sample` if the data graph is large) against
 the *current* production ontology and *current* production data on a
 recurring cadence, independent of any explicit change -- this catches
 exactly the class of problem that only shows up between releases, not at

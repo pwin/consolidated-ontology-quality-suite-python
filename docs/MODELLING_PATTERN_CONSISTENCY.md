@@ -131,7 +131,7 @@ No modelling-pattern inconsistencies found across ontology, taxonomy, transforma
 ```
 
 Add `--output-data` to also review real triplified output (build it first
-with `oxi-gen`, the same way `ontology-suite triplify` does -- see
+with `oxi-gen`, the same way `ontology-quality-suite triplify` does -- see
 `docs/TARQL_ALIGNMENT.md`'s "Reviewing real output data" section for the
 Python snippet). Running the **broken** transform's real output through
 `--output-data` demonstrates the point made above: that layer alone stays

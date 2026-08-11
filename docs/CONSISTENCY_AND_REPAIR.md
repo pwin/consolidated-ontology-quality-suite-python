@@ -1,6 +1,6 @@
 # Consistency checking and automated repair
 
-This is the capability this package (`consolidated-ontology-suite-python`)
+This is the capability this package (`ontology-quality-suite`)
 adds on top of the inherited `ontology_suite` pipeline (see
 `ARCHITECTURE.md` for that): given one or more ontology versions and one or
 more TARQL/oxi-gen transformation files, run every consistency check this
@@ -41,8 +41,8 @@ consistency.apply_repairs(report.repairs, min_confidence=0.7)
 Or from the command line:
 
 ```
-ontology-suite consistency --new domain-v2.ttl --old domain-v1.ttl --queries queries/
-ontology-suite consistency --new domain-v2.ttl --queries queries/ --apply-repairs --min-confidence 0.7
+ontology-quality-suite consistency --new domain-v2.ttl --old domain-v1.ttl --queries queries/
+ontology-quality-suite consistency --new domain-v2.ttl --queries queries/ --apply-repairs --min-confidence 0.7
 ```
 
 `--apply-repairs` writes straight to the target files; without it, suggested

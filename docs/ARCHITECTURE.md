@@ -136,7 +136,7 @@ that depend on OWL2-RL-specific rules).
    `reasoning/consistency.py` (owlrl-backed, optionally a real DL reasoner).
    Optionally also generates the `docgen` reference documentation page (see
    below) when `--docgen` is passed to `run`, or always when invoked
-   directly as `ontology-suite docgen`.
+   directly as `ontology-quality-suite docgen`.
 2. **`checks`** -- the registry-driven SHACL+SPARQL suite
    (`checks/runner.py`), against the ontology and/or a data graph.
 3. **`sketch`** -- `tarql_visualiser.py` builds a Turtle "sketch" of the
@@ -173,7 +173,7 @@ local-first, network only with `--allow-network`. This wasn't always true:
 with a plain parse, no import resolution at all, and `run`'s own calls into
 those stages didn't forward `--import-dir`/`--exclude-imports`/
 `--allow-network` even though the separate `ontology` stage honored them.
-A real user ran `ontology-suite run --ontology ... --import-dir ...
+A real user ran `ontology-quality-suite run --ontology ... --import-dir ...
 --allow-network` and still got a near-total false-positive flood, because
 the flags never reached the stage producing most of the findings. Fixed by
 centralizing import resolution in one helper every stage calls.
@@ -192,7 +192,7 @@ by testing actual behavior rather than assuming it:
    single `/` on Windows (`WindowsPath('https:/example.org/foo.ttl')`),
    silently turning a valid URL into a nonexistent local path.
    `checks/runner.py::load_graph` (the `checks` stage's `--data` loader)
-   had exactly this bug -- `ontology-suite checks --data <url>` failed
+   had exactly this bug -- `ontology-quality-suite checks --data <url>` failed
    outright. `io_utils` never wraps a source in `Path` before checking
    whether it's a URL.
 2. `rdflib.Graph.parse()` does not sniff for gzip -- handing it
@@ -266,7 +266,7 @@ ontology *reference manual* generator:
   resolved via `--ref` too. See `docs/CLASS_DIAGRAMS.md`.
 
 This is deliberately **not** part of `run`'s default output -- pass
-`--docgen` to also generate it there, or run `ontology-suite docgen`
+`--docgen` to also generate it there, or run `ontology-quality-suite docgen`
 directly. Only the HTML/JSON pair produces no `ResultRow` findings; the
 class-diagram files are pure artifacts too (kept alongside the JSON so the
 render step can be re-run alone after hand-editing the template, without

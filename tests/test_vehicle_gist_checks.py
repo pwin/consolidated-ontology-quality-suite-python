@@ -31,7 +31,7 @@ against this pair caught nine separate real bugs in one session:
    the command line -- only the separate `ontology` stage (and
    `version-diff`) actually resolved imports; `pipeline.run_checks_stage`
    et al. just did a plain, non-resolving parse. A real user ran
-   `ontology-suite run --ontology ... --import-dir ... --allow-network`
+   `ontology-quality-suite run --ontology ... --import-dir ... --allow-network`
    and still got the full false-positive flood from bug #1, because the
    flags never reached the `checks` stage that produced most of it. Fixed
    by a shared `pipeline.load_ontology_graph` helper every stage now uses.
