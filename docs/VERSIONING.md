@@ -4,14 +4,14 @@
 suggests a semantic-versioning-style bump (MAJOR/MINOR/PATCH/NONE):
 
 ```
-ontology-suite version-diff old.ttl new.ttl
-ontology-suite version-diff old.ttl new.ttl --json --out-dir out/version-diff
+ontology-quality-suite version-diff old.ttl new.ttl
+ontology-quality-suite version-diff old.ttl new.ttl --json --out-dir out/version-diff
 ```
 
 `owl:imports` are resolved transitively by default (same machinery as the
 `ontology` stage, `ontology_evaluation.py::resolve_imports`) -- pass
 `--exclude-imports` to diff each file alone, or `--import-dir`/
-`--allow-network` the same way `ontology-suite ontology` accepts them.
+`--allow-network` the same way `ontology-quality-suite ontology` accepts them.
 
 ## The rules
 

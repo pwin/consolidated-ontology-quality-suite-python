@@ -96,7 +96,7 @@ records the binding explicitly:
 ```
 
 ```
-ontology-suite consistency-remote \
+ontology-quality-suite consistency-remote \
   --query-endpoint http://localhost:3030/myds/sparql \
   --manifest graphs.json
 ```
