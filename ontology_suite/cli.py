@@ -109,15 +109,17 @@ def _add_import_args(p: argparse.ArgumentParser) -> None:
 
 def _add_engine_arg(p: argparse.ArgumentParser) -> None:
     p.add_argument(
-        "--engine", default="both", choices=list(pipeline.ENGINE_CHOICES),
-        help="which formulation of the registry-driven suite to run: 'both' (default) runs pyshacl "
-             "and the portable SPARQL layer and cross-checks them for drift; 'sparql' runs the "
-             "portable layer only -- every check has a SPARQL form, so this finds the same real "
-             "findings, just without the drift signal, and is typically much faster (pyshacl spends "
-             "most of a run's time on its own Python-level shape traversal on top of the same SPARQL "
-             "the portable layer runs directly); 'shacl' runs pyshacl only; 'native' runs the optional "
-             "native (Rust) SHACL engine instead of pyshacl (see checks/shacl_native_runner.py -- not "
-             "a default dependency); 'native+sparql' is the fast analogue of 'both'.",
+        "--engine", default=pipeline.default_engine(), choices=list(pipeline.ENGINE_CHOICES),
+        help="which formulation of the registry-driven suite to run: 'both' runs pyshacl and the "
+             "portable SPARQL layer and cross-checks them for drift; 'sparql' runs the portable layer "
+             "only -- every check has a SPARQL form, so this finds the same real findings, just "
+             "without the drift signal, and is typically much faster (pyshacl spends most of a run's "
+             "time on its own Python-level shape traversal on top of the same SPARQL the portable "
+             "layer runs directly); 'shacl' runs pyshacl only; 'native' runs the optional native "
+             "(Rust) SHACL engine instead of pyshacl (see checks/shacl_native_runner.py -- not a "
+             "default dependency; falls back to raising unless installed); 'native+sparql' is the "
+             "fast analogue of 'both'. Defaults to 'native+sparql' if the native engine package is "
+             "installed, else 'both'.",
     )
 
 

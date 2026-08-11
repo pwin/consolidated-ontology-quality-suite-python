@@ -108,12 +108,18 @@ def _resolve_blank_source_shapes(results_graph: Graph, message_index: Dict[str, 
             results_graph.add((result_node, SH.sourceShape, resolved))
 
 
-def run_shacl_native(data_graph: Graph, shapes_graph: Graph) -> Tuple[bool, Graph, str]:
+def run_shacl_native(data_graph: Graph, shapes_graph: Graph, *, inference: str = "none") -> Tuple[bool, Graph, str]:
     """Runs the native engine and returns ``(conforms, results_graph,
     results_text)`` -- the same shape ``shacl_runner.run_shacl()`` (pyshacl)
     returns, so callers don't need to know which engine produced it.
-    Unlike pyshacl, there is no ``ont_graph``/``inference`` support here --
-    the native engine validates the graph exactly as given.
+
+    ``inference`` supports ``"none"`` or ``"rdfs"`` (materialised into the
+    data graph before validation, same semantics as pyshacl's own RDFS
+    option) -- the native engine's own supported subset; unlike pyshacl,
+    there is no ``owlrl``/``both`` here (no OWL2-RL reasoner in the Rust
+    engine) or ``ont_graph`` support. `pipeline.py` rejects those two values
+    under ``--engine native``/``native+sparql`` before this is ever called;
+    the native engine itself would also raise a ``ValueError`` for them.
     """
     if _native_shacl is None:
         raise RuntimeError(
@@ -122,7 +128,7 @@ def run_shacl_native(data_graph: Graph, shapes_graph: Graph) -> Tuple[bool, Grap
         ) from _IMPORT_ERROR
 
     shapes = _native_shacl.Shapes.from_turtle(shapes_graph.serialize(format="turtle"))  # type: ignore[attr-defined]
-    report = shapes.validate_turtle(data_graph.serialize(format="turtle"))
+    report = shapes.validate_turtle(data_graph.serialize(format="turtle"), inference=inference)
 
     results_graph = Graph()
     results_graph.parse(data=report.turtle, format="turtle")
