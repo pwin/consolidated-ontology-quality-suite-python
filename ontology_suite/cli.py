@@ -31,6 +31,7 @@ from . import config, pipeline
 from . import consistency as consistency_api
 from .checks.merge import ResultRow
 from .checks.registry import Registry
+from .dataquality import data_quality
 from .reasoning.consistency import REASONER_CHOICES
 from .remote import fuseki
 from .remote import manifest as graph_manifest
@@ -186,6 +187,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
     dat.add_argument("data", nargs="+", help="turtle file(s) and/or folder(s) of them")
     dat.add_argument("--ontology", default=None)
     _add_import_args(dat)
+    dat.add_argument("--file-pattern", default=data_quality.DEFAULT_DATA_GLOBS,
+                      help=f"comma-separated glob pattern(s) used to find data files when a `data` argument is a "
+                           f"folder (default: {data_quality.DEFAULT_DATA_GLOBS})")
     dat.add_argument("--registry", default=str(config.DEFAULT_REGISTRY_PATH))
     dat.add_argument("--sparql", default=str(config.DEFAULT_SPARQL_DIR))
     dat.add_argument("--sample", type=int, default=None, help="cap the reasoning pass to a CBD sample of this many named subjects")
@@ -219,8 +223,14 @@ def build_arg_parser() -> argparse.ArgumentParser:
     run.add_argument("--diagram-imports", action="store_true",
                       help="docgen: also generate diagrams for external/imported classes resolved via --ref")
     run.add_argument("--queries", default=None)
+    run.add_argument("--query-pattern", default=tarql_visualiser.DEFAULT_QUERY_GLOBS,
+                      help=f"comma-separated glob pattern(s) used to find query files under --queries, if it's a "
+                           f"folder (default: {tarql_visualiser.DEFAULT_QUERY_GLOBS})")
     run.add_argument("--csv-dir", default=None)
     run.add_argument("--data", nargs="*", default=None)
+    run.add_argument("--data-pattern", default=data_quality.DEFAULT_DATA_GLOBS,
+                      help=f"comma-separated glob pattern(s) used to find data files under --data, for any "
+                           f"argument that's a folder (default: {data_quality.DEFAULT_DATA_GLOBS})")
     run.add_argument("--registry", default=str(config.DEFAULT_REGISTRY_PATH))
     run.add_argument("--shapes", default=str(config.DEFAULT_SHAPES_DIR))
     run.add_argument("--sparql", default=str(config.DEFAULT_SPARQL_DIR))
@@ -244,6 +254,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--fail-on", default="never", choices=["major", "minor", "patch", "never"],
         help="exit non-zero if the detected bump is at/above this level (default: never)",
     )
+    _add_verbose_arg(vdiff)
 
     cons = sub.add_parser(
         "consistency",
@@ -354,6 +365,7 @@ def cmd_data(args) -> int:
     stage = pipeline.run_data_stage(
         args.data, out_dir, ontology_path=args.ontology, registry=registry,
         sparql_root=args.sparql, sample=args.sample, reasoner=args.reasoner, engine=args.engine,
+        data_pattern=args.file_pattern,
         import_dir=args.import_dir, exclude_imports=args.exclude_imports, allow_network=args.allow_network,
         verbose=args.verbose,
     )
@@ -381,11 +393,13 @@ def cmd_docgen(args) -> int:
 
 def _load_ontology_for_diff(path: str, args):
     if args.exclude_imports:
-        graph, _report = ontology_evaluation.load_without_imports(path)
+        graph, report = ontology_evaluation.load_without_imports(path)
     else:
-        graph, _report = ontology_evaluation.resolve_imports(
+        graph, report = ontology_evaluation.resolve_imports(
             path, args.import_dir, args.allow_network, ontology_evaluation.DEFAULT_IMPORT_GLOBS
         )
+    if args.verbose:
+        print(pipeline.format_import_report(path, report))
     return graph
 
 
@@ -533,7 +547,7 @@ def cmd_run(args) -> int:
 
     if args.queries:
         stage = pipeline.run_sketch_stage(
-            args.queries, out_dir / "sketch", ontology_path=args.ontology,
+            args.queries, out_dir / "sketch", ontology_path=args.ontology, query_pattern=args.query_pattern,
             import_dir=args.import_dir, exclude_imports=args.exclude_imports, allow_network=args.allow_network,
             verbose=args.verbose,
         )
@@ -554,6 +568,7 @@ def cmd_run(args) -> int:
         stage = pipeline.run_data_stage(
             data_paths, out_dir / "data-eval", ontology_path=args.ontology, registry=registry,
             sparql_root=args.sparql, sample=args.sample, reasoner=args.reasoner, engine=args.engine,
+            data_pattern=args.data_pattern,
             import_dir=args.import_dir, exclude_imports=args.exclude_imports, allow_network=args.allow_network,
             verbose=args.verbose,
         )
