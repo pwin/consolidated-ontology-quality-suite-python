@@ -39,6 +39,7 @@ from typing import Iterable, List, Optional
 
 from rdflib import RDF, Literal, URIRef
 
+from . import io_utils
 from .checks.merge import ResultRow
 from .dataquality import data_quality
 from .sketch import dot_export, prefix_alignment as pa
@@ -313,7 +314,20 @@ def main(argv):
                               "shape, coloured red/green/gray by gap/ok/unverified (see "
                               "docs/MODELLING_PATTERN_CONSISTENCY.md) -- render with e.g. "
                               "'dot -Tsvg file.dot -o file.svg'")
+    parser.add_argument("-v", "--verbose", action="store_true",
+                         help="print which query files --file-pattern actually matched, and which "
+                              "--ontology/--taxonomy/--output-data files are being used, before running")
     args = parser.parse_args(argv)
+
+    if args.verbose:
+        expanded = io_utils.expand_sources(args.queries, args.file_pattern)
+        print(f"[verbose] {args.queries} (--file-pattern {args.file_pattern}): {len(expanded)} query file(s) matched:")
+        for p in expanded:
+            print(f"    {p}")
+        print(f"[verbose] {len(args.ontologies)} ontology file(s): {args.ontologies}")
+        print(f"[verbose] {len(args.taxonomies)} taxonomy file(s): {args.taxonomies}")
+        if args.output_data:
+            print(f"[verbose] {len(args.output_data)} output-data file(s): {args.output_data}")
 
     ignore_prefixes = pa.DEFAULT_IGNORED_PREFIXES | set(args.ignore_prefix)
     report = check_four_layer_consistency(

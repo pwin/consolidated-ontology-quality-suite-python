@@ -311,7 +311,15 @@ def main(argv):
     parser.add_argument("--fail-on-mismatch", action="store_true",
                          help="exit 1 if any misalignment or undeclared term is found "
                               "(default: always exit 0, report only)")
+    parser.add_argument("-v", "--verbose", action="store_true",
+                         help="print which query files --file-pattern actually matched before running")
     args = parser.parse_args(argv)
+
+    if args.verbose:
+        expanded = io_utils.expand_sources(args.queries, args.file_pattern)
+        print(f"[verbose] {args.queries} (--file-pattern {args.file_pattern}): {len(expanded)} query file(s) matched:")
+        for p in expanded:
+            print(f"    {p}")
 
     report = check_tarql_ontology_alignment(
         args.queries, args.ontologies,
