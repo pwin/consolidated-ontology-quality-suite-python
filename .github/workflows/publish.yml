@@ -1,12 +1,17 @@
 name: Publish to PyPI
 
-# Runs on any pushed version tag (v0.2.0, v0.2.1, ...). Uses PyPI trusted
-# publishing (OIDC) -- see https://docs.pypi.org/trusted-publishers/ -- so no
-# API token is stored as a repo secret; the `pypi` environment below must be
-# registered as this project's trusted publisher on PyPI first
-# (project: ontology-quality-suite, owner: pwin, repo:
-# consolidated-ontology-quality-suite-python, workflow: publish.yml,
-# environment: pypi).
+# Runs on any pushed version tag (v0.2.0, v0.2.1, ...). Uses trusted
+# publishing (OIDC) on both indexes -- see
+# https://docs.pypi.org/trusted-publishers/ -- so no API token is stored as
+# a repo secret; both environments below must be registered as this
+# project's pending publisher first (project: ontology-quality-suite, owner:
+# pwin, repo: consolidated-ontology-quality-suite-python, workflow:
+# publish.yml, environments: testpypi on test.pypi.org and pypi on pypi.org).
+#
+# Publishes to TestPyPI first, smoke-tests installing from there, and only
+# then publishes to the real index -- a bad build fails on TestPyPI instead
+# of becoming an irreversible real-PyPI upload (PyPI never allows
+# re-uploading a filename, even after deleting the release).
 
 on:
   push:
@@ -28,8 +33,43 @@ jobs:
           name: dist
           path: dist/
 
-  publish:
+  publish-testpypi:
     needs: build
+    runs-on: ubuntu-latest
+    environment: testpypi
+    permissions:
+      id-token: write  # required for trusted publishing; no token/secret needed
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  smoke-test-testpypi:
+    needs: publish-testpypi
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install from TestPyPI and run --help
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          for attempt in 1 2 3 4 5; do
+            python -m pip install --no-cache-dir \
+              --index-url https://test.pypi.org/simple/ \
+              --extra-index-url https://pypi.org/simple/ \
+              "ontology-quality-suite==$VERSION" && break
+            echo "install attempt $attempt failed -- TestPyPI's index may still be propagating; retrying in 20s"
+            sleep 20
+          done
+          ontology-quality-suite --help
+
+  publish-pypi:
+    needs: smoke-test-testpypi
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
