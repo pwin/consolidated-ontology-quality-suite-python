@@ -6,7 +6,7 @@ for how to get it -- not on PyPI yet).
 import rdflib
 import pytest
 
-from ontology_suite import config
+from ontology_suite import config, pipeline
 from ontology_suite.checks import shacl_native_runner as native_runner
 from ontology_suite.checks.merge import build_unified_results
 from ontology_suite.checks.registry import Registry
@@ -84,6 +84,54 @@ def test_run_shacl_native_matches_run_shacl_return_shape(domain_graph, shapes):
     assert isinstance(text, str)
     assert conforms is False
     assert len(results_graph) > 0
+
+
+def test_run_shacl_native_accepts_rdfs_inference(domain_graph, shapes):
+    """shacl>=0.1.3 materialises RDFS entailments into the data graph before
+    validating when asked -- just needs to run without error and return the
+    same shape as the default; the entailment semantics themselves are the
+    native engine's own responsibility, not this adapter's."""
+    conforms, results_graph, _text = native_runner.run_shacl_native(domain_graph, shapes, inference="rdfs")
+    assert isinstance(conforms, bool)
+    assert isinstance(results_graph, rdflib.Graph)
+
+
+def test_run_shacl_native_rejects_owlrl_inference(domain_graph, shapes):
+    """The native engine has no OWL2-RL reasoner -- confirms it still raises
+    for a value this adapter doesn't itself validate (pipeline.py rejects it
+    earlier, but the adapter shouldn't silently accept it if called directly)."""
+    with pytest.raises(ValueError):
+        native_runner.run_shacl_native(domain_graph, shapes, inference="owlrl")
+
+
+def test_default_engine_prefers_native_when_available():
+    """This module only runs when native_runner.available() is True (see
+    pytestmark above), so default_engine() must reflect that."""
+    assert pipeline.default_engine() == "native+sparql"
+
+
+def test_pipeline_rejects_owlrl_inference_under_native_engine(domain_graph, registry):
+    with pytest.raises(ValueError):
+        pipeline.run_registry_suite_on_graph(
+            domain_graph, registry, config.DEFAULT_SHAPES_DIR, config.DEFAULT_SPARQL_DIR,
+            inference="owlrl", engine="native",
+        )
+
+
+def test_pipeline_rejects_both_inference_under_native_plus_sparql_engine(domain_graph, registry):
+    with pytest.raises(ValueError):
+        pipeline.run_registry_suite_on_graph(
+            domain_graph, registry, config.DEFAULT_SHAPES_DIR, config.DEFAULT_SPARQL_DIR,
+            inference="both", engine="native+sparql",
+        )
+
+
+def test_pipeline_accepts_rdfs_inference_under_native_engine(domain_graph, registry):
+    rows = pipeline.run_registry_suite_on_graph(
+        domain_graph, registry, config.DEFAULT_SHAPES_DIR, config.DEFAULT_SPARQL_DIR,
+        inference="rdfs", engine="native",
+    )
+    assert isinstance(rows, list)
 
 
 def test_clean_data_runs_without_error(shapes):

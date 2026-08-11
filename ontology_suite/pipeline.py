@@ -63,6 +63,25 @@ def _capture_stdout(fn, *args, **kwargs) -> str:
 ENGINE_CHOICES = ("both", "sparql", "shacl", "native", "native+sparql")
 
 
+def default_engine() -> str:
+    """``"native+sparql"`` when the optional native engine package is
+    installed, else ``"both"`` -- the CLI's own ``--engine`` default
+    (`cli.py::_add_engine_arg`), so anyone with the wheel installed gets the
+    ~600x-faster path with no flag needed, and anyone without it keeps
+    today's pyshacl-based behavior unchanged. Verified exact-parity findings
+    between the two (`tests/test_shacl_native_runner.py`), so this changes
+    wall-clock time, not results.
+
+    Deliberately *not* used as the default for `run_registry_suite_on_graph`/
+    `run_checks_stage`/`run_data_stage` themselves: those keep a literal
+    `"both"` default so library callers get deterministic, environment-
+    independent behavior -- `tests/test_vehicle_gist_checks.py` in particular
+    pins an exact finding count against pyshacl specifically and calls
+    `run_registry_suite_on_graph` without passing `engine`.
+    """
+    return "native+sparql" if native_shacl_available() else "both"
+
+
 def run_registry_suite_on_graph(
     working_graph: Graph,
     registry: Registry,
@@ -100,8 +119,9 @@ def run_registry_suite_on_graph(
       find the exact same findings pyshacl does on this suite's own shapes
       (see `tests/test_shacl_native_runner.py`); requires the optional
       `shacl` package (see that module's docstring -- not on PyPI yet).
-      `inference` is not supported by the native engine and must be
-      `"none"`.
+      `inference` may be `"none"` or `"rdfs"` under this engine -- the
+      native engine's own supported subset (no OWL2-RL reasoner); `"owlrl"`
+      or `"both"` raise `ValueError` here rather than silently downgrading.
     - ``"native+sparql"`` -- the native engine *and* the portable SPARQL
       layer, i.e. the fast analogue of `"both"`: the same cross-validation
       drift-detection signal, without pyshacl's cost.
@@ -123,9 +143,12 @@ def run_registry_suite_on_graph(
                 f"--engine {engine} needs the optional `shacl` native engine package -- "
                 "see checks/shacl_native_runner.py's module docstring"
             )
-        if inference != "none":
-            raise ValueError(f"--engine {engine} does not support --inference (got {inference!r})")
-        _conforms, shacl_results, _text = run_shacl_native(working_graph, shapes_graph)
+        if inference not in ("none", "rdfs"):
+            raise ValueError(
+                f"--engine {engine} only supports --inference none/rdfs (got {inference!r}); "
+                "the native engine has no OWL2-RL reasoner"
+            )
+        _conforms, shacl_results, _text = run_shacl_native(working_graph, shapes_graph, inference=inference)
 
     sparql_results = Graph()
     if engine in ("both", "sparql", "native+sparql"):

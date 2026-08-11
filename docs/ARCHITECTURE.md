@@ -86,12 +86,11 @@ portable SPARQL twin -- there is no check unique to SHACL
 (`tests/test_check_coverage.py` asserts this stays true). That means
 `--engine sparql` (on `checks`, `data`, and `run`; see
 `ontology_suite/pipeline.py::run_registry_suite_on_graph`) finds the exact
-same real findings as the default `--engine both`, just without the
-drift-detection signal, in roughly a seventh of the time. `--engine both`
-remains the default -- reach for `--engine sparql` when iterating quickly
-or running in CI where speed matters more than catching a SHACL/SPARQL
-formulation drifting apart from itself (a suite-maintenance concern, not
-something that affects a user's own ontology).
+same real findings as pyshacl-backed `--engine both`, just without the
+drift-detection signal, in roughly a seventh of the time. Reach for
+`--engine sparql` when iterating quickly and the drift signal doesn't
+matter (a suite-maintenance concern, not something that affects a user's
+own ontology).
 
 There's a third option that gets both the speed *and* the drift-detection
 signal: `--engine native`/`--engine native+sparql`, which run the optional
@@ -101,15 +100,32 @@ exact same ~3,300-triple fixture used above, against `shacl` v0.1.3:
 **0.29s**, vs. pyshacl's ~193s -- a ~665x speedup, with byte-for-byte
 identical findings (same 38 `ResultRow`s, same check ids, zero
 discrepancies either direction; see `tests/test_shacl_native_runner.py`).
-`--engine native+sparql` is therefore
-strictly better than `--engine both` when the optional `shacl` package is
-available: same cross-validation value, at roughly `--engine sparql`
-speed. It isn't the default only because `shacl` isn't published to PyPI
-yet and isn't a hard dependency of this package -- see
-`shacl_native_runner.py`'s module docstring for how to install it, and for
-why its SHACL-core (non-SPARQL) findings need a `sh:message`-text fallback
-to resolve a check id (blank node identifiers don't survive the Rust/Python
-boundary the way pyshacl's own in-process ones do).
+`--engine native+sparql` is therefore strictly better than `--engine both`
+when the optional `shacl` package is available: same cross-validation
+value, at roughly `--engine sparql` speed -- which is why the CLI's
+`--engine` default (`pipeline.default_engine()`) auto-selects
+`native+sparql` when the package is importable and falls back to `both`
+otherwise, rather than making everyone type the flag by hand. (Library
+callers going through `pipeline.run_registry_suite_on_graph`/
+`run_checks_stage`/`run_data_stage` directly, not via the CLI, still
+default to `"both"` explicitly -- `tests/test_vehicle_gist_checks.py`
+pins an exact finding count against pyshacl specifically and needs that
+default to stay environment-independent.) `shacl` still isn't published to
+PyPI, so this auto-upgrade only kicks in for anyone who's installed the
+wheel themselves -- see `shacl_native_runner.py`'s module docstring for
+how, and for why its SHACL-core (non-SPARQL) findings need a
+`sh:message`-text fallback to resolve a check id (blank node identifiers
+don't survive the Rust/Python boundary the way pyshacl's own in-process
+ones do).
+
+`--inference rdfs` is supported under `--engine native`/`native+sparql` as
+of `shacl` v0.1.3 (materialised into the data graph before validation,
+same semantics as pyshacl's own RDFS option) -- `--inference owlrl`/`both`
+raise a `ValueError` under the native engine rather than silently
+downgrading, since it has no OWL2-RL reasoner (`reasoning/backends/
+owlrl_backend.py`'s pure-Python OWL2-RL closure is deliberately not
+swapped for it -- RDFS-only entailment would silently drop real findings
+that depend on OWL2-RL-specific rules).
 
 ## Pipeline stages (`ontology_suite/pipeline.py`, driven by `cli.py`)
 
