@@ -217,7 +217,9 @@ def test_checks_stage_forwards_import_args_to_load_ontology_graph(monkeypatch, t
     """
     captured = {}
 
-    def fake_load_ontology_graph(ontology_path, *, import_dir=None, exclude_imports=False, allow_network=False):
+    def fake_load_ontology_graph(
+        ontology_path, *, import_dir=None, exclude_imports=False, allow_network=False, verbose=False,
+    ):
         captured["ontology_path"] = ontology_path
         captured["import_dir"] = import_dir
         captured["exclude_imports"] = exclude_imports

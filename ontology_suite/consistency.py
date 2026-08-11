@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, List, Optional
 
+from . import io_utils
 from .pipeline import load_ontology_graph
 from .repair import tarql_repair
 from .repair.types import RepairSuggestion, apply_suggestion
@@ -65,6 +66,7 @@ def check_consistency(
     exclude_imports: bool = False,
     allow_network: bool = False,
     ontology_target_for_stubs: Optional[str | Path] = None,
+    verbose: bool = False,
 ) -> ConsistencyReport:
     """Runs whichever checks apply given the inputs provided:
 
@@ -74,19 +76,23 @@ def check_consistency(
 
     Import resolution (`import_dir`/`exclude_imports`/`allow_network`)
     applies to both `old_ontology` and `new_ontology`, same convention as
-    every other `--ontology`-taking stage in `pipeline.py`.
+    every other `--ontology`-taking stage in `pipeline.py`. `verbose` prints
+    which owl:imports resolved/didn't and which query files `tarql_sources`
+    (a folder, `query_pattern`) actually expanded to, before running.
     """
     ontology_paths = list(ontology_paths) if ontology_paths is not None else [new_ontology]
     report = ConsistencyReport(new_ontology=str(new_ontology), old_ontology=str(old_ontology) if old_ontology else None)
 
     new_graph = load_ontology_graph(
-        new_ontology, import_dir=import_dir, exclude_imports=exclude_imports, allow_network=allow_network
+        new_ontology, import_dir=import_dir, exclude_imports=exclude_imports, allow_network=allow_network,
+        verbose=verbose,
     )
 
     renames: List[TermRename] = []
     if old_ontology is not None:
         old_graph = load_ontology_graph(
-            old_ontology, import_dir=import_dir, exclude_imports=exclude_imports, allow_network=allow_network
+            old_ontology, import_dir=import_dir, exclude_imports=exclude_imports, allow_network=allow_network,
+            verbose=verbose,
         )
         diff, bump = version_diff.diff_ontologies(old_graph, new_graph)
         report.ontology_diff = diff
@@ -96,6 +102,11 @@ def check_consistency(
 
     tarql_sources = list(tarql_sources)
     if tarql_sources:
+        if verbose:
+            expanded = io_utils.expand_sources(tarql_sources, query_pattern)
+            print(f"[verbose] {tarql_sources} (--file-pattern {query_pattern}): {len(expanded)} query file(s) matched:")
+            for p in expanded:
+                print(f"    {p}")
         alignment = pa.check_tarql_ontology_alignment(tarql_sources, ontology_paths, query_pattern=query_pattern)
         report.alignment = alignment
         report.repairs = tarql_repair.suggest_repairs(

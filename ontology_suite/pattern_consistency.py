@@ -301,7 +301,7 @@ def main(argv):
                          help="a taxonomy file of controlled-vocabulary individuals (repeatable)")
     parser.add_argument("--output-data", action="append", default=None, dest="output_data",
                          help="real triplified output to also check (repeatable; omit to skip this layer)")
-    parser.add_argument("--pattern", default=DEFAULT_QUERY_GLOBS,
+    parser.add_argument("--file-pattern", default=DEFAULT_QUERY_GLOBS,
                          help=f"comma-separated glob pattern(s) for query folders (default: {DEFAULT_QUERY_GLOBS})")
     parser.add_argument("--ignore-prefix", action="append", default=[],
                          help="an additional prefix name to ignore in the ontology<->transformation prefix check "
@@ -319,7 +319,7 @@ def main(argv):
     report = check_four_layer_consistency(
         args.queries, args.ontologies, args.taxonomies,
         output_data_paths=args.output_data,
-        query_pattern=args.pattern,
+        query_pattern=args.file_pattern,
         ignore_prefixes=ignore_prefixes,
     )
     print(format_four_layer_report(report))
@@ -327,7 +327,7 @@ def main(argv):
     if args.dot:
         dot_path = write_consistency_dot(
             args.queries, args.ontologies, args.taxonomies, args.dot,
-            query_pattern=args.pattern, ignore_prefixes=ignore_prefixes,
+            query_pattern=args.file_pattern, ignore_prefixes=ignore_prefixes,
         )
         print(f"Wrote {dot_path}")
 

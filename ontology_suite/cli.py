@@ -123,6 +123,15 @@ def _add_engine_arg(p: argparse.ArgumentParser) -> None:
     )
 
 
+def _add_verbose_arg(p: argparse.ArgumentParser) -> None:
+    p.add_argument(
+        "-v", "--verbose", action="store_true",
+        help="print what each input option actually resolved to before running: which query/data "
+             "files --file-pattern matched, which owl:imports resolved (and from where) or failed to, "
+             "and which check engine ran",
+    )
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="ontology-quality-suite", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="command", required=True)
@@ -135,6 +144,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     ont.add_argument("--out-dir", default="out/ontology")
     _add_profile_arg(ont)
     _add_common_reasoning_args(ont)
+    _add_verbose_arg(ont)
 
     chk = sub.add_parser("checks", help="Run the registry-driven SHACL+SPARQL suite")
     chk.add_argument("--ontology", default=None)
@@ -147,15 +157,17 @@ def build_arg_parser() -> argparse.ArgumentParser:
     _add_engine_arg(chk)
     chk.add_argument("--out-dir", default="out/checks")
     chk.add_argument("--fail-on", default="Violation", choices=["Violation", "Warning", "Info", "never"])
+    _add_verbose_arg(chk)
 
     skt = sub.add_parser("sketch", help="Sketch the graph shape of a folder of TARQL/oxi-gen CONSTRUCT queries")
     skt.add_argument("--queries", required=True)
     skt.add_argument("--ontology", default=None, help="if given, diff the sketch's classes/properties against the ontology's declarations")
     _add_import_args(skt)
-    skt.add_argument("--pattern", default=tarql_visualiser.DEFAULT_QUERY_GLOBS)
+    skt.add_argument("--file-pattern", default=tarql_visualiser.DEFAULT_QUERY_GLOBS)
     skt.add_argument("--registry", default=str(config.DEFAULT_REGISTRY_PATH))
     skt.add_argument("--out-dir", default="out/sketch")
     skt.add_argument("--fail-on", default="never", choices=["Violation", "Warning", "Info", "never"])
+    _add_verbose_arg(skt)
 
     trp = sub.add_parser("triplify", help="Run CSV files through oxi-gen to produce real RDF data")
     trp.add_argument("--csv-dir", required=True)
@@ -180,6 +192,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     _add_engine_arg(dat)
     dat.add_argument("--out-dir", default="out/data-eval")
     _add_common_reasoning_args(dat)
+    _add_verbose_arg(dat)
 
     doc = sub.add_parser("docgen", help="Generate a human-readable reference documentation page for the ontology (classes, properties, diagrams)")
     doc.add_argument("--ontology", required=True)
@@ -217,6 +230,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     run.add_argument("--out-dir", default="out")
     _add_profile_arg(run)
     _add_common_reasoning_args(run)
+    _add_verbose_arg(run)
 
     vdiff = sub.add_parser("version-diff", help="Compare two versions of an ontology and suggest a semver-style bump")
     vdiff.add_argument("old", help="the earlier ontology version")
@@ -240,7 +254,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     cons.add_argument("--queries", action="append", default=[], help="a TARQL/oxi-gen query file or folder (repeatable)")
     cons.add_argument("--ontology", action="append", default=[], dest="ontology_paths",
                        help="an additional ontology file to consider for TARQL alignment, e.g. an import (repeatable; --new is always included)")
-    cons.add_argument("--pattern", default=tarql_visualiser.DEFAULT_QUERY_GLOBS)
+    cons.add_argument("--file-pattern", default=tarql_visualiser.DEFAULT_QUERY_GLOBS)
     _add_import_args(cons)
     cons.add_argument("--out-dir", default="out/consistency")
     cons.add_argument("--apply-repairs", action="store_true",
@@ -249,6 +263,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
                        help="only apply/write repairs at or above this confidence (default: 0.5)")
     cons.add_argument("--fail-on-misalignment", action="store_true",
                        help="exit 1 if any TARQL/ontology misalignment is found (default: always exit 0, report-only)")
+    _add_verbose_arg(cons)
 
     consr = sub.add_parser(
         "consistency-remote",
@@ -274,6 +289,8 @@ def cmd_ontology(args) -> int:
         import_dir=args.import_dir, exclude_imports=args.exclude_imports, allow_network=args.allow_network,
         reasoner=args.reasoner, registry=registry, sparql_root=args.sparql, profiles=tuple(args.profile),
     )
+    if args.verbose:
+        print(pipeline.format_import_report(args.ontology, stage.artifacts["import_report"]))
     artifacts = [("ontology_evaluation.txt", out_dir / "ontology_evaluation.txt"),
                  ("ontology_evaluation.json", out_dir / "ontology_evaluation.json")]
     _write_reports(stage.rows, registry, out_dir, "Ontology Evaluation Report", artifacts)
@@ -291,6 +308,7 @@ def cmd_checks(args) -> int:
         registry, out_dir, ontology_path=args.ontology, data_path=args.data,
         shapes_dir=args.shapes, sparql_dir=args.sparql, inference=args.inference, engine=args.engine,
         import_dir=args.import_dir, exclude_imports=args.exclude_imports, allow_network=args.allow_network,
+        verbose=args.verbose,
     )
     _write_reports(stage.rows, registry, out_dir, "Registry Checks Report")
     counts = _print_summary(stage.rows, out_dir, stage.warnings)
@@ -301,8 +319,9 @@ def cmd_sketch(args) -> int:
     out_dir = Path(args.out_dir)
     registry = Registry.load(args.registry)
     stage = pipeline.run_sketch_stage(
-        args.queries, out_dir, ontology_path=args.ontology, query_pattern=args.pattern,
+        args.queries, out_dir, ontology_path=args.ontology, query_pattern=args.file_pattern,
         import_dir=args.import_dir, exclude_imports=args.exclude_imports, allow_network=args.allow_network,
+        verbose=args.verbose,
     )
     artifacts = [("sketch.ttl", stage.artifacts["sketch_path"])]
     _write_reports(stage.rows, registry, out_dir, "TARQL/oxi-gen Sketch Report", artifacts)
@@ -336,6 +355,7 @@ def cmd_data(args) -> int:
         args.data, out_dir, ontology_path=args.ontology, registry=registry,
         sparql_root=args.sparql, sample=args.sample, reasoner=args.reasoner, engine=args.engine,
         import_dir=args.import_dir, exclude_imports=args.exclude_imports, allow_network=args.allow_network,
+        verbose=args.verbose,
     )
     _write_reports(stage.rows, registry, out_dir, "Data Quality & Conformance Report")
     counts = _print_summary(stage.rows, out_dir, stage.warnings)
@@ -403,10 +423,11 @@ def cmd_consistency(args) -> int:
         old_ontology=args.old,
         tarql_sources=args.queries,
         ontology_paths=[args.new] + args.ontology_paths,
-        query_pattern=args.pattern,
+        query_pattern=args.file_pattern,
         import_dir=args.import_dir,
         exclude_imports=args.exclude_imports,
         allow_network=args.allow_network,
+        verbose=args.verbose,
     )
 
     text = consistency_api.format_consistency_report(report)
@@ -484,6 +505,8 @@ def cmd_run(args) -> int:
         rows += stage.rows
         warnings += stage.warnings
         artifacts += [("ontology_evaluation.txt", out_dir / "ontology" / "ontology_evaluation.txt")]
+        if args.verbose:
+            print(pipeline.format_import_report(args.ontology, stage.artifacts["import_report"]))
 
     if args.docgen:
         if not args.ontology:
@@ -503,6 +526,7 @@ def cmd_run(args) -> int:
             data_path=(args.data[0] if args.data and len(args.data) == 1 else None),
             shapes_dir=args.shapes, sparql_dir=args.sparql, engine=args.engine,
             import_dir=args.import_dir, exclude_imports=args.exclude_imports, allow_network=args.allow_network,
+            verbose=args.verbose,
         )
         rows += stage.rows
         warnings += stage.warnings
@@ -511,6 +535,7 @@ def cmd_run(args) -> int:
         stage = pipeline.run_sketch_stage(
             args.queries, out_dir / "sketch", ontology_path=args.ontology,
             import_dir=args.import_dir, exclude_imports=args.exclude_imports, allow_network=args.allow_network,
+            verbose=args.verbose,
         )
         rows += stage.rows
         warnings += stage.warnings
@@ -530,6 +555,7 @@ def cmd_run(args) -> int:
             data_paths, out_dir / "data-eval", ontology_path=args.ontology, registry=registry,
             sparql_root=args.sparql, sample=args.sample, reasoner=args.reasoner, engine=args.engine,
             import_dir=args.import_dir, exclude_imports=args.exclude_imports, allow_network=args.allow_network,
+            verbose=args.verbose,
         )
         rows += stage.rows
         warnings += stage.warnings

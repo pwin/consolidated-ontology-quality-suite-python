@@ -225,7 +225,7 @@ def main(argv):
     parser.add_argument("-o", "--output", default=None, help="output .ttl file (default: <input>.ttl)")
     parser.add_argument(
         "-p",
-        "--pattern",
+        "--file-pattern",
         default=DEFAULT_QUERY_GLOBS,
         help=f"comma-separated glob pattern(s) used to find query files when input is a folder "
              f"(default: {DEFAULT_QUERY_GLOBS})",
@@ -256,7 +256,7 @@ def main(argv):
 
     if os.path.isdir(args.input):
         output = args.output or os.path.normpath(args.input) + ".ttl"
-        paths = visualise_folder(args.input, output, args.pattern, **write_turtle_kwargs)
+        paths = visualise_folder(args.input, output, args.file_pattern, **write_turtle_kwargs)
         noun = "query" if len(paths) == 1 else "queries"
         print(f"Consolidated {len(paths)} {noun} into {output}")
     else:

@@ -156,12 +156,36 @@ def run_registry_suite_on_graph(
     return build_unified_results(shacl_results, sparql_results, registry, shapes_graph)
 
 
+def format_import_report(path: str | Path, report: dict) -> str:
+    """Renders an ``ontology_evaluation.resolve_imports``/``load_without_imports``
+    report as human-readable text -- shared by every ``--verbose`` print site
+    so the same information reads identically everywhere it's shown."""
+    lines = [f"[verbose] {path}:"]
+    if report["excluded"]:
+        lines.append(f"  owl:imports present but excluded (--exclude-imports): {', '.join(report['excluded'])}")
+    if report["resolved"]:
+        lines.append(f"  {len(report['resolved'])} owl:imports resolved:")
+        for r in report["resolved"]:
+            lines.append(f"    {r['iri']}  <-  {r['source']}")
+    if report["unresolved"]:
+        lines.append(
+            f"  {len(report['unresolved'])} owl:imports UNRESOLVED "
+            f"(--allow-network={report['network_allowed']}):"
+        )
+        for iri in report["unresolved"]:
+            lines.append(f"    {iri}")
+    if not report["excluded"] and not report["resolved"] and not report["unresolved"]:
+        lines.append("  no owl:imports found")
+    return "\n".join(lines)
+
+
 def load_ontology_graph(
     ontology_path: str | Path,
     *,
     import_dir: Optional[str | Path] = None,
     exclude_imports: bool = False,
     allow_network: bool = False,
+    verbose: bool = False,
 ) -> Graph:
     """Load an ontology file, transitively resolving its ``owl:imports`` the
     same way the ``ontology`` stage and ``version-diff`` already do (via
@@ -181,11 +205,13 @@ def load_ontology_graph(
     stage silently dropped them.
     """
     if exclude_imports:
-        graph, _report = ontology_evaluation.load_without_imports(ontology_path)
+        graph, report = ontology_evaluation.load_without_imports(ontology_path)
     else:
-        graph, _report = ontology_evaluation.resolve_imports(
+        graph, report = ontology_evaluation.resolve_imports(
             ontology_path, import_dir, allow_network, ontology_evaluation.DEFAULT_IMPORT_GLOBS
         )
+    if verbose:
+        print(format_import_report(ontology_path, report))
     return graph
 
 
@@ -324,6 +350,7 @@ def run_checks_stage(
     import_dir: Optional[str | Path] = None,
     exclude_imports: bool = False,
     allow_network: bool = False,
+    verbose: bool = False,
 ) -> StageResult:
     if not ontology_path and not data_path:
         raise ValueError("run_checks_stage needs at least one of ontology_path or data_path")
@@ -331,14 +358,19 @@ def run_checks_stage(
     working_graph = Graph()
     if ontology_path:
         ontology_graph = load_ontology_graph(
-            ontology_path, import_dir=import_dir, exclude_imports=exclude_imports, allow_network=allow_network
+            ontology_path, import_dir=import_dir, exclude_imports=exclude_imports, allow_network=allow_network,
+            verbose=verbose,
         )
         for triple in ontology_graph:
             working_graph.add(triple)
     if data_path:
+        if verbose:
+            print(f"[verbose] {data_path}: loaded as data")
         for triple in load_graph(data_path):
             working_graph.add(triple)
 
+    if verbose:
+        print(f"[verbose] engine: {engine}")
     rows = run_registry_suite_on_graph(working_graph, registry, shapes_dir, sparql_dir, inference, engine=engine)
 
     return StageResult(name="checks", rows=rows, artifacts={"graph": working_graph})
@@ -358,11 +390,16 @@ def run_sketch_stage(
     import_dir: Optional[str | Path] = None,
     exclude_imports: bool = False,
     allow_network: bool = False,
+    verbose: bool = False,
 ) -> StageResult:
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     sketch_path = out_dir / "sketch.ttl"
     used_queries = tarql_visualiser.visualise_folder(str(queries_dir), str(sketch_path), patterns=query_pattern)
+    if verbose:
+        print(f"[verbose] {queries_dir} (--file-pattern {query_pattern}): {len(used_queries)} query file(s) matched:")
+        for p in used_queries:
+            print(f"    {p}")
 
     ignored = graph_quality.default_ignored_predicates(
         tarql_visualiser.DEFAULT_BASE,
@@ -378,7 +415,8 @@ def run_sketch_stage(
     rows: List[ResultRow] = []
     if ontology_path:
         ontology_graph = load_ontology_graph(
-            ontology_path, import_dir=import_dir, exclude_imports=exclude_imports, allow_network=allow_network
+            ontology_path, import_dir=import_dir, exclude_imports=exclude_imports, allow_network=allow_network,
+            verbose=verbose,
         )
         declarations = data_quality.ontology_declarations(ontology_graph)
         conformance = data_quality.check_conformance(declarations, sketch_graph)
@@ -454,6 +492,7 @@ def run_data_stage(
     import_dir: Optional[str | Path] = None,
     exclude_imports: bool = False,
     allow_network: bool = False,
+    verbose: bool = False,
 ) -> StageResult:
     ignored = graph_quality.default_ignored_predicates(
         tarql_visualiser.DEFAULT_BASE,
@@ -462,11 +501,16 @@ def run_data_stage(
     )
     resolved = data_quality.resolve_input_paths([str(p) for p in data_paths], data_pattern)
     aggregate_graph, per_file = data_quality.load_data_graphs(resolved, ignored)
+    if verbose:
+        print(f"[verbose] {len(resolved)} data file(s) matched:")
+        for f in per_file:
+            print(f"    {f['path']}  ({len(f['graph'])} triples, {f['ignored_triple_count']} ignored)")
 
     ontology_graph: Optional[Graph] = None
     if ontology_path:
         ontology_graph = load_ontology_graph(
-            ontology_path, import_dir=import_dir, exclude_imports=exclude_imports, allow_network=allow_network
+            ontology_path, import_dir=import_dir, exclude_imports=exclude_imports, allow_network=allow_network,
+            verbose=verbose,
         )
 
     rows: List[ResultRow] = []
@@ -482,6 +526,8 @@ def run_data_stage(
         if ontology_graph is not None:
             for triple in ontology_graph:
                 working_graph.add(triple)
+        if verbose:
+            print(f"[verbose] engine: {engine}")
         rows += run_registry_suite_on_graph(working_graph, registry, config.DEFAULT_SHAPES_DIR, sparql_root, engine=engine)
 
     sample_note = None

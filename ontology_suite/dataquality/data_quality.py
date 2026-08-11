@@ -475,7 +475,7 @@ def main(argv):
     )
     parser.add_argument("inputs", nargs="+", help="one or more turtle data files, or folders of them")
     parser.add_argument(
-        "--pattern",
+        "--file-pattern",
         default=DEFAULT_DATA_GLOBS,
         help=f"comma-separated glob pattern(s) used to find files when an input is a folder (default: {DEFAULT_DATA_GLOBS})",
     )
@@ -496,7 +496,7 @@ def main(argv):
     args = parser.parse_args(argv)
 
     ignored_predicates = default_ignored_predicates(args.base, args.namespace_predicate, args.namespace_conflict_predicate)
-    paths = resolve_input_paths(args.inputs, args.pattern)
+    paths = resolve_input_paths(args.inputs, args.file_pattern)
     combined_graph, per_file = load_data_graphs(paths, ignored_predicates)
     total_ignored = sum(entry["ignored_triple_count"] for entry in per_file)
     data_metrics = compute_data_metrics(combined_graph)

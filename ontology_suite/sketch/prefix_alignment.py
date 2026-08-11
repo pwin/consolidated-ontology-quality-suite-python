@@ -303,7 +303,7 @@ def main(argv):
                          help="a query file or folder of them (repeatable)")
     parser.add_argument("--ontology", action="append", required=True, dest="ontologies",
                          help="an ontology file (repeatable -- pass every file you want considered)")
-    parser.add_argument("--pattern", default=DEFAULT_QUERY_GLOBS,
+    parser.add_argument("--file-pattern", default=DEFAULT_QUERY_GLOBS,
                          help=f"comma-separated glob pattern(s) for query folders (default: {DEFAULT_QUERY_GLOBS})")
     parser.add_argument("--ignore-prefix", action="append", default=[],
                          help="an additional prefix name to ignore, on top of the structural-vocabulary defaults "
@@ -315,7 +315,7 @@ def main(argv):
 
     report = check_tarql_ontology_alignment(
         args.queries, args.ontologies,
-        query_pattern=args.pattern,
+        query_pattern=args.file_pattern,
         ignore_prefixes=DEFAULT_IGNORED_PREFIXES | set(args.ignore_prefix),
     )
     print(format_alignment_report(report))
