@@ -97,9 +97,30 @@ signal: `--engine native`/`--engine native+sparql`, which run the optional
 native (Rust) SHACL engine (`checks/shacl_native_runner.py`,
 https://github.com/pwin/SHACL_Engine) instead of pyshacl. Measured on the
 exact same ~3,300-triple fixture used above, against `shacl` v0.1.3:
-**0.29s**, vs. pyshacl's ~193s -- a ~665x speedup, with byte-for-byte
-identical findings (same 38 `ResultRow`s, same check ids, zero
-discrepancies either direction; see `tests/test_shacl_native_runner.py`).
+**0.29s**, vs. pyshacl's ~193s -- a ~665x speedup, with identical findings
+*by identity* -- same 38 `(check_id, focus_node, value)` triples, same check
+ids, zero discrepancies either direction; see `tests/test_shacl_native_runner.py`.
+
+**Identity is proven; severity is not, and the two engines genuinely
+disagree on it.** pyshacl silently drops an `sh:severity` declared *inside*
+an `sh:sparql [...]` SPARQLConstraint block and always reports `Violation`
+regardless of what the shape actually says; the native engine reports the
+declared severity correctly (per the SHACL-AF spec -- a pyshacl limitation,
+not a native-engine bug). Confirmed directly on this suite's own shapes:
+`examples/ontology/domain.ttl`'s 18 findings come back as 17 Violation/1
+Warning/0 Info under `--engine shacl`, but 1 Violation/15 Warning/2 Info
+under `--engine native` -- `QUA-001`/`QUA-002`/`STY-001`/`STY-002`/
+`STY-003`/`STR-003`/`EFF-001` all declare `sh:severity` this way in
+`resources/shapes/*.ttl`, and pyshacl reports every one of them as
+`Violation` regardless. (`sh:severity` declared directly on a SHACL-core
+shape -- e.g. `LOG-001`'s `sh:property [...]` -- is unaffected; it's
+specifically the SPARQLConstraint-nested form pyshacl drops.) This matters
+in practice because every subcommand defaults to `--fail-on Violation`:
+the same ontology can pass or fail purely depending on which `--engine`
+flag is passed -- see `tests/test_shacl_native_runner.py::test_native_and_pyshacl_disagree_on_sh_sparql_severity`,
+which pins the actual divergence rather than just excluding severity from
+the identity comparison.
+
 `--engine native+sparql` is therefore strictly better than `--engine both`
 when the optional `shacl` package is available: same cross-validation
 value, at roughly `--engine sparql` speed -- which is why the CLI's
@@ -117,6 +138,14 @@ how, and for why its SHACL-core (non-SPARQL) findings need a
 `sh:message`-text fallback to resolve a check id (blank node identifiers
 don't survive the Rust/Python boundary the way pyshacl's own in-process
 ones do).
+
+**`uv sync` will silently uninstall `shacl`** -- it isn't (can't be) a
+`pyproject.toml` dependency, so `uv` treats it as lockfile drift and
+removes it on every sync, which silently changes the CLI's default engine
+back to `both`/pyshacl (with the severity consequences above) until it's
+reinstalled: `uv pip install --python .venv/Scripts/python.exe <the
+wheel>` (pass `--python` explicitly -- `uv pip install` respects a stray
+`VIRTUAL_ENV` env var over the current project's venv).
 
 `--inference rdfs` is supported under `--engine native`/`native+sparql` as
 of `shacl` v0.1.3 (materialised into the data graph before validation,

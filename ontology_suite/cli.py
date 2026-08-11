@@ -12,6 +12,7 @@ Subcommands mirror the pipeline stages in ``pipeline.py``:
     ontology-quality-suite version-diff        old.ttl new.ttl
     ontology-quality-suite consistency         --new domain.ttl [--old domain-v1.ttl] [--queries queries/] [--apply-repairs]
     ontology-quality-suite consistency-remote  --query-endpoint URL --manifest graphs.json [--update-endpoint URL]
+    ontology-quality-suite pattern-consistency --queries queries/ --ontology domain.ttl --taxonomy taxonomy.ttl
 
 Each subcommand is independently runnable (matching each ported tool's own
 original standalone CLI) and writes, under ``--out-dir``: ``report.html``,
@@ -27,8 +28,9 @@ import sys
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from . import config, pipeline
+from . import config, io_utils, pipeline
 from . import consistency as consistency_api
+from . import pattern_consistency
 from .checks.merge import ResultRow
 from .checks.registry import Registry
 from .dataquality import data_quality
@@ -39,6 +41,7 @@ from .report.cucumber import write_cucumber_json, write_gherkin_feature_files
 from .report.html_report import write_html_report
 from .report.plots import write_all_plots
 from .report.tables import write_all_tables
+from .sketch import prefix_alignment as pa
 from .sketch import tarql_visualiser
 from .ontologyeval import ontology_evaluation
 from .versioning import diff as version_diff
@@ -258,7 +261,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
     cons = sub.add_parser(
         "consistency",
-        help="Check ontology-version and TARQL/oxi-gen-vs-ontology consistency together, with suggested repair diffs",
+        help="Check ontology-version and TARQL/oxi-gen-vs-ontology consistency together, with suggested repair "
+             "diffs. Does NOT check a taxonomy layer -- a query hard-coding a nonexistent controlled-vocabulary "
+             "reference reports clean here; see the separate 'pattern-consistency' subcommand for that boundary.",
     )
     cons.add_argument("--new", required=True, help="the ontology version to check against")
     cons.add_argument("--old", default=None, help="an earlier ontology version, to also run version-diff + rename detection")
@@ -288,6 +293,35 @@ def build_arg_parser() -> argparse.ArgumentParser:
     consr.add_argument("--sample-limit", type=int, default=None, help="cap how many triples are pulled per named graph (see remote.fuseki.load_named_graph)")
     consr.add_argument("--out-dir", default="out/consistency-remote")
     consr.add_argument("--fail-on-misalignment", action="store_true")
+
+    patc = sub.add_parser(
+        "pattern-consistency",
+        help="Check modelling-pattern consistency across an ontology, a taxonomy, a TARQL/oxi-gen "
+             "transformation, and (optionally) real triplified output data",
+    )
+    patc.add_argument("--queries", action="append", required=True, help="a query file or folder of them (repeatable)")
+    patc.add_argument("--ontology", action="append", required=True, dest="ontologies",
+                       help="an ontology file (repeatable)")
+    patc.add_argument("--taxonomy", action="append", required=True, dest="taxonomies",
+                       help="a taxonomy file of controlled-vocabulary individuals (repeatable)")
+    patc.add_argument("--output-data", action="append", default=None, dest="output_data",
+                       help="real triplified output to also check (repeatable; omit to skip this layer)")
+    patc.add_argument("--file-pattern", default=tarql_visualiser.DEFAULT_QUERY_GLOBS,
+                       help=f"comma-separated glob pattern(s) for query folders "
+                            f"(default: {tarql_visualiser.DEFAULT_QUERY_GLOBS})")
+    patc.add_argument("--ignore-prefix", action="append", default=[],
+                       help="an additional prefix name to ignore in the ontology<->transformation prefix check "
+                            "(repeatable)")
+    patc.add_argument("--dot", default=None,
+                       help="also write a Graphviz .dot file visualising the transform's CONSTRUCT-template "
+                            "shape, coloured red/green/gray by gap/ok/unverified (see "
+                            "docs/MODELLING_PATTERN_CONSISTENCY.md) -- render with e.g. "
+                            "'dot -Tsvg file.dot -o file.svg'")
+    patc.add_argument("--out-dir", default="out/pattern-consistency")
+    patc.add_argument("--fail-on-mismatch", action="store_true",
+                       help="exit 1 if any modelling-pattern inconsistency is found across ontology, taxonomy, "
+                            "transformation, or output data (default: always exit 0, report-only)")
+    _add_verbose_arg(patc)
 
     return p
 
@@ -503,6 +537,48 @@ def cmd_consistency_remote(args) -> int:
     return 0
 
 
+def cmd_pattern_consistency(args) -> int:
+    """The taxonomy<->transformation boundary `consistency` doesn't check --
+    see `pattern_consistency.py`'s module docstring for why a query
+    referencing a nonexistent taxonomy value looks identical, from
+    `consistency`'s own checks alone, to a legitimately unverifiable one."""
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    if args.verbose:
+        expanded = io_utils.expand_sources(args.queries, args.file_pattern)
+        print(f"[verbose] {args.queries} (--file-pattern {args.file_pattern}): {len(expanded)} query file(s) matched:")
+        for p in expanded:
+            print(f"    {p}")
+        print(f"[verbose] {len(args.ontologies)} ontology file(s): {args.ontologies}")
+        print(f"[verbose] {len(args.taxonomies)} taxonomy file(s): {args.taxonomies}")
+        if args.output_data:
+            print(f"[verbose] {len(args.output_data)} output-data file(s): {args.output_data}")
+
+    ignore_prefixes = pa.DEFAULT_IGNORED_PREFIXES | set(args.ignore_prefix)
+    report = pattern_consistency.check_four_layer_consistency(
+        args.queries, args.ontologies, args.taxonomies,
+        output_data_paths=args.output_data,
+        query_pattern=args.file_pattern,
+        ignore_prefixes=ignore_prefixes,
+    )
+    text = pattern_consistency.format_four_layer_report(report)
+    (out_dir / "pattern-consistency.txt").write_text(text, encoding="utf-8")
+    print(text)
+    print(f"\nWritten to: {out_dir / 'pattern-consistency.txt'}")
+
+    if args.dot:
+        dot_path = pattern_consistency.write_consistency_dot(
+            args.queries, args.ontologies, args.taxonomies, args.dot,
+            query_pattern=args.file_pattern, ignore_prefixes=ignore_prefixes,
+        )
+        print(f"Wrote {dot_path}")
+
+    if args.fail_on_mismatch and not report.is_clean:
+        return 1
+    return 0
+
+
 def cmd_run(args) -> int:
     out_dir = Path(args.out_dir)
     registry = Registry.load(args.registry)
@@ -594,6 +670,7 @@ def main(argv=None) -> int:
         "version-diff": cmd_version_diff,
         "consistency": cmd_consistency,
         "consistency-remote": cmd_consistency_remote,
+        "pattern-consistency": cmd_pattern_consistency,
     }
     return handlers[args.command](args)
 

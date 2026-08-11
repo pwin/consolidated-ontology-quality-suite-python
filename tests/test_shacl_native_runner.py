@@ -40,6 +40,14 @@ def _rows_for(data_graph, shapes, registry, run_fn):
 
 
 def _row_key(row):
+    """Deliberately excludes severity: pyshacl silently drops an
+    sh:severity declared inside an sh:sparql [...] SPARQLConstraint block
+    and always reports Violation regardless, while the native engine
+    reports the declared severity correctly (a confirmed pyshacl
+    limitation, not a native-engine bug -- see
+    checks/shacl_native_runner.py's module docstring, and
+    test_native_and_pyshacl_disagree_on_sh_sparql_severity below, which
+    pins the actual divergence rather than just excluding it here)."""
     return (row.check_id, row.focus_node, row.value)
 
 
@@ -55,6 +63,26 @@ def test_native_matches_pyshacl_on_the_deliberately_flawed_domain_fixture(domain
     assert {_row_key(r) for r in rows_py} == {_row_key(r) for r in rows_native}
     assert not any(r.check_id is None for r in rows_py)
     assert not any(r.check_id is None for r in rows_native)
+
+
+def test_native_and_pyshacl_disagree_on_sh_sparql_severity(domain_graph, shapes, registry):
+    """QUA-002 (resources/shapes/quality.ttl) declares `sh:severity sh:Info`
+    inside its `sh:sparql [...]` SPARQLConstraint block. pyshacl silently
+    drops that and reports Violation anyway; the native engine reports the
+    declared Info correctly (per the SHACL-AF spec). This pins the actual
+    divergence -- see checks/shacl_native_runner.py's module docstring for
+    why `_row_key` above excludes severity from the identity comparison,
+    and why this matters in practice: every subcommand defaults to
+    `--fail-on Violation`, so the same ontology can pass or fail purely
+    depending on which --engine is passed."""
+    _conforms_py, rows_py = _rows_for(domain_graph, shapes, registry, run_shacl)
+    _conforms_native, rows_native = _rows_for(domain_graph, shapes, registry, native_runner.run_shacl_native)
+
+    qua002_py = [r for r in rows_py if r.check_id == "QUA-002"]
+    qua002_native = [r for r in rows_native if r.check_id == "QUA-002"]
+    assert qua002_py and qua002_native
+    assert all(r.severity == "Violation" for r in qua002_py)
+    assert all(r.severity == "Info" for r in qua002_native)
 
 
 def test_native_resolves_check_id_for_a_blank_node_rooted_shape(domain_graph, shapes, registry):

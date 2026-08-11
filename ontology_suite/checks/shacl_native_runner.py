@@ -6,9 +6,31 @@ components; this suite's own shapes lean heavily on SHACL-SPARQL, where the
 gap narrows since both engines then spend their time inside a query
 evaluator -- see docs/ARCHITECTURE.md's pyshacl-vs-portable-SPARQL note for
 the equivalent caveat). Verified to find the exact same findings pyshacl
-does, both on ``examples/ontology/domain.ttl`` (18/18) and the
-~3,300-triple vehicle-ontology fixture (38/38) -- see
-``tests/test_shacl_native_runner.py``.
+does by identity -- ``(check_id, focus_node, value)``, both on
+``examples/ontology/domain.ttl`` (18/18) and the ~3,300-triple
+vehicle-ontology fixture (38/38) -- see ``tests/test_shacl_native_runner.py``.
+
+**Identity is proven; severity is not, and the two engines genuinely
+disagree on it.** pyshacl silently drops an ``sh:severity`` declared
+*inside* an ``sh:sparql [...]`` SPARQLConstraint block and always reports
+``Violation`` regardless of what the shape actually says; the native engine
+reports the declared severity correctly (per the SHACL-AF spec -- this is a
+pyshacl limitation, not a native-engine bug). Confirmed directly on this
+suite's own shapes: ``examples/ontology/domain.ttl`` via ``--engine shacl``
+reports 17 Violation/1 Warning/0 Info for the same 18 findings
+``--engine native`` reports as 1 Violation/15 Warning/2 Info --
+``QUA-001``/``QUA-002``/``STY-001``/``STY-002``/``STY-003``/``STR-003``/
+``EFF-001`` all declare ``sh:severity`` this way in ``resources/shapes/*.ttl``
+and pyshacl reports every one of them as ``Violation`` regardless. (A
+``sh:severity`` declared directly on a SHACL-core shape, e.g. ``LOG-001``'s
+``sh:property [...]``, is unaffected -- pyshacl handles that form
+correctly; it's specifically the SPARQLConstraint-nested form it drops.)
+This matters in practice because every subcommand defaults to
+``--fail-on Violation``: the same ontology can pass or fail purely
+depending on which ``--engine`` flag is passed. ``tests/test_shacl_native_runner.py``'s
+``_row_key`` deliberately excludes severity from the identity comparison
+for exactly this reason -- it is not an oversight, it is documenting a
+known, confirmed divergence.
 
 ``shacl`` isn't published to PyPI yet: install a prebuilt wheel from a
 SHACL_Engine GitHub Release (matching your platform), or build one with
@@ -20,6 +42,23 @@ a flat list of `Result` objects, not the real ``sh:ValidationReport`` graph
 this module now consumes directly (``Report.turtle``, added in that
 version) -- see git history for the previous, more manual approach this
 replaced.
+
+**``uv sync`` will silently uninstall it.** Since ``shacl`` isn't a
+``pyproject.toml`` dependency (it can't be, not being on PyPI), ``uv``
+treats it as drift from ``uv.lock`` and removes it on every ``uv sync`` --
+no warning beyond the routine ``- shacl==0.1.3 (from file:///...)`` line in
+``uv sync``'s own output, easy to miss. ``--engine native``/``native+sparql``
+then fail with a clear ``RuntimeError`` (see ``run_shacl_native`` below --
+not silent corruption), but the CLI's own default engine
+(``pipeline.default_engine()``) auto-selects ``native+sparql`` *whenever the
+package is importable*, so losing it after a routine ``uv sync`` silently
+changes which engine every subcommand runs by default, with the severity
+consequences documented above. Reinstall after every ``uv sync``:
+``uv pip install --python .venv/Scripts/python.exe <the wheel>`` -- pass
+``--python`` explicitly rather than relying on the current directory, since
+``uv pip install`` respects a stray ``VIRTUAL_ENV`` environment variable
+over the current project's venv (an easy mistake in a multi-repo shell
+session).
 
 Blank-node sourceShape resolution
 ----------------------------------

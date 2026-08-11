@@ -10,7 +10,19 @@ uv run pytest tests/test_pattern_consistency.py -v
 ```
 
 Run the checker itself against the worked example in this repo
-(`examples/pattern_consistency/`, walked through in full below):
+(`examples/pattern_consistency/`, walked through in full below), either as
+its own `ontology-quality-suite` subcommand:
+
+```
+uv run ontology-quality-suite pattern-consistency \
+  --queries  examples/pattern_consistency/transform.rq \
+  --ontology examples/pattern_consistency/ontology.ttl \
+  --taxonomy examples/pattern_consistency/taxonomy.ttl \
+  --out-dir out/pattern-consistency
+```
+
+or the standalone module directly (same checks, same flags minus
+`--out-dir`, prints to stdout only):
 
 ```
 uv run python -m ontology_suite.pattern_consistency \
@@ -23,10 +35,11 @@ That one's deliberately broken and should print one finding. Swap in
 `transform-fixed.rq` for the clean version:
 
 ```
-uv run python -m ontology_suite.pattern_consistency \
+uv run ontology-quality-suite pattern-consistency \
   --queries  examples/pattern_consistency/transform-fixed.rq \
   --ontology examples/pattern_consistency/ontology.ttl \
-  --taxonomy examples/pattern_consistency/taxonomy.ttl
+  --taxonomy examples/pattern_consistency/taxonomy.ttl \
+  --out-dir out/pattern-consistency
 ```
 
 Point `--queries`/`--ontology`/`--taxonomy` at your own files the same way
@@ -34,8 +47,22 @@ to run it for real; `--ontology`/`--taxonomy` are repeatable if your setup
 spans more than one file each. Add `--fail-on-mismatch` to get a non-zero
 exit code for CI use instead of report-only (default) behavior.
 
-The same module also runs without `uv` (e.g. inside an already-activated
-venv) as plain `python -m ontology_suite.pattern_consistency ...` /
+**Not the same check as the `consistency` subcommand.** `consistency`
+checks ontology<->transformation (prefix/namespace drift, undeclared
+classes/properties via `sketch.prefix_alignment`) and, given `--old`,
+ontology-version drift -- it has no notion of a taxonomy at all, so it
+reports clean on a query that hard-codes a nonexistent taxonomy reference
+(exactly `examples/pattern_consistency/transform.rq`'s deliberate flaw).
+Running `ontology-quality-suite consistency --new .../ontology.ttl
+--queries .../transform.rq` against this same worked example demonstrates
+that directly: a clean, correctly-scoped result for the boundary it
+actually checks, with no signal that `pattern-consistency`'s
+taxonomy<->transformation boundary was never run. If your setup has a
+taxonomy layer at all, run both.
+
+The standalone module also runs without `uv` (e.g. inside an
+already-activated venv) as plain
+`python -m ontology_suite.pattern_consistency ...` /
 `pytest tests/test_pattern_consistency.py -v`.
 
 ## The four layers
