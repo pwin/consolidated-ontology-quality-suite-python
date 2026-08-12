@@ -86,6 +86,71 @@ def test_write_repair_patches_and_apply_repairs(tmp_path):
     assert "ex:NewThing a owl:Class ." in onto.read_text(encoding="utf-8")
 
 
+def test_check_consistency_resolves_new_ontologys_imports_for_tarql_alignment_too(tmp_path):
+    """Regression test for a real reported gap: --import-dir resolved
+    owl:imports for the version-diff/rename-detection half of `consistency`
+    but not for the TARQL-alignment half, which did a plain multi-file parse
+    of just `ontology_paths` (default: [new_ontology] alone) with no import
+    resolution at all -- an imported vocabulary's classes/properties came
+    back "undeclared" unless the caller passed each import's local file
+    again via a repeatable --ontology <path>. Two files in the same
+    directory (import_dir defaults to the main ontology's own directory)
+    reproduce this with no --import-dir flag needed."""
+    _write(
+        tmp_path / "imported.ttl",
+        "@prefix owl: <http://www.w3.org/2002/07/owl#> .\n"
+        "@prefix ex2: <https://example.org/imported/> .\n"
+        "<https://example.org/imported/> a owl:Ontology .\n"
+        "ex2:ImportedClass a owl:Class .\n",
+    )
+    main_onto = _write(
+        tmp_path / "main.ttl",
+        "@prefix owl: <http://www.w3.org/2002/07/owl#> .\n"
+        "<https://example.org/main/> a owl:Ontology ; owl:imports <https://example.org/imported/> .\n",
+    )
+    tarql = _write(
+        tmp_path / "transform.rq",
+        "PREFIX ex2: <https://example.org/imported/>\n"
+        "CONSTRUCT { ?item a ex2:ImportedClass . } WHERE { BIND(?x AS ?item) }\n",
+    )
+
+    report = consistency.check_consistency(main_onto, tarql_sources=[tarql])
+
+    assert report.alignment is not None
+    undeclared = [u.term for u in report.alignment.undeclared_terms]
+    assert "https://example.org/imported/ImportedClass" not in undeclared
+    assert report.is_clean
+
+
+def test_check_consistency_exclude_imports_skips_import_resolution_for_alignment_too(tmp_path):
+    """--exclude-imports should behave consistently across both halves: the
+    imported class stays "undeclared" for TARQL alignment too when imports
+    are explicitly excluded, not silently resolved anyway."""
+    _write(
+        tmp_path / "imported.ttl",
+        "@prefix owl: <http://www.w3.org/2002/07/owl#> .\n"
+        "@prefix ex2: <https://example.org/imported/> .\n"
+        "<https://example.org/imported/> a owl:Ontology .\n"
+        "ex2:ImportedClass a owl:Class .\n",
+    )
+    main_onto = _write(
+        tmp_path / "main.ttl",
+        "@prefix owl: <http://www.w3.org/2002/07/owl#> .\n"
+        "<https://example.org/main/> a owl:Ontology ; owl:imports <https://example.org/imported/> .\n",
+    )
+    tarql = _write(
+        tmp_path / "transform.rq",
+        "PREFIX ex2: <https://example.org/imported/>\n"
+        "CONSTRUCT { ?item a ex2:ImportedClass . } WHERE { BIND(?x AS ?item) }\n",
+    )
+
+    report = consistency.check_consistency(main_onto, tarql_sources=[tarql], exclude_imports=True)
+
+    assert report.alignment is not None
+    undeclared = [u.term for u in report.alignment.undeclared_terms]
+    assert "https://example.org/imported/ImportedClass" in undeclared
+
+
 def test_apply_repairs_respects_min_confidence(tmp_path):
     onto_a = _write(tmp_path / "a.ttl", "@prefix ex: <https://example.org/a/> .\n@prefix owl: <http://www.w3.org/2002/07/owl#> .\nex:X a owl:Class .\n")
     onto_b = _write(tmp_path / "b.ttl", "@prefix ex: <https://example.org/b/> .\n@prefix owl: <http://www.w3.org/2002/07/owl#> .\nex:Y a owl:Class .\n")

@@ -75,6 +75,18 @@ def _print_summary(rows: List[ResultRow], out_dir: Path, warnings: List[str]) ->
     return counts
 
 
+def _filter_own_namespace(rows: List[ResultRow], own_namespace: Optional[str]) -> List[ResultRow]:
+    """Restrict a finished ResultRow set to findings in the caller's own
+    namespace -- a report-layer filter (applied after checking, right before
+    writing reports/printing the summary), not a re-scoping of what's
+    checked. Findings against imported vocabulary terms (e.g. a domain
+    violation on a foaf: property) are still computed correctly -- imports
+    stay resolved -- they're just excluded from the shown/written results."""
+    if not own_namespace:
+        return rows
+    return [r for r in rows if r.focus_node.startswith(own_namespace)]
+
+
 def _exit_code(counts: dict, fail_on: str) -> int:
     if fail_on == "never":
         return 0
@@ -136,6 +148,18 @@ def _add_verbose_arg(p: argparse.ArgumentParser) -> None:
     )
 
 
+def _add_own_namespace_arg(p: argparse.ArgumentParser) -> None:
+    p.add_argument(
+        "--own-namespace", default=None,
+        help="only show findings whose focus node starts with this IRI prefix (repeatable-free; a "
+             "single prefix, e.g. 'https://example.org/acme/'). Filters the report, it does not change "
+             "what's checked -- imports are still resolved and reasoned over normally, so a finding in "
+             "your own terms that depends on an imported vocabulary's declarations is still caught. "
+             "Unlike --exclude-imports, this does not introduce undeclared-term noise; it just hides "
+             "pre-existing findings that belong to an imported vocabulary rather than your own.",
+    )
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="ontology-quality-suite", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="command", required=True)
@@ -161,6 +185,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     _add_engine_arg(chk)
     chk.add_argument("--out-dir", default="out/checks")
     chk.add_argument("--fail-on", default="Violation", choices=["Violation", "Warning", "Info", "never"])
+    _add_own_namespace_arg(chk)
     _add_verbose_arg(chk)
 
     skt = sub.add_parser("sketch", help="Sketch the graph shape of a folder of TARQL/oxi-gen CONSTRUCT queries")
@@ -199,6 +224,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     _add_engine_arg(dat)
     dat.add_argument("--out-dir", default="out/data-eval")
     _add_common_reasoning_args(dat)
+    _add_own_namespace_arg(dat)
     _add_verbose_arg(dat)
 
     doc = sub.add_parser("docgen", help="Generate a human-readable reference documentation page for the ontology (classes, properties, diagrams)")
@@ -243,6 +269,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     run.add_argument("--out-dir", default="out")
     _add_profile_arg(run)
     _add_common_reasoning_args(run)
+    _add_own_namespace_arg(run)
     _add_verbose_arg(run)
 
     vdiff = sub.add_parser("version-diff", help="Compare two versions of an ontology and suggest a semver-style bump")
@@ -269,7 +296,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
     cons.add_argument("--old", default=None, help="an earlier ontology version, to also run version-diff + rename detection")
     cons.add_argument("--queries", action="append", default=[], help="a TARQL/oxi-gen query file or folder (repeatable)")
     cons.add_argument("--ontology", action="append", default=[], dest="ontology_paths",
-                       help="an additional ontology file to consider for TARQL alignment, e.g. an import (repeatable; --new is always included)")
+                       help="an additional ontology file to consider for TARQL alignment (repeatable; --new is "
+                            "always included). --new's own owl:imports are already resolved automatically via "
+                            "--import-dir/--allow-network below -- this flag is for extra files outside that "
+                            "resolution, e.g. a vocabulary not reachable via owl:imports at all")
     cons.add_argument("--file-pattern", default=tarql_visualiser.DEFAULT_QUERY_GLOBS)
     _add_import_args(cons)
     cons.add_argument("--out-dir", default="out/consistency")
@@ -355,8 +385,9 @@ def cmd_checks(args) -> int:
         import_dir=args.import_dir, exclude_imports=args.exclude_imports, allow_network=args.allow_network,
         verbose=args.verbose,
     )
-    _write_reports(stage.rows, registry, out_dir, "Registry Checks Report")
-    counts = _print_summary(stage.rows, out_dir, stage.warnings)
+    rows = _filter_own_namespace(stage.rows, args.own_namespace)
+    _write_reports(rows, registry, out_dir, "Registry Checks Report")
+    counts = _print_summary(rows, out_dir, stage.warnings)
     return _exit_code(counts, args.fail_on)
 
 
@@ -403,8 +434,9 @@ def cmd_data(args) -> int:
         import_dir=args.import_dir, exclude_imports=args.exclude_imports, allow_network=args.allow_network,
         verbose=args.verbose,
     )
-    _write_reports(stage.rows, registry, out_dir, "Data Quality & Conformance Report")
-    counts = _print_summary(stage.rows, out_dir, stage.warnings)
+    rows = _filter_own_namespace(stage.rows, args.own_namespace)
+    _write_reports(rows, registry, out_dir, "Data Quality & Conformance Report")
+    counts = _print_summary(rows, out_dir, stage.warnings)
     if stage.artifacts.get("sample_note"):
         print(stage.artifacts["sample_note"])
     return _exit_code(counts, args.fail_on)
@@ -651,6 +683,7 @@ def cmd_run(args) -> int:
         rows += stage.rows
         warnings += stage.warnings
 
+    rows = _filter_own_namespace(rows, args.own_namespace)
     _write_reports(rows, registry, out_dir, "Consolidated Ontology Suite Report", artifacts)
     counts = _print_summary(rows, out_dir, warnings)
     return _exit_code(counts, args.fail_on)

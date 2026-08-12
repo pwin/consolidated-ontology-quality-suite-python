@@ -107,6 +107,98 @@ def test_per_row_constructed_entities_are_not_treated_as_taxonomy_references(tmp
     assert findings == []
 
 
+# --- check_taxonomy_membership: identity-based, real-data taxonomy check ----
+# (the taxonomy<->output-data boundary check_taxonomy_references structurally
+# can't do, since a per-row dynamically-constructed value has no fixed
+# literal in the query text -- found as a real, reproducible gap building an
+# external worked example against this suite.)
+
+def test_taxonomy_membership_catches_a_dynamically_built_reference_that_doesnt_exist(tmp_path):
+    """check_taxonomy_references (query-text-only) can't see this at all --
+    the department IRI is built per-row from a CSV column
+    (BIND(IRI(CONCAT(...)) AS ?dept)), not hard-coded in the query -- so
+    only real triplified output can expose the gap."""
+    onto = _write(
+        tmp_path / "onto.ttl",
+        "@prefix ex: <https://example.org/demo/> .\n@prefix owl: <http://www.w3.org/2002/07/owl#> .\n"
+        "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+        "ex:Employee a owl:Class .\nex:Department a owl:Class .\n"
+        "ex:worksIn a owl:ObjectProperty ; rdfs:domain ex:Employee ; rdfs:range ex:Department .\n",
+    )
+    taxonomy = _write(
+        tmp_path / "taxonomy.ttl",
+        "@prefix ex: <https://example.org/demo/> .\nex:ENG a ex:Department .\nex:QA a ex:Department .\n",
+    )
+    output = _write(
+        tmp_path / "output.ttl",
+        "@prefix ex: <https://example.org/demo/> .\n"
+        "ex:e1 a ex:Employee ; ex:worksIn ex:ENG .\n"
+        "ex:e2 a ex:Employee ; ex:worksIn ex:MKT .\n",  # MKT never declared in taxonomy.ttl
+    )
+    findings = pc.check_taxonomy_membership([output], [onto], [taxonomy])
+    assert len(findings) == 1
+    assert findings[0].term == "https://example.org/demo/MKT"
+    assert findings[0].property == "https://example.org/demo/worksIn"
+
+
+def test_taxonomy_membership_no_false_positive_for_valid_references(tmp_path):
+    onto = _write(
+        tmp_path / "onto.ttl",
+        "@prefix ex: <https://example.org/demo/> .\n@prefix owl: <http://www.w3.org/2002/07/owl#> .\n"
+        "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+        "ex:Employee a owl:Class .\nex:Department a owl:Class .\n"
+        "ex:worksIn a owl:ObjectProperty ; rdfs:domain ex:Employee ; rdfs:range ex:Department .\n",
+    )
+    taxonomy = _write(
+        tmp_path / "taxonomy.ttl",
+        "@prefix ex: <https://example.org/demo/> .\nex:ENG a ex:Department .\n",
+    )
+    output = _write(
+        tmp_path / "output.ttl",
+        "@prefix ex: <https://example.org/demo/> .\nex:e1 a ex:Employee ; ex:worksIn ex:ENG .\n",
+    )
+    assert pc.check_taxonomy_membership([output], [onto], [taxonomy]) == []
+
+
+def test_taxonomy_property_inference_is_subclass_aware():
+    """examples/pattern_consistency/'s own ontology is exactly this shape:
+    gist:isCategorizedBy's range is the generic gist:Category, but
+    taxonomy.ttl's individuals are typed ex:FuelType, a
+    rdfs:subClassOf gist:Category -- an exact-class-match-only inference
+    would miss this ordinary, non-contrived pattern entirely."""
+    inferred = pc._infer_taxonomy_properties(
+        Graph().parse(ONTOLOGY, format="turtle"),
+        Graph().parse(TAXONOMY, format="turtle"),
+    )
+    assert inferred.get(GIST.isCategorizedBy) == EX.FuelType
+
+
+def test_taxonomy_membership_via_output_data_flag_end_to_end():
+    """The full pattern-consistency --output-data path, using this repo's
+    own bundled fixture -- the same scenario
+    test_broken_transform_output_data_layer_alone_does_not_catch_the_gap
+    demonstrates check_data_conformance() alone can't catch, now caught by
+    the identity-based check running alongside it."""
+    import tempfile
+    from pathlib import Path
+    tmp = Path(tempfile.mkdtemp())
+    output_path = tmp / "output.ttl"
+    output_path.write_text(
+        "@prefix ex: <https://example.org/vehicle-demo/> .\n"
+        "@prefix gist: <https://w3id.org/semanticarts/ns/ontology/gist/> .\n"
+        "ex:vehicle-1 a ex:Vehicle ; gist:isCategorizedBy ex:Gasoline .\n",
+        encoding="utf-8",
+    )
+    report = pc.check_four_layer_consistency(
+        [BROKEN_TRANSFORM], [ONTOLOGY], [TAXONOMY], output_data_paths=[str(output_path)],
+    )
+    assert report.taxonomy_output_data is not None
+    assert len(report.taxonomy_output_data) == 1
+    assert report.taxonomy_output_data[0].term == "https://example.org/vehicle-demo/Gasoline"
+    assert not report.is_clean
+    assert "taxonomy <-> output data" in pc.format_four_layer_report(report)
+
+
 # --- real worked example: examples/pattern_consistency/ ---------------------
 
 def test_broken_transform_flags_exactly_the_taxonomy_gap():

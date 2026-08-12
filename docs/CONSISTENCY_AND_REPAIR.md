@@ -50,6 +50,20 @@ diffs are written as `.patch` files under `--out-dir/repairs` for review
 first -- the same "dry-run by default, opt in to the real edit" convention
 `version-diff --fail-on` and the rest of this suite's CLI already follow.
 
+## `--import-dir` covers both halves of the check
+
+`--new`'s (and `--old`'s) `owl:imports` are resolved via `--import-dir`/
+`--allow-network`/`--exclude-imports` the same way every other
+`--ontology`-taking stage in this suite does -- and that resolution applies
+to **both** halves of `consistency`: version-diff/rename-detection *and*
+TARQL/oxi-gen alignment. A query that references a class or property
+declared only in an ontology `--new` imports (not in `--new` itself) is
+checked against that imported vocabulary automatically; you don't need to
+also pass the imported file's local copy via a repeatable `--ontology
+<path>` just to make TARQL alignment see it. `--ontology` is still there for
+files genuinely outside `--new`'s own `owl:imports` closure (a vocabulary
+the queries use that the ontology doesn't formally import, for instance).
+
 ## How a rename is detected
 
 The hard part isn't finding that a TARQL query references something the

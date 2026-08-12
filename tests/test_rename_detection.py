@@ -56,6 +56,40 @@ def test_explicit_equivalent_class_annotation_is_detected_with_full_confidence()
     assert "equivalentClass" in r.reason
 
 
+def test_explicit_equivalent_class_annotation_is_detected_in_reverse_direction():
+    """owl:equivalentClass is logically symmetric -- asserting it from the
+    *new* term ("here's what this replaces") is just as valid as from the
+    old one, and just as recognizable. Found as a real gap building a
+    worked example against this suite: only the old->new direction was
+    checked, so the equally-valid new->old direction silently fell back to
+    the lower-confidence local-name-similarity signal instead."""
+    old = _graph('ex:Widget a owl:Class .\n')
+    new = _graph('ex:Product a owl:Class ; owl:equivalentClass ex:Widget .\n')
+    diff, _bump = diff_ontologies(old, new)
+    renames = detect_renames(diff, new)
+    assert len(renames) == 1
+    r = renames[0]
+    assert (r.kind, r.old_iri, r.new_iri, r.confidence) == ("class", EX + "Widget", EX + "Product", 1.0)
+    assert "equivalentClass" in r.reason
+
+
+def test_dcterms_is_replaced_by_stays_one_directional():
+    """dcterms:isReplacedBy is directional by definition (the subject is
+    replaced by the object) -- unlike owl:equivalentClass/Property, its
+    reverse direction must NOT be recognized as a migration tombstone,
+    since that would nonsensically claim the new term is replaced by the
+    old one. Falls back to the lower-confidence local-name-similarity
+    signal instead, same as no annotation at all."""
+    old = _graph('ex:Widget a owl:Class .\n')
+    new = _graph(
+        '@prefix dcterms: <http://purl.org/dc/terms/> .\n'
+        'ex:Product a owl:Class ; dcterms:isReplacedBy ex:Widget .\n'
+    )
+    diff, _bump = diff_ontologies(old, new)
+    renames = detect_renames(diff, new)
+    assert all(r.confidence < 1.0 for r in renames)
+
+
 def test_explicit_equivalent_property_annotation_is_detected():
     old = _graph('ex:price a owl:DatatypeProperty .\n')
     new = _graph('ex:cost a owl:DatatypeProperty .\nex:price owl:equivalentProperty ex:cost .\n')

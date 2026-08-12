@@ -21,11 +21,14 @@ the local-file entry point.
 """
 from __future__ import annotations
 
+import contextlib
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, List, Optional
 
 from . import io_utils
+from .ontologyeval import ontology_evaluation
 from .pipeline import load_ontology_graph
 from .repair import tarql_repair
 from .repair.types import RepairSuggestion, apply_suggestion
@@ -55,6 +58,51 @@ class ConsistencyReport:
         return self.alignment is None or self.alignment.is_clean
 
 
+@contextlib.contextmanager
+def _resolved_imports_tempfile(
+    main_ontology: str | Path,
+    import_dir: Optional[str | Path],
+    exclude_imports: bool,
+    allow_network: bool,
+):
+    """Yields one extra ontology file path covering `main_ontology`'s
+    resolved ``owl:imports`` (or ``None`` if `exclude_imports` or nothing
+    resolved) -- so the TARQL-alignment half of `check_consistency` sees the
+    same `--import-dir`/`--allow-network`-resolved imports the version-diff/
+    rename-detection half above already does via `load_ontology_graph`.
+
+    Without this, `pa.check_tarql_ontology_alignment` -> `load_merged_ontology_graph`
+    does a plain multi-file parse of exactly the paths it's given, with no
+    import resolution at all (that function's own docstring says so) --
+    every imported class/property came back "undeclared" unless the caller
+    passed each import's local file again via a repeatable `--ontology
+    <path>`, even though `--import-dir` looked like it should already cover
+    this, since it does for every other `--ontology`-taking stage.
+
+    Reuses `ontology_evaluation.resolve_imports` (the same traversal
+    `load_ontology_graph` calls) rather than reimplementing import
+    resolution here, and serializes the *whole* resolved merge (main
+    ontology + every transitively resolved import, network-fetched ones
+    included) to one temp Turtle file, since `load_merged_ontology_graph`
+    only accepts file paths, not pre-built graphs -- it's shared with every
+    other `--ontology`-taking call site in this suite, so it isn't
+    special-cased to accept a graph just for this caller.
+    """
+    if exclude_imports:
+        yield None
+        return
+    merged_graph, report = ontology_evaluation.resolve_imports(
+        main_ontology, import_dir, allow_network, ontology_evaluation.DEFAULT_IMPORT_GLOBS
+    )
+    if not report["resolved"]:
+        yield None
+        return
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir) / "resolved-imports.ttl"
+        merged_graph.serialize(destination=str(tmp_path), format="turtle")
+        yield str(tmp_path)
+
+
 def check_consistency(
     new_ontology: str | Path,
     *,
@@ -75,10 +123,13 @@ def check_consistency(
       (default: just `new_ontology`), sharpened by any renames detected above.
 
     Import resolution (`import_dir`/`exclude_imports`/`allow_network`)
-    applies to both `old_ontology` and `new_ontology`, same convention as
-    every other `--ontology`-taking stage in `pipeline.py`. `verbose` prints
-    which owl:imports resolved/didn't and which query files `tarql_sources`
-    (a folder, `query_pattern`) actually expanded to, before running.
+    applies to `old_ontology`, `new_ontology`, *and* (via
+    `_resolved_imports_tempfile`) `new_ontology`'s resolved imports being
+    folded into the TARQL-alignment ontology set too -- same convention as
+    every other `--ontology`-taking stage in `pipeline.py`, now including
+    this one. `verbose` prints which owl:imports resolved/didn't and which
+    query files `tarql_sources` (a folder, `query_pattern`) actually
+    expanded to, before running.
     """
     ontology_paths = list(ontology_paths) if ontology_paths is not None else [new_ontology]
     report = ConsistencyReport(new_ontology=str(new_ontology), old_ontology=str(old_ontology) if old_ontology else None)
@@ -107,8 +158,16 @@ def check_consistency(
             print(f"[verbose] {tarql_sources} (--file-pattern {query_pattern}): {len(expanded)} query file(s) matched:")
             for p in expanded:
                 print(f"    {p}")
-        alignment = pa.check_tarql_ontology_alignment(tarql_sources, ontology_paths, query_pattern=query_pattern)
+        with _resolved_imports_tempfile(new_ontology, import_dir, exclude_imports, allow_network) as imports_path:
+            alignment_ontology_paths = ontology_paths + [imports_path] if imports_path else ontology_paths
+            alignment = pa.check_tarql_ontology_alignment(
+                tarql_sources, alignment_ontology_paths, query_pattern=query_pattern
+            )
         report.alignment = alignment
+        # Repairs are written back to the caller's own files, so they use
+        # `ontology_paths` (unexpanded) -- the resolved-imports temp file is
+        # only ever a read-only input to the alignment check above, never a
+        # repair target.
         report.repairs = tarql_repair.suggest_repairs(
             alignment, ontology_paths, tarql_sources, renames=renames,
             ontology_target_for_stubs=ontology_target_for_stubs,

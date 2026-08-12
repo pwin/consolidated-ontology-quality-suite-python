@@ -16,14 +16,18 @@ as the rest of this suite's lint-style checks -- see
 Two independent signals are used, in priority order:
 
 1. **Explicit migration annotation** (``owl:equivalentClass``/
-   ``owl:equivalentProperty``/``dcterms:isReplacedBy`` asserted *from* the
-   old (now-removed) IRI *to* the new (added) one, directly in the new
+   ``owl:equivalentProperty``/``dcterms:isReplacedBy``, directly in the new
    ontology graph) -- always confidence 1.0 when present. This is the only
    signal that can catch a genuine *semantic* rename (``ex:Widget`` ->
    ``ex:Product``, unrelated spellings) -- an ontology author who wants
    downstream tooling (this one included) to resolve the rename
    automatically should leave exactly this kind of tombstone behind when
-   retiring the old IRI.
+   retiring the old IRI. ``owl:equivalentClass``/``owl:equivalentProperty``
+   are logically symmetric, so *either* direction is recognized -- asserted
+   from the old (removed) IRI to the new (added) one, or the other way
+   round (asserting it from the new term -- "here's what this replaces" --
+   is at least as natural to write). ``dcterms:isReplacedBy`` is directional
+   by definition and only recognized old -> new, as its semantics require.
 2. **Local-name similarity** (identical, or a close ``difflib`` match) --
    the fallback when no explicit annotation exists. This only catches
    renames that kept a similar spelling (typo fixes, capitalization, a
@@ -52,10 +56,19 @@ from .diff import OntologyDiff
 MIN_LOCAL_NAME_SIMILARITY = 0.6
 
 DCTERMS = Namespace("http://purl.org/dc/terms/")
+# (label, symmetric?). owl:equivalentClass/equivalentProperty are logically
+# symmetric -- a reasoner treats "A equivalentClass B" and "B equivalentClass
+# A" identically -- so both directions are recognized as a migration
+# tombstone regardless of which side an author asserts it from (asserting it
+# *from the new term* -- "here's what this replaces" -- is at least as
+# natural as from the old one). dcterms:isReplacedBy is directional by
+# definition (the *subject* is replaced by the *object*) and stays one-way;
+# checking its reverse would nonsensically claim the new term is replaced by
+# the old one.
 _MIGRATION_PREDICATES = {
-    OWL.equivalentClass: "owl:equivalentClass",
-    OWL.equivalentProperty: "owl:equivalentProperty",
-    DCTERMS.isReplacedBy: "dcterms:isReplacedBy",
+    OWL.equivalentClass: ("owl:equivalentClass", True),
+    OWL.equivalentProperty: ("owl:equivalentProperty", True),
+    DCTERMS.isReplacedBy: ("dcterms:isReplacedBy", False),
 }
 
 
@@ -92,10 +105,12 @@ def _explicit_migration_candidates(
     if new_graph is None:
         return []
     candidates = []
-    for predicate, label in _MIGRATION_PREDICATES.items():
-        for old, new in new_graph.subject_objects(predicate):
-            if old in removed and new in added:
-                candidates.append((1.0, old, new, f"explicit {label} assertion in the new ontology"))
+    for predicate, (label, symmetric) in _MIGRATION_PREDICATES.items():
+        for subject, obj in new_graph.subject_objects(predicate):
+            if subject in removed and obj in added:
+                candidates.append((1.0, subject, obj, f"explicit {label} assertion in the new ontology"))
+            elif symmetric and obj in removed and subject in added:
+                candidates.append((1.0, obj, subject, f"explicit {label} assertion (reverse direction) in the new ontology"))
     return candidates
 
 

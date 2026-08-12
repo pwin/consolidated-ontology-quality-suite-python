@@ -18,12 +18,30 @@ is small enough to check independently:
                                  taxonomy file is just a small data graph)
   taxonomy <-> transformation   a transform hard-codes a reference to a
                                  controlled-vocabulary individual that
-                                 doesn't actually exist in the taxonomy --
-                                 the one check genuinely new here
-                                 (`check_taxonomy_references`)
+                                 doesn't actually exist in the taxonomy
+                                 (`check_taxonomy_references`) -- static,
+                                 query-text-only, so it can't see a value
+                                 built dynamically per data row (see below)
   ontology+taxonomy <-> output  `dataquality.data_quality` again, against
                                  real triplified output instead of the
-                                 static sketch
+                                 static sketch -- *type*-conformance only
+  taxonomy <-> output data      `check_taxonomy_membership` -- *identity*
+                                 checking against real triplified output:
+                                 does every value actually used with a
+                                 taxonomy-bound property exist as a real
+                                 taxonomy individual? Catches exactly what
+                                 the two checks above structurally can't: a
+                                 per-row dynamically-constructed reference
+                                 (e.g. `BIND(IRI(CONCAT(...,?dept)) AS
+                                 ?deptIri)`) has no fixed literal for
+                                 `check_taxonomy_references` to inspect, and
+                                 an IRI with no `rdf:type` anywhere in the
+                                 data being checked is "unverifiable" to
+                                 type-conformance checking, not "wrong" --
+                                 identical to a reference that genuinely
+                                 doesn't exist. Found as a real gap this way
+                                 while building an external worked example
+                                 against this suite.
 
 `check_four_layer_consistency` runs all four together and returns one
 report. See `docs/MODELLING_PATTERN_CONSISTENCY.md` for the worked example
@@ -35,7 +53,7 @@ import argparse
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional
 
 from rdflib import RDF, Literal, URIRef
 
@@ -106,6 +124,115 @@ def check_taxonomy_references(
     return sorted(findings, key=lambda f: (f.property, f.term))
 
 
+def _infer_taxonomy_properties(ontology_graph, taxonomy_graph) -> Dict[URIRef, URIRef]:
+    """Infer which properties point at taxonomy concepts, with no explicit
+    configuration needed in the common case: any property whose declared
+    `rdfs:range` is a class actually populated (has at least one `rdf:type`
+    instance, directly or via a subclass) in `taxonomy_graph` -- e.g.
+    `acme:worksIn`'s range is `acme:Department`, and `taxonomy_graph`
+    declares `acme:ENG a acme:Department`, so `acme:worksIn` is inferred as
+    taxonomy-bound to `acme:Department`.
+
+    Subclass-aware, not just an exact class match: a taxonomy commonly has
+    a "category root" range class with real individuals typed one of its
+    *subclasses* instead -- this suite's own bundled
+    `examples/pattern_consistency/` fixture is exactly this shape
+    (`gist:isCategorizedBy`'s range is the generic `gist:Category`;
+    `taxonomy.ttl`'s individuals are typed `ex:FuelType`, a
+    `rdfs:subClassOf gist:Category`) -- an exact-match-only check would
+    silently fail to infer the binding for a fixture as ordinary as this
+    suite's own.
+    """
+    declarations = data_quality.ontology_declarations(ontology_graph)
+    parents_of = declarations["parents_of"]
+    taxonomy_classes = {o for _, o in taxonomy_graph.subject_objects(RDF.type)}
+
+    def _is_descendant_or_self(cls: URIRef, target: URIRef) -> bool:
+        if cls == target:
+            return True
+        stack, seen = [cls], set()
+        while stack:
+            current = stack.pop()
+            if current in seen:
+                continue
+            seen.add(current)
+            for parent in parents_of.get(current, ()):
+                if parent == target:
+                    return True
+                stack.append(parent)
+        return False
+
+    result: Dict[URIRef, URIRef] = {}
+    for prop, ranges in declarations["range"].items():
+        for range_class in ranges:
+            matched = {tc for tc in taxonomy_classes if _is_descendant_or_self(tc, range_class)}
+            if matched:
+                result[prop] = next(iter(matched))
+                break
+    return result
+
+
+def check_taxonomy_membership(
+    data_paths: Iterable[str | Path],
+    ontology_paths: Iterable[str | Path],
+    taxonomy_paths: Iterable[str | Path],
+    *,
+    property_to_taxonomy_class: Optional[Dict[URIRef, URIRef]] = None,
+) -> List[TaxonomyReferenceGap]:
+    """Find a *real, triplified* reference to a taxonomy concept that
+    doesn't actually exist -- the identity-based counterpart to
+    `check_taxonomy_references` above, for the case that check structurally
+    cannot catch: a value built dynamically per data row (e.g.
+    `BIND(IRI(CONCAT(...,?department)) AS ?dept)`) has no fixed literal IRI
+    in the query text for `check_taxonomy_references` to inspect -- the
+    problem only exists once real data is produced. `dataquality.
+    data_quality.check_conformance`'s domain/range checking doesn't catch
+    it either: an IRI with no `rdf:type` anywhere in the graph being
+    checked is "unverifiable" there, not "wrong" (deliberately, so a value
+    legitimately typed in a file that wasn't included in a given run isn't
+    misreported as broken) -- and a reference to an individual that
+    genuinely doesn't exist anywhere looks identical to that case. This
+    asks a different, more direct question instead: for a property known
+    to point at a taxonomy concept, does every distinct value actually used
+    with it in the data appear as a subject anywhere in the taxonomy set?
+
+    `property_to_taxonomy_class` maps a property to the taxonomy class its
+    values should belong to (only the keys matter here, not the values --
+    membership is checked against the *whole* taxonomy graph, not scoped
+    per-class, since a taxonomy file is typically small and single-purpose
+    enough that this simpler check is the more useful signal). Left
+    unspecified, it's inferred via `_infer_taxonomy_properties` from each
+    property's declared `rdfs:range`, when that class is actually populated
+    in the given taxonomy set -- covers the common case with no extra
+    configuration; pass it explicitly for a property whose range isn't
+    declared, or isn't itself the taxonomy's root class.
+    """
+    data_graph = pa.load_merged_ontology_graph(data_paths)
+    ontology_graph = pa.load_merged_ontology_graph(ontology_paths)
+    taxonomy_graph = pa.load_merged_ontology_graph(taxonomy_paths)
+
+    if property_to_taxonomy_class is None:
+        property_to_taxonomy_class = _infer_taxonomy_properties(ontology_graph, taxonomy_graph)
+
+    known_individuals = set(taxonomy_graph.subjects(None, None))
+    findings: List[TaxonomyReferenceGap] = []
+    seen = set()
+    for prop in property_to_taxonomy_class:
+        for _s, o in data_graph.subject_objects(prop):
+            if not isinstance(o, URIRef) or o in known_individuals:
+                continue
+            key = (str(prop), str(o))
+            if key in seen:
+                continue
+            seen.add(key)
+            findings.append(TaxonomyReferenceGap(
+                property=str(prop), term=str(o),
+                detail=f"{o} is used as the value of {prop} in the data graph but is not declared "
+                       "as an individual anywhere in the given taxonomy set.",
+            ))
+    return sorted(findings, key=lambda f: (f.property, f.term))
+
+
 def check_data_conformance(ontology_paths: Iterable[str | Path], data_paths: Iterable[str | Path], source_label: str) -> List[ResultRow]:
     """Check any RDF data graph (a taxonomy file, or real triplified
     output) against the ontology's declarations, reusing
@@ -134,6 +261,13 @@ class FourLayerConsistencyReport:
     ontology_taxonomy: List[ResultRow]
     taxonomy_transform: List[TaxonomyReferenceGap]
     output_data: Optional[List[ResultRow]] = field(default=None)
+    taxonomy_output_data: Optional[List[TaxonomyReferenceGap]] = field(default=None)
+    """Identity-based taxonomy<->output-data findings (check_taxonomy_membership)
+    -- only populated alongside `output_data`, when `output_data_paths` is
+    given. Catches a dynamically-built value (one row-to-row IRI a query
+    constructs per CSV row) referencing a taxonomy individual that doesn't
+    exist -- exactly the case `taxonomy_transform` structurally can't see,
+    since there's no fixed literal in the query text for it to inspect."""
 
     @property
     def is_clean(self) -> bool:
@@ -142,6 +276,7 @@ class FourLayerConsistencyReport:
             and not self.ontology_taxonomy
             and not self.taxonomy_transform
             and not self.output_data
+            and not self.taxonomy_output_data
         )
 
 
@@ -157,7 +292,9 @@ def check_four_layer_consistency(
     """Run all four layer-boundary checks together: ontology<->transform,
     ontology<->taxonomy, taxonomy<->transform, and (if `output_data_paths`
     is given -- real triplified output, e.g. from `oxi-gen`)
-    ontology<->output-data."""
+    ontology<->output-data *and* taxonomy<->output-data (type-conformance
+    and taxonomy-membership identity checking respectively -- see
+    `check_taxonomy_membership` for why real output needs both)."""
     ontology_transform = pa.check_tarql_ontology_alignment(
         tarql_sources, ontology_paths, query_pattern=query_pattern, ignore_prefixes=ignore_prefixes
     )
@@ -170,11 +307,17 @@ def check_four_layer_consistency(
         if output_data_paths is not None
         else None
     )
+    taxonomy_output_data = (
+        check_taxonomy_membership(output_data_paths, ontology_paths, taxonomy_paths)
+        if output_data_paths is not None
+        else None
+    )
     return FourLayerConsistencyReport(
         ontology_transform=ontology_transform,
         ontology_taxonomy=ontology_taxonomy,
         taxonomy_transform=taxonomy_transform,
         output_data=output_data,
+        taxonomy_output_data=taxonomy_output_data,
     )
 
 
@@ -201,6 +344,11 @@ def format_four_layer_report(report: FourLayerConsistencyReport) -> str:
         lines.append("== ontology+taxonomy <-> output data ==")
         for row in report.output_data:
             lines.append(f"  [{row.check_id}] {row.message}")
+
+    if report.taxonomy_output_data:
+        lines.append("== taxonomy <-> output data ==")
+        for f in report.taxonomy_output_data:
+            lines.append(f"  [undeclared_taxonomy_reference] {f.detail}")
 
     return "\n".join(lines)
 

@@ -264,6 +264,17 @@ def check_conformance(declarations, data_graph):
     ancestor_memo = {}
 
     def satisfies(term, declared_classes):
+        # owl:Thing/rdfs:Resource are axiomatically the universal class --
+        # every resource is trivially one, whether or not any triple ever
+        # says so. A real vocabulary can and does declare a property's
+        # rdfs:domain/range as owl:Thing deliberately (FOAF's own
+        # "usable on absolutely anything" convention, e.g. foaf:name) --
+        # the ordinary subclass-ancestor walk below can never reach that,
+        # since no ontology asserts "SomeClass rdfs:subClassOf owl:Thing"
+        # as an ordinary triple, so without this it would false-positive a
+        # domain/range violation on every single use of such a property.
+        if OWL.Thing in declared_classes or RDFS.Resource in declared_classes:
+            return True
         types = entity_types.get(term)
         if not types:
             return None
@@ -302,11 +313,19 @@ def check_conformance(declarations, data_graph):
         range_classes = declarations["range"].get(p)
         if range_classes:
             if isinstance(o, Literal):
-                expected_datatypes = {c for c in range_classes if str(c).startswith(str(XSD)) or c == RDFS.Literal}
-                if expected_datatypes:
-                    actual = o.datatype or (RDFS.langString if o.language else XSD.string)
-                    if actual not in expected_datatypes:
-                        range_violations[p].add(o)
+                # rdfs:Literal is the universal literal class -- like
+                # owl:Thing/rdfs:Resource above, every literal is trivially
+                # one, so a property ranged on it accepts any datatype (real
+                # FOAF's own foaf:name is exactly this: rdfs:range
+                # rdfs:Literal, not a specific datatype).
+                if RDFS.Literal in range_classes:
+                    pass
+                else:
+                    expected_datatypes = {c for c in range_classes if str(c).startswith(str(XSD))}
+                    if expected_datatypes:
+                        actual = o.datatype or (RDFS.langString if o.language else XSD.string)
+                        if actual not in expected_datatypes:
+                            range_violations[p].add(o)
             else:
                 result = satisfies(o, range_classes)
                 if result is False:

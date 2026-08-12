@@ -92,12 +92,13 @@ its source, by checking each layer boundary independently:
 |---|---|---|
 | ontology <-> transformation | `sketch.prefix_alignment` | prefix/namespace drift; classes/properties a query uses that the ontology never declares |
 | ontology <-> taxonomy | `dataquality.data_quality` (reused) | a taxonomy individual typed with a class the ontology never declared |
-| taxonomy <-> transformation | `pattern_consistency.check_taxonomy_references` (new) | a query hard-codes a reference to a controlled-vocabulary individual that doesn't actually exist in the taxonomy |
-| ontology+taxonomy <-> output data | `dataquality.data_quality` (reused) | real triplified output using an undeclared class/property |
+| taxonomy <-> transformation | `pattern_consistency.check_taxonomy_references` | a query hard-codes a reference to a controlled-vocabulary individual that doesn't actually exist in the taxonomy -- static, query-text-only |
+| ontology+taxonomy <-> output data | `dataquality.data_quality` (reused) | real triplified output using an undeclared class/property, or the wrong type -- *type*-conformance only |
+| taxonomy <-> output data | `pattern_consistency.check_taxonomy_membership` | a real triplified value referencing a taxonomy individual that doesn't exist -- *identity* checking, catching exactly what the previous two rows structurally can't (see below) |
 
-Three of the four boundaries were already covered by existing tooling
-(`docs/TARQL_ALIGNMENT.md`, `dataquality.data_quality`); the taxonomy<->
-transformation boundary was the genuine gap, and is what this module adds.
+Most of these boundaries were already covered by existing tooling
+(`docs/TARQL_ALIGNMENT.md`, `dataquality.data_quality`); taxonomy<->
+transformation and taxonomy<->output-data are what this module adds.
 
 ## Why taxonomy<->transformation needed its own check
 
@@ -116,6 +117,67 @@ Catching it needs a different question -- not "is this value's type
 compatible?" but "does this value exist at all?" -- asked directly against
 the taxonomy, which is exactly what `check_taxonomy_references` does. The
 worked example below demonstrates this concretely.
+
+## The gap `check_taxonomy_references` itself can't cover: dynamically-built values
+
+`check_taxonomy_references` inspects the CONSTRUCT template's own text --
+it works because a hard-coded reference (`gist:isCategorizedBy
+ex:Gasoline`, written directly by the query author) is a literal IRI
+sitting right there to check. It has a structural blind spot: a value
+built *dynamically*, one per CSV row --
+`BIND(IRI(CONCAT(".../department/", ?department)) AS ?dept)` -- has no
+fixed literal in the query text at all. The row-to-row value only exists
+once the query actually runs against real data, so no amount of reading
+the query text can find a bad one. This is a real, reproducible gap found
+building an external SemOps worked example against this suite (a
+`department` CSV column with a value -- `"MKT"` -- the taxonomy never
+declared, referenced via exactly this per-row `BIND`/`CONCAT` pattern).
+
+`check_taxonomy_membership` covers it, by asking the question at the only
+point it can actually be answered -- against real triplified output, not
+the query template:
+
+```python
+from ontology_suite import pattern_consistency as pc
+
+findings = pc.check_taxonomy_membership(
+    ["path/to/real-output.ttl"], ["path/to/ontology.ttl"], ["path/to/taxonomy.ttl"],
+)
+```
+
+For each property known to point at a taxonomy concept, it collects every
+distinct value actually used with that property in the data and reports
+any not present as an individual anywhere in the taxonomy graph -- a much
+simpler question than type-conformance checking (set membership, not
+domain/range/ancestor-walking), and one type-conformance checking
+structurally can't answer: an IRI with no `rdf:type` triple anywhere in
+the graph being checked is "unverifiable" there (deliberately -- so a
+value legitimately typed in a file that just wasn't included in a given
+run isn't misreported as broken), and a reference to something that
+**genuinely doesn't exist** looks identical to that case. "Does this value
+exist at all?" is a different question than "is this value's type
+compatible?", and needs asking directly.
+
+**Which property counts as "taxonomy-bound" is inferred automatically** in
+the common case, from the property's own declared `rdfs:range`: if that
+range class (or a subclass of it -- see below) is actually populated with
+individuals in the given taxonomy set, the property is taken as
+taxonomy-bound to it. No configuration needed for a property like
+`acme:worksIn` (`rdfs:range acme:Department`, with `taxonomy.ttl`
+declaring `acme:ENG a acme:Department`) or this suite's own
+`gist:isCategorizedBy` (`rdfs:range gist:Category`, with `taxonomy.ttl`
+declaring its individuals typed `ex:FuelType`, a `rdfs:subClassOf
+gist:Category` -- the inference walks the ontology's own subclass
+hierarchy, not just an exact class match, since a taxonomy commonly has a
+generic "category root" range class with real individuals typed one of
+its more specific subclasses). Pass `property_to_taxonomy_class`
+explicitly for a property whose range isn't declared, or isn't itself
+close to the taxonomy's root class.
+
+Wired into `pattern-consistency --output-data`/`check_four_layer_consistency`
+automatically -- `report.taxonomy_output_data` is populated alongside
+`report.output_data` whenever `--output-data`/`output_data_paths` is
+given, no separate flag needed.
 
 ## Worked example: `examples/pattern_consistency/`
 
@@ -295,12 +357,14 @@ pc.write_consistency_dot(
 
 `report.ontology_transform` (a `sketch.prefix_alignment.AlignmentReport`),
 `report.ontology_taxonomy` (`ResultRow`s, `CNF-001`/`CNF-002`/`CNF-003`/
-`CNF-004`), `report.taxonomy_transform` (`TaxonomyReferenceGap`s), and
-`report.output_data` are also inspectable individually. The three checks
-that produce `ResultRow`s omit `CNF-005` ("class never populated") --
-that's a population-*completeness* signal, not a modelling
-*inconsistency*, and would be noise in every real example (a taxonomy
-file legitimately never touches most of an ontology's classes).
+`CNF-004`), `report.taxonomy_transform` (`TaxonomyReferenceGap`s),
+`report.output_data`, and `report.taxonomy_output_data`
+(`TaxonomyReferenceGap`s again -- `None` unless `output_data_paths` was
+given) are also inspectable individually. The `ResultRow`-producing checks
+omit `CNF-005` ("class never populated") -- that's a population-
+*completeness* signal, not a modelling *inconsistency*, and would be noise
+in every real example (a taxonomy file legitimately never touches most of
+an ontology's classes).
 
 ## A fix this feature needed to be accurate: SKOS annotation predicates
 
