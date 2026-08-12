@@ -53,6 +53,13 @@ See `docs/CONSISTENCY_AND_REPAIR.md` for the local-file workflow,
 the inherited pipeline this all sits on top of, and
 `docs/UPSTREAM_README.md` for that pipeline's own original README.
 
+Want one continuous, realistic worked example instead of task-by-task
+fixtures? `docs/ACME_ROBOTICS_WALKTHROUGH.md` runs nearly every stage above
+against a single small org chart built on two real external vocabularies
+(W3C Organization Ontology, FOAF) -- with two companion notebooks,
+`docs/acme_robotics_lifecycle.ipynb` and
+`docs/acme_robotics_data_pipeline.ipynb` (also validated on every push).
+
 ## Quick start
 
 ```bash

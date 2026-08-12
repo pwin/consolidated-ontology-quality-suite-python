@@ -608,3 +608,12 @@ Nothing here requires steps in strict order -- a project with no
 triplification pipeline at all (ontology-only work) legitimately stops
 after step 2, permanently, and that's a complete, valid use of this suite,
 not a partial one.
+
+## 15. Want to see it all together?
+
+Every use case above uses its own small, isolated fixture. For one
+continuous, realistic worked example running through most of the suite in
+the order a real project would actually hit it, see
+`docs/ACME_ROBOTICS_WALKTHROUGH.md` -- a small org chart built on two real
+external vocabularies (W3C Organization Ontology, FOAF), with two runnable
+companion notebooks.

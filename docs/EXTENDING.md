@@ -132,3 +132,11 @@ print(len(list(result.graph)))
 
 A query that "looks right" but matches zero triples against a fixture that
 should trigger it is a bug, not a clean bill of health.
+
+## A real worked example
+
+`examples/acme_robotics/custom_checks/` is a real, minimal project-local
+registry (one check, `ACM-001`) built following exactly the steps above --
+see `docs/ACME_ROBOTICS_WALKTHROUGH.md` §4 for the full walkthrough,
+including verifying it against real triplified data with zero false
+positives and a deliberately incomplete record that correctly fires it.

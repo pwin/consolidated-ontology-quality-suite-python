@@ -15,7 +15,21 @@ from ..checks.merge import ResultRow
 from ..checks.registry import Registry
 
 
+_FULL_RESULTS_COLUMNS = [
+    "check_id", "category", "title", "severity", "focus_node", "path", "value",
+    "message", "remediation", "sources",
+]
+
+
 def rows_to_dataframe(rows: List[ResultRow]) -> pd.DataFrame:
+    # Explicit columns even when rows is empty -- a plain pd.DataFrame([])
+    # has none at all, so a fully clean run's full_results.csv comes out
+    # completely empty (no header row), which pandas' own pd.read_csv can't
+    # parse back (EmptyDataError) -- caught building a notebook that calls
+    # pd.read_csv(full_results.csv) unconditionally after every run,
+    # including a clean one.
+    if not rows:
+        return pd.DataFrame(columns=_FULL_RESULTS_COLUMNS)
     return pd.DataFrame(
         [
             {

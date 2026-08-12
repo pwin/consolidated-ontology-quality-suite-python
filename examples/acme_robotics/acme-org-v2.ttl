@@ -1,0 +1,130 @@
+@prefix acme: <https://acme.example.org/ns/> .
+@prefix org: <http://www.w3.org/ns/org#> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+# Acme Robotics' org-chart ontology, v2.0.0 -- a plausible next release:
+# fixes the QUA-002 metadata gap from v1, renames Engineer -> SoftwareEngineer
+# (a MAJOR, breaking change) *with* an owl:equivalentClass migration
+# annotation so this suite's rename detection + auto-repair can do its job,
+# and adds one genuinely new, additive class+property (MINOR). Everything
+# else from v1 (the Contractor contradiction, hasSkill's missing label,
+# reports_to's naming/domain-range gaps) is left exactly as it was --
+# a real release doesn't fix everything at once, and
+# docs/ACME_ROBOTICS_WALKTHROUGH.md's `checks`/`consistency` walkthrough
+# uses that fact deliberately.
+
+<https://acme.example.org/ns/2.0.0>
+    a owl:Ontology ;
+    owl:versionIRI <https://acme.example.org/ns/2.0.0> ;
+    owl:imports <http://www.w3.org/ns/org#>, <http://xmlns.com/foaf/0.1/> ;
+    owl:versionInfo "2.0.0" ;
+    dcterms:title "Acme Robotics Organization Ontology"@en ;
+    rdfs:label "Acme Robotics Organization Ontology"@en ;
+    rdfs:comment "Acme Robotics' internal org chart: departments, employees, and roles, built on org: and FOAF."@en .
+
+# --------------------------------------------------------------------------
+# Classes (unchanged from v1)
+# --------------------------------------------------------------------------
+
+acme:Department a owl:Class ;
+    rdfs:subClassOf org:OrganizationalUnit ;
+    rdfs:label "Department"@en ;
+    rdfs:comment "A named organizational unit within Acme Robotics, e.g. Engineering."@en .
+
+acme:Employee a owl:Class ;
+    rdfs:subClassOf foaf:Person ;
+    rdfs:label "Employee"@en ;
+    rdfs:comment "A person employed by Acme Robotics."@en .
+
+acme:Contractor a owl:Class ;
+    rdfs:subClassOf acme:Employee ;
+    owl:disjointWith acme:Employee ;
+    rdfs:label "Contractor"@en ;
+    rdfs:comment "A person under a fixed-term contract rather than permanent employment."@en .
+    # Still unsatisfiable (LOG-001) -- v2 doesn't fix this one; see the manual.
+
+# --------------------------------------------------------------------------
+# Renamed: acme:Engineer -> acme:SoftwareEngineer (MAJOR, with a migration
+# annotation so a rename, not a delete+add, is what gets detected/repaired).
+#
+# The migration triple is asserted acme:Engineer owl:equivalentClass
+# acme:SoftwareEngineer -- FROM the old (removed) IRI TO the new (added)
+# one, the conventional direction for a retiring-IRI tombstone.
+# owl:equivalentClass is logically symmetric (either direction means the
+# same thing to a reasoner), and this suite's rename-detection heuristic
+# recognizes both directions as a migration tombstone at full confidence
+# (ontology_suite/versioning/rename_detection.py's module docstring covers
+# why dcterms:isReplacedBy, unlike this predicate, stays one-way). See
+# docs/ACME_ROBOTICS_WALKTHROUGH.md.
+# --------------------------------------------------------------------------
+
+acme:SoftwareEngineer a owl:Class ;
+    rdfs:subClassOf acme:Employee ;
+    rdfs:label "Software Engineer"@en ;
+    rdfs:comment "An employee whose primary role is software engineering. Was acme:Engineer in v1.0.0."@en .
+
+acme:Engineer owl:equivalentClass acme:SoftwareEngineer .
+
+# --------------------------------------------------------------------------
+# New in v2.0.0 (MINOR, purely additive)
+# --------------------------------------------------------------------------
+
+acme:ProductManager a owl:Class ;
+    rdfs:subClassOf acme:Employee ;
+    rdfs:label "Product Manager"@en ;
+    rdfs:comment "An employee who owns product direction for one or more teams."@en .
+
+acme:hireDate a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain acme:Employee ;
+    rdfs:range xsd:date ;
+    rdfs:label "hire date"@en ;
+    rdfs:comment "The date this employee joined Acme Robotics."@en .
+
+# --------------------------------------------------------------------------
+# Properties (unchanged from v1)
+# --------------------------------------------------------------------------
+
+acme:hasEmployeeId a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain acme:Employee ;
+    rdfs:range xsd:string ;
+    rdfs:label "has employee ID"@en ;
+    rdfs:comment "Acme's internal employee identifier, e.g. ACM-0042."@en .
+
+acme:worksIn a owl:ObjectProperty ;
+    rdfs:domain acme:Employee ;
+    rdfs:range acme:Department ;
+    rdfs:label "works in"@en ;
+    rdfs:comment "The department an employee primarily works in."@en .
+
+acme:hasRole a owl:DatatypeProperty ;
+    rdfs:domain acme:Employee ;
+    rdfs:range xsd:string ;
+    rdfs:label "has role"@en ;
+    rdfs:comment "The employee's job title/role, as free text."@en .
+
+acme:hasSkill a owl:DatatypeProperty ;
+    rdfs:domain acme:Employee ;
+    rdfs:range xsd:string .
+
+acme:reports_to a owl:ObjectProperty ;
+    rdfs:label "reports to"@en .
+
+# --------------------------------------------------------------------------
+# SKOS terms used by taxonomy.ttl, stubbed locally (unchanged from v1).
+# --------------------------------------------------------------------------
+
+skos:Concept a owl:Class ;
+    rdfs:label "Concept"@en .
+
+skos:ConceptScheme a owl:Class ;
+    rdfs:label "Concept Scheme"@en .
+
+skos:inScheme a owl:ObjectProperty ;
+    rdfs:domain skos:Concept ;
+    rdfs:range skos:ConceptScheme ;
+    rdfs:label "in scheme"@en .

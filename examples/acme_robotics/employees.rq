@@ -1,0 +1,26 @@
+PREFIX acme: <https://acme.example.org/ns/>
+PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+
+# Triplifies employees.csv against acme-org-v1.ttl/v2.ttl. Two deliberate
+# gaps, each demonstrating a different check in SemOps_Manual.md:
+#   - row E005's department ("MKT", Marketing) is not declared in
+#     taxonomy.ttl's controlled department list (ENG/QA/SALES only) --
+#     `pattern-consistency`'s taxonomy<->transformation boundary.
+#   - every row is typed acme:Engineer, which v2.0.0 renames to
+#     acme:SoftwareEngineer (with a migration annotation) -- this query is
+#     what `consistency --old acme-org-v1.ttl --new acme-org-v2.ttl`'s
+#     rename detection + auto-repair fixes.
+CONSTRUCT {
+  ?employee a acme:Employee, acme:Engineer ;
+    foaf:name ?name ;
+    foaf:mbox ?emailIri ;
+    acme:hasEmployeeId ?id ;
+    acme:worksIn ?dept ;
+    acme:hasRole ?role ;
+    acme:hasSkill ?skill .
+}
+WHERE {
+  BIND(IRI(CONCAT("https://acme.example.org/data/employee/", ?id)) AS ?employee)
+  BIND(IRI(CONCAT("https://acme.example.org/data/department/", ?department)) AS ?dept)
+  BIND(IRI(CONCAT("mailto:", ?email)) AS ?emailIri)
+}

@@ -1,0 +1,25 @@
+@prefix acme: <https://acme.example.org/ns/> .
+@prefix dept: <https://acme.example.org/data/department/> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+# The controlled vocabulary of valid Acme Robotics departments -- the
+# taxonomy layer in SemOps_Manual.md's four-layer consistency story
+# (ontology <-> taxonomy <-> transformation <-> output data). Individuals'
+# IRIs deliberately match what employees.rq constructs from the CSV's
+# `department` column, so a CSV row using a department code NOT declared
+# here (see employees.csv's "MKT" row) is a genuine, catchable gap.
+
+acme:DepartmentTaxonomy a skos:ConceptScheme ;
+    skos:prefLabel "Acme Robotics Department Taxonomy"@en .
+
+dept:ENG a acme:Department, skos:Concept ;
+    skos:inScheme acme:DepartmentTaxonomy ;
+    skos:prefLabel "Engineering"@en .
+
+dept:QA a acme:Department, skos:Concept ;
+    skos:inScheme acme:DepartmentTaxonomy ;
+    skos:prefLabel "Quality Assurance"@en .
+
+dept:SALES a acme:Department, skos:Concept ;
+    skos:inScheme acme:DepartmentTaxonomy ;
+    skos:prefLabel "Sales"@en .

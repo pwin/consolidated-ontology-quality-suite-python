@@ -1,0 +1,105 @@
+@prefix acme: <https://acme.example.org/ns/> .
+@prefix org: <http://www.w3.org/ns/org#> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+# Acme Robotics' internal org-chart ontology, v1.0.0 -- the worked example
+# behind docs/ACME_ROBOTICS_WALKTHROUGH.md. Extends two real, external
+# W3C/community vocabularies (the W3C Organization Ontology, org:, and
+# FOAF) rather than reinventing "person" and "organizational unit" from
+# scratch -- exactly the reuse pattern a real ontology should follow, and
+# it exercises this suite's owl:imports resolution for real.
+#
+# Deliberately imperfect, on purpose, the same way this repo's own
+# examples/ontology/domain.ttl is: each flaw below is commented with
+# exactly which check it's there to demonstrate.
+
+<https://acme.example.org/ns/1.0.0>
+    a owl:Ontology ;
+    owl:versionIRI <https://acme.example.org/ns/1.0.0> ;
+    owl:imports <http://www.w3.org/ns/org#>, <http://xmlns.com/foaf/0.1/> ;
+    rdfs:label "Acme Robotics Organization Ontology"@en ;
+    rdfs:comment "Acme Robotics' internal org chart: departments, employees, and roles, built on org: and FOAF."@en .
+    # DELIBERATE FLAW (QUA-002): no owl:versionInfo / dcterms:title -- fixed in v2.
+
+# --------------------------------------------------------------------------
+# Classes
+# --------------------------------------------------------------------------
+
+acme:Department a owl:Class ;
+    rdfs:subClassOf org:OrganizationalUnit ;
+    rdfs:label "Department"@en ;
+    rdfs:comment "A named organizational unit within Acme Robotics, e.g. Engineering."@en .
+
+acme:Employee a owl:Class ;
+    rdfs:subClassOf foaf:Person ;
+    rdfs:label "Employee"@en ;
+    rdfs:comment "A person employed by Acme Robotics."@en .
+
+acme:Engineer a owl:Class ;
+    rdfs:subClassOf acme:Employee ;
+    rdfs:label "Engineer"@en ;
+    rdfs:comment "An employee whose primary role is engineering. Renamed to acme:SoftwareEngineer in v2.0.0."@en .
+
+acme:Contractor a owl:Class ;
+    rdfs:subClassOf acme:Employee ;
+    owl:disjointWith acme:Employee ;
+    rdfs:label "Contractor"@en ;
+    rdfs:comment "A person under a fixed-term contract rather than permanent employment."@en .
+    # DELIBERATE FLAW (LOG-001): subClassOf Employee AND disjointWith Employee
+    # at once -- makes Contractor logically unsatisfiable. Mirrors domain.ttl's
+    # own Reptile/Animal example exactly.
+
+# --------------------------------------------------------------------------
+# Properties
+# --------------------------------------------------------------------------
+
+acme:hasEmployeeId a owl:DatatypeProperty, owl:FunctionalProperty ;
+    rdfs:domain acme:Employee ;
+    rdfs:range xsd:string ;
+    rdfs:label "has employee ID"@en ;
+    rdfs:comment "Acme's internal employee identifier, e.g. ACM-0042."@en .
+
+acme:worksIn a owl:ObjectProperty ;
+    rdfs:domain acme:Employee ;
+    rdfs:range acme:Department ;
+    rdfs:label "works in"@en ;
+    rdfs:comment "The department an employee primarily works in."@en .
+
+acme:hasRole a owl:DatatypeProperty ;
+    rdfs:domain acme:Employee ;
+    rdfs:range xsd:string ;
+    rdfs:label "has role"@en ;
+    rdfs:comment "The employee's job title/role, as free text."@en .
+
+acme:hasSkill a owl:DatatypeProperty ;
+    rdfs:domain acme:Employee ;
+    rdfs:range xsd:string .
+    # DELIBERATE FLAW (QUA-001): no rdfs:label at all.
+
+acme:reports_to a owl:ObjectProperty ;
+    rdfs:label "reports to"@en .
+    # DELIBERATE FLAWS: STY-002 (local name "reports_to" isn't lowerCamelCase)
+    # and STR-003 (no rdfs:domain/range declared at all).
+
+# --------------------------------------------------------------------------
+# SKOS terms used by taxonomy.ttl, stubbed locally rather than imported --
+# the same choice consolidated_ontology_suite_python's own
+# examples/pattern_consistency/ontology.ttl makes for gist:Category
+# ("purely to keep this example small and fast -- a real project would
+# import the real vocabulary instead").
+# --------------------------------------------------------------------------
+
+skos:Concept a owl:Class ;
+    rdfs:label "Concept"@en .
+
+skos:ConceptScheme a owl:Class ;
+    rdfs:label "Concept Scheme"@en .
+
+skos:inScheme a owl:ObjectProperty ;
+    rdfs:domain skos:Concept ;
+    rdfs:range skos:ConceptScheme ;
+    rdfs:label "in scheme"@en .

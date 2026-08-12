@@ -1,0 +1,22 @@
+PREFIX acme: <https://acme.example.org/ns/>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+
+# Project-specific check: every acme:Employee must carry an
+# acme:hasEmployeeId. Not part of this suite's own registry -- added here
+# per docs/EXTENDING.md, in a project-local --registry/--sparql copy (see
+# docs/ACME_ROBOTICS_WALKTHROUGH.md's tooling-extension walkthrough). This
+# is intentionally a minimal registry (just this one check) rather than a
+# full copy of ontology_suite/resources/ -- point --shapes/--sparql at the
+# real resources dir alongside this one if you also want the full 50-check
+# registry to keep running.
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Violation ;
+    sh:focusNode ?this ;
+    sh:resultMessage "Employee {$this} has no acme:hasEmployeeId." ;
+    sh:sourceConstraintComponent acme:ACM-001 .
+}
+WHERE {
+  ?this a acme:Employee .
+  FILTER NOT EXISTS { ?this acme:hasEmployeeId ?id }
+}

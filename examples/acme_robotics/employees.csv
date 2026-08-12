@@ -1,0 +1,6 @@
+id,name,email,department,role,skill
+E001,Grace Hopper,grace.hopper@acme.example.org,ENG,Software Engineer,Rust
+E002,Ada Lovelace,ada.lovelace@acme.example.org,ENG,Software Engineer,SPARQL
+E003,Alan Turing,alan.turing@acme.example.org,ENG,Software Engineer,SHACL
+E004,Margaret Hamilton,margaret.hamilton@acme.example.org,QA,Test Engineer,Automation
+E005,Katherine Johnson,katherine.johnson@acme.example.org,MKT,Analyst,Forecasting

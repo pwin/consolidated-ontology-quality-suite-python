@@ -1,24 +1,26 @@
-name: Validate primer notebook
+name: Validate notebooks
 
-# Executes docs/primer.ipynb end-to-end on every push/PR that could affect
-# it -- the notebook is a runnable companion to docs/PRIMER.md (every code
-# cell actually runs against this repo's own examples/ fixtures), so it can
-# silently drift out of date the same way any other example code can.
+# Executes each notebook below end-to-end on every push/PR that could affect
+# it -- each is a runnable companion to a doc (docs/PRIMER.md for
+# primer.ipynb, docs/ACME_ROBOTICS_WALKTHROUGH.md for the acme_robotics_*
+# pair), every code cell actually running against this repo's own examples/
+# fixtures -- so a notebook can silently drift out of date the same way any
+# other example code can.
 #
 # jupyter/nbconvert/ipykernel are installed as a one-off CI step, not added
-# to pyproject.toml -- they're a verification tool for this one artifact,
-# not a runtime dependency of the package itself.
+# to pyproject.toml -- they're a verification tool for these artifacts, not
+# a runtime dependency of the package itself.
 #
 # Cells that need optional extras this CI job doesn't install (a real OWL2
 # DL reasoner + Java, a built oxi-gen binary, the native Rust SHACL engine)
-# detect that and skip themselves gracefully rather than failing -- see the
+# detect that and skip themselves gracefully rather than failing -- see each
 # notebook's own setup/reasoner/triplify cells.
 
 on:
   push:
     branches: [main, develop]
     paths:
-      - "docs/primer.ipynb"
+      - "docs/*.ipynb"
       - "ontology_suite/**"
       - "examples/**"
       - "pyproject.toml"
@@ -26,7 +28,7 @@ on:
       - ".github/workflows/notebook.yml"
   pull_request:
     paths:
-      - "docs/primer.ipynb"
+      - "docs/*.ipynb"
       - "ontology_suite/**"
       - "examples/**"
       - "pyproject.toml"
@@ -39,6 +41,13 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        notebook:
+          - docs/primer.ipynb
+          - docs/acme_robotics_lifecycle.ipynb
+          - docs/acme_robotics_data_pipeline.ipynb
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
@@ -48,15 +57,15 @@ jobs:
       - name: Execute the notebook
         run: |
           uv run jupyter nbconvert --to notebook --execute \
-            --output /tmp/primer-executed.ipynb \
+            --output /tmp/executed.ipynb \
             --ExecutePreprocessor.kernel_name=python3 \
             --ExecutePreprocessor.timeout=300 \
-            docs/primer.ipynb
+            "${{ matrix.notebook }}"
       - name: Check for cell errors
         run: |
           uv run python -c "
           import json, sys
-          nb = json.load(open('/tmp/primer-executed.ipynb', encoding='utf-8'))
+          nb = json.load(open('/tmp/executed.ipynb', encoding='utf-8'))
           errors = [
               (i, o.get('ename'), o.get('evalue'))
               for i, cell in enumerate(nb['cells']) if cell['cell_type'] == 'code'
