@@ -38,6 +38,16 @@ local file, an http(s) URL, or either gzip-compressed, transparently (see
 `ontology_suite/io_utils.py` and `docs/ARCHITECTURE.md`'s "Loading files"
 section).
 
+**New here? Start with `docs/PRIMER.md`** -- a task-oriented guide to which
+command answers which question, worked examples for every major use case
+(auditing an ontology, validating a CSV-to-RDF pipeline, releasing a new
+version, auto-repairing drift, taxonomy governance, live-triplestore
+checks, CI wiring), and a suggested adoption path. New to RDF/OWL? It opens
+with a short, plain-language glossary. Prefer running things over reading
+them? `docs/primer.ipynb` is a Jupyter notebook covering most of the same
+ground with live, executable cells against this repo's own `examples/`
+fixtures (validated on every push by `.github/workflows/notebook.yml`).
+
 See `docs/CONSISTENCY_AND_REPAIR.md` for the local-file workflow,
 `docs/FUSEKI.md` for the live-triplestore one, `docs/ARCHITECTURE.md` for
 the inherited pipeline this all sits on top of, and

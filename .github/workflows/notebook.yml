@@ -1,0 +1,68 @@
+name: Validate primer notebook
+
+# Executes docs/primer.ipynb end-to-end on every push/PR that could affect
+# it -- the notebook is a runnable companion to docs/PRIMER.md (every code
+# cell actually runs against this repo's own examples/ fixtures), so it can
+# silently drift out of date the same way any other example code can.
+#
+# jupyter/nbconvert/ipykernel are installed as a one-off CI step, not added
+# to pyproject.toml -- they're a verification tool for this one artifact,
+# not a runtime dependency of the package itself.
+#
+# Cells that need optional extras this CI job doesn't install (a real OWL2
+# DL reasoner + Java, a built oxi-gen binary, the native Rust SHACL engine)
+# detect that and skip themselves gracefully rather than failing -- see the
+# notebook's own setup/reasoner/triplify cells.
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "docs/primer.ipynb"
+      - "ontology_suite/**"
+      - "examples/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/notebook.yml"
+  pull_request:
+    paths:
+      - "docs/primer.ipynb"
+      - "ontology_suite/**"
+      - "examples/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/notebook.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv sync
+      - run: uv pip install jupyter nbconvert ipykernel
+      - run: uv run python -m ipykernel install --user --name python3
+      - name: Execute the notebook
+        run: |
+          uv run jupyter nbconvert --to notebook --execute \
+            --output /tmp/primer-executed.ipynb \
+            --ExecutePreprocessor.kernel_name=python3 \
+            --ExecutePreprocessor.timeout=300 \
+            docs/primer.ipynb
+      - name: Check for cell errors
+        run: |
+          uv run python -c "
+          import json, sys
+          nb = json.load(open('/tmp/primer-executed.ipynb', encoding='utf-8'))
+          errors = [
+              (i, o.get('ename'), o.get('evalue'))
+              for i, cell in enumerate(nb['cells']) if cell['cell_type'] == 'code'
+              for o in cell.get('outputs', []) if o.get('output_type') == 'error'
+          ]
+          for i, ename, evalue in errors:
+              print(f'CELL {i}: {ename}: {evalue}', file=sys.stderr)
+          sys.exit(1 if errors else 0)
+          "

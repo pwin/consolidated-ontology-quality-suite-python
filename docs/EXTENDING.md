@@ -3,6 +3,19 @@
 There are three kinds of check, depending on what it needs to compute. Pick
 the lightest one that fits.
 
+**Paths below are relative to `ontology_suite/resources/`** (i.e.
+`registry.json` below means `ontology_suite/resources/registry.json`,
+`sparql/<category>/<id>.rq` means
+`ontology_suite/resources/sparql/<category>/<id>.rq`) -- both in this
+repo's own source tree and, once installed, inside the package itself
+(`<site-packages>/ontology_suite/resources/`, findable via
+`python -c "from ontology_suite import config; print(config.PACKAGE_RESOURCES)"`).
+Editing a pip-installed copy directly works but doesn't survive an
+upgrade; `checks`/`data`/`run`'s `--registry`/`--shapes`/`--sparql` flags
+let you point at your own copy instead without touching the installed
+package at all -- see `docs/PRIMER.md` §13 for the full copy-edit-point-at
+worked example, verified against a real `pip install`.
+
 ## 1. A portable SPARQL `CONSTRUCT` check (most checks)
 
 Fits anything expressible as a graph pattern over a single merged graph:

@@ -535,7 +535,7 @@ def run_data_stage(
     if sample is not None:
         reasoning_graph = sample_graph(aggregate_graph, sample)
         sample_note = (
-            f"reasoning pass sampled {len(list(reasoning_graph.subjects()))} named subjects "
+            f"reasoning pass sampled {len(set(reasoning_graph.subjects()))} named subjects "
             f"(of {len(set(aggregate_graph.subjects()))} total) via a Concise Bounded Description each"
         )
 

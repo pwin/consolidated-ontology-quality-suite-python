@@ -89,17 +89,72 @@ records the binding explicitly:
       "graph_uri": "https://example.org/graph/triplified/animals",
       "role": "triplified_data",
       "source_tarql": "queries/animals.rq",
-      "ontology_graph_uri": "https://example.org/graph/ontology/2.0.0"
+      "ontology_graph_uri": "https://example.org/graph/ontology/2.0.0",
+      "notes": "rebuilt weekly via cron"
     }
   ]
 }
 ```
 
+Each entry (`GraphBinding`) is a flat object:
+
+| Field | Required | Applies to | Meaning |
+|---|---|---|---|
+| `graph_uri` | yes | both roles | the named graph's URI in the store |
+| `role` | yes | both roles | exactly `"ontology"` or `"triplified_data"` -- no other values |
+| `source_tarql` | no | `triplified_data` only | local path to the query file that produced this graph |
+| `ontology_graph_uri` | no | `triplified_data` only | which `"ontology"`-role graph this data graph should conform to |
+| `notes` | no | either | free text for humans -- never read by any check |
+
+`GraphManifest.save()` always writes every field of every binding (`null`
+for anything unset), so a saved file always shows this full shape, not
+just what you filled in. `source_tarql`/`ontology_graph_uri` are
+meaningless on an `"ontology"`-role binding -- they describe what a *data*
+graph points back to, not the reverse.
+
+Python API, as an alternative to hand-writing the JSON:
+
+```python
+from ontology_suite.remote.manifest import GraphManifest, GraphBinding
+
+manifest = GraphManifest(bindings=[
+    GraphBinding(graph_uri="https://example.org/graph/ontology/2.0.0", role="ontology"),
+    GraphBinding(
+        graph_uri="https://example.org/graph/triplified/animals", role="triplified_data",
+        source_tarql="queries/animals.rq", ontology_graph_uri="https://example.org/graph/ontology/2.0.0",
+    ),
+])
+manifest.save("graphs.json")
+
+loaded = GraphManifest.load("graphs.json")
+loaded.ontology_bindings()   # every role="ontology" entry
+loaded.data_bindings()       # every role="triplified_data" entry
+```
+
 ```
 ontology-quality-suite consistency-remote \
   --query-endpoint http://localhost:3030/myds/sparql \
-  --manifest graphs.json
+  --manifest graphs.json \
+  --sample-limit 5000
 ```
+
+`--sample-limit` caps how many triples get pulled per named graph when
+materializing it (`fuseki.load_named_graph`'s `limit` parameter) -- see
+that function's own docstring for why this isn't a true CBD sample, just
+a straightforward cap; omit it for graphs known to be small (the common
+case: one triplify job's output).
+
+**`source_tarql`/`ontology_graph_uri` are each independently optional**,
+and `check_named_graph_consistency` degrades gracefully rather than
+erroring when one is missing -- it just skips whichever checks need it,
+with a warning in the report rather than a failure:
+
+| `ontology_graph_uri` set? | `source_tarql` set? | Checks that run |
+|---|---|---|
+| yes | yes | all three |
+| yes | no | live data vs. ontology only |
+| no | yes | template vs. live data only |
+| no | no | none -- not a useful binding in practice |
 
 For each `"triplified_data"` binding, `check_named_graph_consistency` runs
 **three** independent checks, each catching a different failure mode:
