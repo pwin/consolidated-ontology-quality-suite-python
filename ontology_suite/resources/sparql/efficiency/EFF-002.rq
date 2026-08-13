@@ -22,8 +22,9 @@ WHERE {
     WHERE {
       SELECT DISTINCT ?node (IF(isBlank(?node), 1, 0) AS ?isbn)
       WHERE {
-        ?s ?p ?o .
-        { BIND(?s AS ?node) } UNION { BIND(?o AS ?node) FILTER(isIRI(?o) || isBlank(?o)) }
+        { ?node ?p ?o }
+        UNION
+        { ?s ?p ?node . FILTER(isIRI(?node) || isBlank(?node)) }
       }
     }
   }

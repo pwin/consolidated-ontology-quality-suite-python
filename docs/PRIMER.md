@@ -88,6 +88,7 @@ pip install ontology-quality-suite          # from PyPI
 # or, working in this repo:
 uv sync                                     # base
 uv sync --extra reasoner                    # + owlready2, real OWL2 DL reasoning (needs Java)
+uv sync --extra native-shacl                # + the native (Rust) SHACL engine -- much faster --engine native/native+sparql
 ```
 
 Every subcommand takes `-v`/`--verbose` to show exactly what it resolved

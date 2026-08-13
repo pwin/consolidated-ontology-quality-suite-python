@@ -22,7 +22,7 @@ WHERE {
   ?focus a ?type ;
     skos:prefLabel ?label .
   FILTER(!STRSTARTS(STR(?focus), "http://www.w3.org/"))
-  BIND(LCASE(REPLACE(REPLACE(STR(?focus), "^.*[/#]", ""), "_", "")) AS ?flatUri)
+  BIND(LCASE(REPLACE(REPLACE(STR(?focus), "^.*[/#]", ""), "[^A-Za-z0-9]", "")) AS ?flatUri)
   BIND(LCASE(REPLACE(STR(?label), "[^A-Za-z0-9]", "")) AS ?flatLabel)
   FILTER(?flatUri != ?flatLabel)
   BIND(CONCAT("Term ", STR(?focus), " has skos:prefLabel '", STR(?label),

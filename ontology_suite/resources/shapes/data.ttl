@@ -25,16 +25,15 @@ oq:DAT-001
         $this ?path ?value .
         FILTER(isLiteral(?value))
         BIND(DATATYPE(?value) AS ?dt)
-        {
-          FILTER(?dt = xsd:date)
-          FILTER(!REGEX(STR(?value), "^-?[0-9]{4}-[0-9]{2}-[0-9]{2}(Z|[+-][0-9]{2}:[0-9]{2})?$"))
-        } UNION {
-          FILTER(?dt = xsd:integer)
-          FILTER(!REGEX(STR(?value), "^[+-]?[0-9]+$"))
-        } UNION {
-          FILTER(?dt = xsd:boolean)
-          FILTER(!REGEX(STR(?value), "^(true|false|1|0)$"))
-        }
+        # A UNION of FILTER-only branches (no triple pattern of its own in
+        # any branch) silently matches nothing under rdflib's SPARQL
+        # engine (pyshacl's evaluator), no matter the data -- see
+        # sparql/data/DAT-001.rq's identical fix for the isolated repro.
+        FILTER(
+          (?dt = xsd:date && !REGEX(STR(?value), "^-?[0-9]{4}-[0-9]{2}-[0-9]{2}(Z|[+-][0-9]{2}:[0-9]{2})?$"))
+          || (?dt = xsd:integer && !REGEX(STR(?value), "^[+-]?[0-9]+$"))
+          || (?dt = xsd:boolean && !REGEX(STR(?value), "^(true|false|1|0)$"))
+        )
       }
     """ ;
   ] .

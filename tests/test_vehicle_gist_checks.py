@@ -93,6 +93,39 @@ against this pair caught nine separate real bugs in one session:
    rewriting the SHACL shape to `sh:sparql` accepting either predicate,
    matching QUA-001's own fix.
 
+A later session's engine-parity audit (`tests/test_engine_parity_stress.py`)
+found a tenth bug this fixture happens to also exercise, once fixed:
+10. `EFF-002` ("excessive blank-node ratio") never fired under *any*
+    engine, on *any* fixture, no matter the data -- its SPARQL logic
+    (`{BIND(?s AS ?node)} UNION {BIND(?o AS ?node) FILTER(...)}`) matched
+    zero rows under rdflib's SPARQL engine unconditionally (a `UNION` of
+    branches containing only a `BIND`, no triple pattern, silently
+    returns nothing -- confirmed as a standalone rdflib quirk, isolated
+    outside this suite entirely). Fixed by restructuring so each branch
+    has its own real triple pattern. This gist-importing fixture
+    genuinely is ~60% blank nodes (gist's own OWL restriction/axiom
+    style) -- once fixed, `EFF-002` correctly reports it, raising this
+    test's own expected finding count from 55 to 56.
+
+That same audit also found two real bugs in the *external* native `shacl`
+engine (not this repo), both since fixed upstream:
+11. An N^2 cross-product for `sh:sparql` constraints with multiple
+    blank-node focus nodes, fixed in `shacl` 0.1.4.
+12. Immediately after installing that fix to verify it: `STY-001` ("class
+    local name not UpperCamelCase") reported every one of gist's ~97
+    blank-node anonymous class expressions (`owl:unionOf`/
+    `owl:intersectionOf` members) as a false positive under `--engine
+    native`/`native+sparql`, where pyshacl correctly found none --
+    `STY-001`'s `FILTER(isIRI($this))`, meant to exclude blank-node focus
+    nodes from a check that only makes sense for a real local name,
+    stopped doing so in `shacl` 0.1.4 (apparently a side effect of
+    whatever change fixed bug #11, since both touch the same
+    per-focus-node `$this`-scoping machinery). Fixed in `shacl` 0.1.5,
+    confirmed here and in `tests/test_engine_parity_stress.py`'s own
+    regression tests -- see
+    `test_native_engine_matches_pyshacl_on_the_real_vehicle_gist_fixture`
+    below.
+
 This test is comparatively slow (pyshacl over a real ~3,300-triple merged
 graph takes on the order of minutes, not the sub-second unit tests
 elsewhere in this suite) -- that's expected, not a regression.
@@ -101,6 +134,7 @@ import pytest
 from rdflib import Graph
 
 from ontology_suite import config, pipeline
+from ontology_suite.checks import shacl_native_runner as native_runner
 from ontology_suite.checks.registry import Registry
 from ontology_suite.ontologyeval import ontology_evaluation as oe
 from ontology_suite.reasoning import consistency
@@ -153,14 +187,17 @@ def test_total_finding_count_is_small_and_accurate(registry_rows):
     where its SPARQL twin accepted rdfs:label|skos:prefLabel -- caught via
     --engine sparql vs --engine both disagreeing by one finding against
     gist's own ontology IRI, which carries skos:prefLabel but no
-    rdfs:label). The real signal, once every one of those is fixed, is
-    exactly 55: STR-003 (35, genuinely unconstrained gist properties, by
-    design), STY-004 (9, real but mostly gist's deliberate abbreviation
-    convention), QUA-004 (4), STR-002/STR-007/STR-004 (2 each), QUA-001
-    (1). A regression back toward hundreds of findings means one of the
-    fixed bugs came back."""
-    assert len(registry_rows) == 55, (
-        f"expected exactly 55 verified-genuine findings, got {len(registry_rows)} -- "
+    rdfs:label). The real signal, once every one of those is fixed
+    (including the tenth, EFF-002, fixed in a later session -- see this
+    file's own module docstring), is exactly 56: STR-003 (35, genuinely
+    unconstrained gist properties, by design), STY-004 (9, real but
+    mostly gist's deliberate abbreviation convention), QUA-004 (4),
+    STR-002/STR-007/STR-004 (2 each), QUA-001 (1), EFF-002 (1 -- this
+    graph is genuinely ~60% blank nodes, gist's own OWL restriction/axiom
+    style). A regression back toward hundreds of findings means one of
+    the fixed bugs came back."""
+    assert len(registry_rows) == 56, (
+        f"expected exactly 56 verified-genuine findings, got {len(registry_rows)} -- "
         "one of the false-positive-flood bugs this test module exists to catch may have regressed"
     )
 
@@ -293,3 +330,31 @@ def test_qua004_accepts_rdfs_label_and_exempts_version_iris(registry_rows):
     # undeclared vann: properties (vann was never imported) and two
     # example gist:Magnitude individuals with no label at all.
     assert len(qua004) == 4, f"expected exactly 4 genuine findings, got {len(qua004)}: {sorted(flagged)}"
+
+
+@pytest.mark.skipif(
+    not native_runner.available(), reason="native `shacl` package not installed (see shacl_native_runner.py docstring)"
+)
+def test_native_engine_matches_pyshacl_on_the_real_vehicle_gist_fixture(merged_graph, registry_rows):
+    """The only automated cross-engine comparison against a real, large
+    (~3,300-triple) ontology in this suite -- `tests/test_shacl_native_runner.py`
+    and `tests/test_engine_parity_stress.py` both use smaller, synthetic
+    fixtures. `registry_rows` (this file's own fixture) runs `--engine
+    both` (pyshacl); this reruns the same merged graph through
+    `--engine native+sparql` and checks the total and per-check breakdown
+    match exactly (56/56, identical breakdown, confirmed both before and
+    after this file's own bug #11 -- see this file's module docstring --
+    was found and fixed upstream in shacl 0.1.5)."""
+    from collections import Counter
+
+    graph, _report = merged_graph
+    registry = Registry.load(str(config.DEFAULT_REGISTRY_PATH))
+    native_rows = pipeline.run_registry_suite_on_graph(
+        graph, registry, config.DEFAULT_SHAPES_DIR, config.DEFAULT_SPARQL_DIR, engine="native+sparql"
+    )
+    assert len(native_rows) == len(registry_rows)
+    assert Counter(r.check_id for r in native_rows) == Counter(r.check_id for r in registry_rows)
+
+    native_counts = Counter(r.check_id for r in native_rows if r.check_id != "STY-001")
+    pyshacl_counts = Counter(r.check_id for r in registry_rows if r.check_id != "STY-001")
+    assert native_counts == pyshacl_counts

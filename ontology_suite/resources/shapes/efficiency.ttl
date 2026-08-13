@@ -44,13 +44,22 @@ oq:EFF-002
     sh:select """
       SELECT $this
       WHERE {
+        # $this (always oq:Graph -- see sh:targetNode above) is otherwise
+        # unreferenced by this graph-wide aggregate check; a harmless
+        # OPTIONAL triple pattern naming it keeps rdflib's SPARQL engine
+        # (pyshacl's evaluator) from silently dropping every solution --
+        # confirmed: without this, pyshacl's initBindings-prebound $this
+        # never rejoins the result of the nested SELECT subqueries below,
+        # and this check can never fire under pyshacl no matter the data.
+        OPTIONAL { $this ?anyPredicate ?anyObject }
         {
           SELECT (COUNT(?node) AS ?total) (SUM(?isbn) AS ?bnodes)
           WHERE {
             SELECT DISTINCT ?node (IF(isBlank(?node), 1, 0) AS ?isbn)
             WHERE {
-              ?s ?p ?o .
-              { BIND(?s AS ?node) } UNION { BIND(?o AS ?node) FILTER(isIRI(?o) || isBlank(?o)) }
+              { ?node ?p ?o }
+              UNION
+              { ?s ?p ?node . FILTER(isIRI(?node) || isBlank(?node)) }
             }
           }
         }

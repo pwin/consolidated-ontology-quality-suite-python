@@ -100,6 +100,14 @@ exact same ~3,300-triple fixture used above, against `shacl` v0.1.3:
 **0.29s**, vs. pyshacl's ~193s -- a ~665x speedup, with identical findings
 *by identity* -- same 38 `(check_id, focus_node, value)` triples, same check
 ids, zero discrepancies either direction; see `tests/test_shacl_native_runner.py`.
+A larger, denser stress fixture (`examples/checks_stress_test/`,
+`tests/test_engine_parity_stress.py`) confirms the same full parity at
+scale for all 18 checks that have both a SHACL and SPARQL formulation,
+including two cases (`STY-003`, many blank-node focus nodes at once;
+`STY-001`/`STY-002`, blank-node-typed anonymous class/property
+expressions) that each found a real native-engine bug, since fixed in
+`shacl` 0.1.4 and 0.1.5 respectively -- see that test module's docstring
+for the history.
 
 **Identity is proven; severity is not, and the two engines genuinely
 disagree on it.** pyshacl silently drops an `sh:severity` declared *inside*
@@ -121,6 +129,39 @@ flag is passed -- see `tests/test_shacl_native_runner.py::test_native_and_pyshac
 which pins the actual divergence rather than just excluding severity from
 the identity comparison.
 
+**Fixed history: blank-node focus nodes used to cross-join under the
+native engine.** Before `shacl` 0.1.4, a `sh:sparql`-formulated check
+whose target could include blank-node focus nodes (in this suite's own
+shapes, only `STY-003`'s `sh:targetSubjectsOf rdfs:label`) didn't scope
+`$this` per focus node correctly: N blank-node focus nodes sharing the
+shape produced N² findings instead of N. Reported upstream and fixed in
+`shacl` 0.1.4 (https://github.com/pwin/SHACL_Engine); confirmed fixed here
+at N=2/3/4/60 -- `tests/test_engine_parity_stress.py` still carries a
+regression test for it, so a pre-0.1.4 wheel ever getting reinstalled
+(see the `uv sync` note below) is caught rather than silently corrupting
+results.
+
+**Fixed history: blank-node focus nodes used to leak past `isIRI($this)`.**
+Found immediately after installing `shacl` 0.1.4 to verify the N²
+cross-product fix above -- turned out to be a regression from (or a
+boundary case left uncovered by) that same fix, since both involve the
+same per-focus-node `$this`-scoping machinery. `FILTER(isIRI($this))`
+inside a `sh:sparql` constraint stopped excluding blank-node focus nodes
+in `shacl` 0.1.4: `STY-001` (`sh:targetClass owl:Class`) and `STY-002`
+(`sh:targetClass owl:ObjectProperty`/`owl:DatatypeProperty`) both rely on
+exactly this filter to exclude blank-node-typed anonymous class/property
+expressions (`owl:unionOf`/`owl:intersectionOf` members, `owl:inverseOf`'s
+anonymous object, etc. -- extremely common in real ontologies) from a
+check that's only meaningful for a real, named local name. Confirmed
+against real data: gist 14.1.0 alone has ~97 such blank nodes, and
+`STY-001` reported every one of them as a false positive under `--engine
+native`/`native+sparql` under 0.1.4, where pyshacl correctly found none.
+Reported upstream and fixed in `shacl` 0.1.5 -- confirmed fixed here at
+the same scale (real gist data, 56/56 full parity) -- see
+`tests/test_engine_parity_stress.py::test_native_isiri_this_blank_node_regression`
+and `tests/test_vehicle_gist_checks.py::test_native_engine_matches_pyshacl_on_the_real_vehicle_gist_fixture`,
+which still carry regression tests for this.
+
 `--engine native+sparql` is therefore strictly better than `--engine both`
 when the optional `shacl` package is available: same cross-validation
 value, at roughly `--engine sparql` speed -- which is why the CLI's
@@ -131,21 +172,21 @@ callers going through `pipeline.run_registry_suite_on_graph`/
 `run_checks_stage`/`run_data_stage` directly, not via the CLI, still
 default to `"both"` explicitly -- `tests/test_vehicle_gist_checks.py`
 pins an exact finding count against pyshacl specifically and needs that
-default to stay environment-independent.) `shacl` still isn't published to
-PyPI, so this auto-upgrade only kicks in for anyone who's installed the
-wheel themselves -- see `shacl_native_runner.py`'s module docstring for
-how, and for why its SHACL-core (non-SPARQL) findings need a
+default to stay environment-independent.) `shacl` is on PyPI as of 0.1.4
+(0.1.5 for the isIRI($this) fix above -- this package's `native-shacl`
+extra pins `shacl>=0.1.5`), installed via the opt-in `uv sync --extra
+native-shacl` (same convention as this package's own `reasoner` extra) --
+see `shacl_native_runner.py`'s
+module docstring for why its SHACL-core (non-SPARQL) findings need a
 `sh:message`-text fallback to resolve a check id (blank node identifiers
 don't survive the Rust/Python boundary the way pyshacl's own in-process
 ones do).
 
-**`uv sync` will silently uninstall `shacl`** -- it isn't (can't be) a
-`pyproject.toml` dependency, so `uv` treats it as lockfile drift and
-removes it on every sync, which silently changes the CLI's default engine
-back to `both`/pyshacl (with the severity consequences above) until it's
-reinstalled: `uv pip install --python .venv/Scripts/python.exe <the
-wheel>` (pass `--python` explicitly -- `uv pip install` respects a stray
-`VIRTUAL_ENV` env var over the current project's venv).
+**Plain `uv sync` (no `--extra native-shacl`) still uninstalls `shacl`**
+-- standard behavior for any opt-in extra, easy to trip over: it silently
+changes the CLI's default engine back to `both`/pyshacl (with the
+severity consequences above) until reinstalled with `uv sync --extra
+native-shacl`.
 
 `--inference rdfs` is supported under `--engine native`/`native+sparql` as
 of `shacl` v0.1.3 (materialised into the data graph before validation,

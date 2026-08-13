@@ -9,6 +9,14 @@ the equivalent caveat). Verified to find the exact same findings pyshacl
 does by identity -- ``(check_id, focus_node, value)``, both on
 ``examples/ontology/domain.ttl`` (18/18) and the ~3,300-triple
 vehicle-ontology fixture (38/38) -- see ``tests/test_shacl_native_runner.py``.
+A larger, denser fixture built specifically to stress multi-instance/
+multi-focus-node scenarios (``examples/checks_stress_test/``,
+``tests/test_engine_parity_stress.py``) confirms the same full parity for
+all 18 checks that have both a SHACL and SPARQL formulation, including two
+cases (``STY-003``, many blank-node focus nodes at once; ``STY-001``/
+``STY-002``, blank-node-typed anonymous class/property expressions) that
+each found a real, since-fixed native-engine bug -- see that test module's
+own docstring for the history; requires ``shacl>=0.1.5``.
 
 **Identity is proven; severity is not, and the two engines genuinely
 disagree on it.** pyshacl silently drops an ``sh:severity`` declared
@@ -32,33 +40,74 @@ depending on which ``--engine`` flag is passed. ``tests/test_shacl_native_runner
 for exactly this reason -- it is not an oversight, it is documenting a
 known, confirmed divergence.
 
-``shacl`` isn't published to PyPI yet: install a prebuilt wheel from a
-SHACL_Engine GitHub Release (matching your platform), or build one with
-``maturin build --release`` in that repo's ``crates/shacl-python``, then
-``uv pip install <the wheel>``. Not a hard dependency of this package --
-imported lazily here, same convention as ``shacl_runner.py``'s own pyshacl
-import. Requires ``shacl>=0.1.3``: earlier versions' bindings returned only
-a flat list of `Result` objects, not the real ``sh:ValidationReport`` graph
-this module now consumes directly (``Report.turtle``, added in that
-version) -- see git history for the previous, more manual approach this
-replaced.
+**Fixed history: blank-node focus nodes used to cross-join under a
+``sh:sparql`` constraint.** Before ``shacl`` 0.1.4, a shape whose target
+could include *blank-node* focus nodes (in this suite's own shapes, only
+``STY-003``'s ``sh:targetSubjectsOf rdfs:label`` -- a blank node can carry
+an ``rdfs:label`` same as a named resource) didn't scope ``$this`` per
+focus node correctly when evaluating the ``sh:sparql`` SPARQLConstraint:
+N blank-node focus nodes sharing the shape produced N² findings (every
+focus node cross-joined against every other focus node's own value)
+instead of the correct N. Reported upstream and fixed in ``shacl`` 0.1.4
+(https://github.com/pwin/SHACL_Engine); confirmed fixed here at N=2/3/4/60
+-- see ``tests/test_engine_parity_stress.py``, which still carries a
+regression test for this (it would fail loudly again if a pre-0.1.4 wheel
+ever got reinstalled -- see the ``uv sync`` warning below for exactly how
+that could happen silently).
 
-**``uv sync`` will silently uninstall it.** Since ``shacl`` isn't a
-``pyproject.toml`` dependency (it can't be, not being on PyPI), ``uv``
-treats it as drift from ``uv.lock`` and removes it on every ``uv sync`` --
-no warning beyond the routine ``- shacl==0.1.3 (from file:///...)`` line in
-``uv sync``'s own output, easy to miss. ``--engine native``/``native+sparql``
+**Fixed history: blank-node focus nodes used to leak past
+``isIRI($this)``.** Found immediately after installing ``shacl`` 0.1.4 to
+verify the N² cross-product fix above -- turned out to be a regression
+from (or a boundary case left uncovered by) that same fix, since both
+involve the same per-focus-node ``$this``-scoping machinery.
+``FILTER(isIRI($this))`` inside a ``sh:sparql`` SPARQLConstraint stopped
+excluding blank-node focus nodes in ``shacl`` 0.1.4: ``STY-001``
+(``sh:targetClass owl:Class``) and ``STY-002`` (``sh:targetClass
+owl:ObjectProperty``/``owl:DatatypeProperty``) both rely on exactly this
+filter to exclude blank-node-typed anonymous class/property expressions
+(``owl:unionOf``/``owl:intersectionOf`` members, ``owl:inverseOf``'s
+anonymous object, etc. -- extremely common in real ontologies) from a
+check that's only meaningful for a real, named local name. Confirmed
+against real data: gist 14.1.0 alone has ~97 such blank nodes, and
+``STY-001`` reported every one of them as a false positive under
+``--engine native``/``native+sparql`` under 0.1.4, where pyshacl
+(independent, pure-Python) correctly found none. Reported upstream and
+fixed in ``shacl`` 0.1.5 -- confirmed fixed here at the same scale (real
+gist data, 56/56 full parity) -- see
+``tests/test_engine_parity_stress.py::test_native_isiri_this_blank_node_regression``
+(and its ``_sty002_isolated`` sibling) and
+``tests/test_vehicle_gist_checks.py::test_native_engine_matches_pyshacl_on_the_real_vehicle_gist_fixture``,
+which still carry regression tests for this (they would fail loudly again
+if a pre-0.1.5 wheel ever got reinstalled).
+
+``shacl`` is on PyPI as of 0.1.4 (0.1.5 for the fix above) -- install with
+``uv sync --extra native-shacl`` (an opt-in extra, same convention as this
+package's own ``reasoner`` extra; see ``pyproject.toml``, pinned
+``shacl>=0.1.5``). Not a hard dependency of this package proper -- still
+imported lazily here (same convention as ``shacl_runner.py``'s own
+pyshacl import), so ``--engine shacl``/``sparql``
+and everything else works fine without it. Requires ``shacl>=0.1.5``
+(pinned in ``pyproject.toml``'s ``native-shacl`` extra): 0.1.3/0.1.4 had
+the two blank-node focus-node bugs documented above (N² cross-product,
+then ``isIRI($this)`` no longer excluding blank nodes), and 0.1.3
+specifically predates PyPI publication and this package's
+``Report.turtle``-based result-graph consumption (``sh:ValidationReport``,
+not a hand-reconstructed flat list of ``Result`` objects -- see git
+history for the older, more manual approach this replaced).
+
+**Plain ``uv sync`` (no ``--extra native-shacl``) still uninstalls it** --
+standard behavior for any opt-in extra, not special to this package, but
+easy to trip over: running bare ``uv sync`` after having it installed
+removes it again, with no warning beyond the routine ``- shacl==0.1.5``
+line in ``uv sync``'s own output. ``--engine native``/``native+sparql``
 then fail with a clear ``RuntimeError`` (see ``run_shacl_native`` below --
 not silent corruption), but the CLI's own default engine
 (``pipeline.default_engine()``) auto-selects ``native+sparql`` *whenever the
 package is importable*, so losing it after a routine ``uv sync`` silently
 changes which engine every subcommand runs by default, with the severity
-consequences documented above. Reinstall after every ``uv sync``:
-``uv pip install --python .venv/Scripts/python.exe <the wheel>`` -- pass
-``--python`` explicitly rather than relying on the current directory, since
-``uv pip install`` respects a stray ``VIRTUAL_ENV`` environment variable
-over the current project's venv (an easy mistake in a multi-repo shell
-session).
+consequences documented above. Always include the extra:
+``uv sync --extra native-shacl`` (add ``--extra reasoner`` too if you also
+want the optional DL-reasoner path).
 
 Blank-node sourceShape resolution
 ----------------------------------

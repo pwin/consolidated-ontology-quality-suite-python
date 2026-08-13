@@ -1,0 +1,148 @@
+@prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:     <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:     <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix ex:      <https://example.org/stress/> .
+
+# ---------------------------------------------------------------------------
+# Engine-parity stress test, ontology half. Larger and more repetitive than
+# examples/ontology/domain.ttl on purpose: several *separate* instances of
+# each triggerable flaw (not just one), so a check that silently collapses
+# multiple genuine findings into one, or cross-joins unrelated findings
+# together, is visible by count -- not just by presence/absence. Built
+# specifically after finding a real native-SHACL-engine bug this way (a
+# multi-focus-node sh:sparql constraint producing a cross-product of every
+# focus node against every other focus node's own value -- see
+# ontology_suite/checks/shacl_native_runner.py's module docstring).
+#
+# --- Ontology header: deliberately missing versionInfo/title -> QUA-002 ----
+ex:StressOntology a owl:Ontology .
+
+# ---------------------------------------------------------------------------
+# STY-001: class local name not UpperCamelCase (3 separate classes).
+# ---------------------------------------------------------------------------
+ex:bad_class_alpha a owl:Class ; rdfs:label "Bad Class Alpha"@en .
+ex:bad_class_beta a owl:Class ; rdfs:label "Bad Class Beta"@en .
+ex:bad_class_gamma a owl:Class ; rdfs:label "Bad Class Gamma"@en .
+
+# Blank-node-typed anonymous class expressions (2 separate ones) -- the
+# exact pattern real ontologies use for owl:unionOf/owl:intersectionOf/
+# owl:Restriction (gist 14.1.0 alone has ~97 of these). STY-001's
+# `FILTER(isIRI($this))` is supposed to exclude these from ever being
+# focus nodes for a *local-name* check (a blank node has no local name to
+# judge) -- added here after this exact pattern, against real gist data,
+# exposed a real native-engine regression (see
+# tests/test_engine_parity_stress.py's own regression test for the
+# history: the initial fix for the blank-node cross-product bug didn't
+# also fix `FILTER(isIRI($this))` no longer excluding blank focus nodes).
+[] a owl:Class ; owl:unionOf ( ex:bad_class_alpha ex:bad_class_beta ) .
+[] a owl:Class ; owl:unionOf ( ex:bad_class_beta ex:bad_class_gamma ) .
+
+# ---------------------------------------------------------------------------
+# STY-002: property local name not lowerCamelCase (3 separate properties).
+# ---------------------------------------------------------------------------
+ex:Bad_Prop_One a owl:ObjectProperty ;
+  rdfs:label "bad prop one"@en ; rdfs:domain ex:bad_class_alpha ; rdfs:range ex:bad_class_beta .
+ex:BAD_PROP_TWO a owl:DatatypeProperty ;
+  rdfs:label "bad prop two"@en ; rdfs:domain ex:bad_class_alpha ; rdfs:range xsd:string .
+ex:Bad_Prop_Three a owl:DatatypeProperty ;
+  rdfs:label "bad prop three"@en ; rdfs:domain ex:bad_class_alpha ; rdfs:range xsd:string .
+
+# ---------------------------------------------------------------------------
+# STY-003: label with no language tag (5 SEPARATE resources, 5 DIFFERENT
+# label texts) -- the specific shape that exposed a real cross-product bug
+# in the native engine when there are multiple focus nodes at once: each
+# of these 5 must be reported with *only its own* label value, not all 5
+# values against all 5 focus nodes (25 findings would be the buggy count).
+# ---------------------------------------------------------------------------
+ex:noLangPropOne a owl:DatatypeProperty ; rdfs:label "label one" ; rdfs:domain ex:bad_class_alpha ; rdfs:range xsd:string .
+ex:noLangPropTwo a owl:DatatypeProperty ; rdfs:label "label two" ; rdfs:domain ex:bad_class_alpha ; rdfs:range xsd:string .
+ex:noLangPropThree a owl:DatatypeProperty ; rdfs:label "label three" ; rdfs:domain ex:bad_class_alpha ; rdfs:range xsd:string .
+ex:noLangPropFour a owl:DatatypeProperty ; rdfs:label "label four" ; rdfs:domain ex:bad_class_alpha ; rdfs:range xsd:string .
+ex:noLangPropFive a owl:DatatypeProperty ; rdfs:label "label five" ; rdfs:domain ex:bad_class_alpha ; rdfs:range xsd:string .
+
+# ---------------------------------------------------------------------------
+# LOG-001: class disjoint with its own ancestor (3 SEPARATE contradictions).
+# ---------------------------------------------------------------------------
+ex:BaseA a owl:Class ; rdfs:label "Base A"@en .
+ex:ContraA a owl:Class ; rdfs:label "Contra A"@en ; rdfs:subClassOf ex:BaseA ; owl:disjointWith ex:BaseA .
+
+ex:BaseB a owl:Class ; rdfs:label "Base B"@en .
+ex:ContraB a owl:Class ; rdfs:label "Contra B"@en ; rdfs:subClassOf ex:BaseB ; owl:disjointWith ex:BaseB .
+
+ex:BaseC a owl:Class ; rdfs:label "Base C"@en .
+ex:ContraC a owl:Class ; rdfs:label "Contra C"@en ; rdfs:subClassOf ex:BaseC ; owl:disjointWith ex:BaseC .
+
+# ---------------------------------------------------------------------------
+# LOG-003: redundant equivalentClass + subClassOf (3 SEPARATE pairs).
+# ---------------------------------------------------------------------------
+ex:EqBaseA a owl:Class ; rdfs:label "Eq Base A"@en .
+ex:EqA a owl:Class ; rdfs:label "Eq A"@en ; rdfs:subClassOf ex:EqBaseA ; owl:equivalentClass ex:EqBaseA .
+
+ex:EqBaseB a owl:Class ; rdfs:label "Eq Base B"@en .
+ex:EqB a owl:Class ; rdfs:label "Eq B"@en ; rdfs:subClassOf ex:EqBaseB ; owl:equivalentClass ex:EqBaseB .
+
+ex:EqBaseC a owl:Class ; rdfs:label "Eq Base C"@en .
+ex:EqC a owl:Class ; rdfs:label "Eq C"@en ; rdfs:subClassOf ex:EqBaseC ; owl:equivalentClass ex:EqBaseC .
+
+# ---------------------------------------------------------------------------
+# EFF-001: hierarchy chain >= 6 hops deep (2 SEPARATE chains, 7 hops each).
+# ---------------------------------------------------------------------------
+ex:ChainARoot a owl:Class ; rdfs:label "Chain A Root"@en .
+ex:ChainA1 a owl:Class ; rdfs:label "Chain A 1"@en ; rdfs:subClassOf ex:ChainARoot .
+ex:ChainA2 a owl:Class ; rdfs:label "Chain A 2"@en ; rdfs:subClassOf ex:ChainA1 .
+ex:ChainA3 a owl:Class ; rdfs:label "Chain A 3"@en ; rdfs:subClassOf ex:ChainA2 .
+ex:ChainA4 a owl:Class ; rdfs:label "Chain A 4"@en ; rdfs:subClassOf ex:ChainA3 .
+ex:ChainA5 a owl:Class ; rdfs:label "Chain A 5"@en ; rdfs:subClassOf ex:ChainA4 .
+ex:ChainA6 a owl:Class ; rdfs:label "Chain A 6"@en ; rdfs:subClassOf ex:ChainA5 .
+ex:ChainA7 a owl:Class ; rdfs:label "Chain A 7"@en ; rdfs:subClassOf ex:ChainA6 .
+
+ex:ChainBRoot a owl:Class ; rdfs:label "Chain B Root"@en .
+ex:ChainB1 a owl:Class ; rdfs:label "Chain B 1"@en ; rdfs:subClassOf ex:ChainBRoot .
+ex:ChainB2 a owl:Class ; rdfs:label "Chain B 2"@en ; rdfs:subClassOf ex:ChainB1 .
+ex:ChainB3 a owl:Class ; rdfs:label "Chain B 3"@en ; rdfs:subClassOf ex:ChainB2 .
+ex:ChainB4 a owl:Class ; rdfs:label "Chain B 4"@en ; rdfs:subClassOf ex:ChainB3 .
+ex:ChainB5 a owl:Class ; rdfs:label "Chain B 5"@en ; rdfs:subClassOf ex:ChainB4 .
+ex:ChainB6 a owl:Class ; rdfs:label "Chain B 6"@en ; rdfs:subClassOf ex:ChainB5 .
+ex:ChainB7 a owl:Class ; rdfs:label "Chain B 7"@en ; rdfs:subClassOf ex:ChainB6 .
+
+# ---------------------------------------------------------------------------
+# STR-003: property missing both domain and range (3 SEPARATE properties).
+# ---------------------------------------------------------------------------
+ex:noDomRangeOne a owl:ObjectProperty ; rdfs:label "no dom range one"@en .
+ex:noDomRangeTwo a owl:ObjectProperty ; rdfs:label "no dom range two"@en .
+ex:noDomRangeThree a owl:ObjectProperty ; rdfs:label "no dom range three"@en .
+
+# ---------------------------------------------------------------------------
+# QUA-001: class/property with no rdfs:label and no skos:prefLabel
+# (3 SEPARATE terms).
+# ---------------------------------------------------------------------------
+ex:NoLabelClassOne a owl:Class .
+ex:noLabelPropOne a owl:DatatypeProperty ; rdfs:domain ex:bad_class_alpha ; rdfs:range xsd:string .
+ex:noLabelPropTwo a owl:DatatypeProperty ; rdfs:domain ex:bad_class_alpha ; rdfs:range xsd:string .
+
+# ---------------------------------------------------------------------------
+# QUA-003: deprecated term (3 SEPARATE properties, each used by data.ttl).
+# ---------------------------------------------------------------------------
+ex:deprecatedPropOne a owl:DatatypeProperty ; rdfs:label "deprecated one"@en ; owl:deprecated true .
+ex:deprecatedPropTwo a owl:DatatypeProperty ; rdfs:label "deprecated two"@en ; owl:deprecated true .
+ex:deprecatedPropThree a owl:DatatypeProperty ; rdfs:label "deprecated three"@en ; owl:deprecated true .
+
+# ---------------------------------------------------------------------------
+# Support declarations for the ABox half (stress-data.ttl) -- declared here
+# so DAT-001/DAT-002/LOG-002/EFF-002/EFF-003 fire on their own terms without
+# incidentally also tripping STR-001/STR-002 (undeclared class/property).
+# ---------------------------------------------------------------------------
+ex:Item a owl:Class ; rdfs:label "Item"@en .
+ex:hasDate a owl:DatatypeProperty ; rdfs:label "has date"@en ; rdfs:domain ex:Item ; rdfs:range xsd:date .
+ex:hasCount a owl:DatatypeProperty ; rdfs:label "has count"@en ; rdfs:domain ex:Item ; rdfs:range xsd:integer .
+ex:isActive a owl:DatatypeProperty ; rdfs:label "is active"@en ; rdfs:domain ex:Item ; rdfs:range xsd:boolean .
+ex:relatesToExternal a owl:ObjectProperty ; rdfs:label "relates to external"@en ; rdfs:domain ex:Item ; rdfs:range ex:Item .
+ex:hasSingleValueA a owl:DatatypeProperty, owl:FunctionalProperty ;
+  rdfs:label "has single value A"@en ; rdfs:domain ex:Item ; rdfs:range xsd:string .
+ex:hasSingleValueB a owl:DatatypeProperty, owl:FunctionalProperty ;
+  rdfs:label "has single value B"@en ; rdfs:domain ex:Item ; rdfs:range xsd:string .
+ex:hasManyTagsOne a owl:DatatypeProperty ; rdfs:label "has many tags one"@en ; rdfs:domain ex:Item ; rdfs:range xsd:string .
+ex:hasManyTagsTwo a owl:DatatypeProperty ; rdfs:label "has many tags two"@en ; rdfs:domain ex:Item ; rdfs:range xsd:string .
+ex:hasComponent a owl:ObjectProperty ; rdfs:label "has component"@en ; rdfs:domain ex:Item ; rdfs:range owl:Thing .

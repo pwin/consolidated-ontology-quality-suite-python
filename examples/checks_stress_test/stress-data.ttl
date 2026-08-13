@@ -1,0 +1,152 @@
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix ex:   <https://example.org/stress/> .
+
+# ---------------------------------------------------------------------------
+# Engine-parity stress test, data half -- see stress-ontology.ttl's header
+# comment for why this is deliberately larger/more repetitive than
+# examples/data/legacy-export.ttl.
+# ---------------------------------------------------------------------------
+
+# --- DAT-001: invalid literal lexical form (3 separate individuals,
+# 3 separate datatypes -- date/integer/boolean). ----------------------------
+ex:dateItemOne a ex:Item ; rdfs:label "Date Item One"@en ; ex:hasDate "31-13-2020"^^xsd:date .
+ex:countItemOne a ex:Item ; rdfs:label "Count Item One"@en ; ex:hasCount "12x"^^xsd:integer .
+ex:boolItemOne a ex:Item ; rdfs:label "Bool Item One"@en ; ex:isActive "yesplz"^^xsd:boolean .
+
+# --- DAT-002: dangling IRI reference (3 separate individuals, 3 separate
+# nonexistent targets). ------------------------------------------------------
+ex:danglingItemOne a ex:Item ; rdfs:label "Dangling Item One"@en ; ex:relatesToExternal ex:GhostOne .
+ex:danglingItemTwo a ex:Item ; rdfs:label "Dangling Item Two"@en ; ex:relatesToExternal ex:GhostTwo .
+ex:danglingItemThree a ex:Item ; rdfs:label "Dangling Item Three"@en ; ex:relatesToExternal ex:GhostThree .
+
+# --- DAT-003: duplicate literal values for the same subject/predicate
+# (3 separate subjects; each pair is two genuinely distinct RDF terms --
+# one with a language tag, one without -- sharing the same STR() value;
+# two byte-identical triples would collapse into one and never trigger
+# this at all, see legacy-export.ttl's own fix for the same mistake). ------
+ex:dupItemOne a ex:Item ; rdfs:label "Dup Item One"@en .
+ex:dupItemOne rdfs:comment "Duplicate text one." .
+ex:dupItemOne rdfs:comment "Duplicate text one."@en .
+
+ex:dupItemTwo a ex:Item ; rdfs:label "Dup Item Two"@en .
+ex:dupItemTwo rdfs:comment "Duplicate text two." .
+ex:dupItemTwo rdfs:comment "Duplicate text two."@en .
+
+ex:dupItemThree a ex:Item ; rdfs:label "Dup Item Three"@en .
+ex:dupItemThree rdfs:comment "Duplicate text three." .
+ex:dupItemThree rdfs:comment "Duplicate text three."@en .
+
+# --- LOG-002: owl:FunctionalProperty violated by data (3 separate
+# individuals across 2 separate functional properties). --------------------
+ex:funcItemOne a ex:Item ; rdfs:label "Func Item One"@en ;
+  ex:hasSingleValueA "value-1" ; ex:hasSingleValueA "value-2" .
+ex:funcItemTwo a ex:Item ; rdfs:label "Func Item Two"@en ;
+  ex:hasSingleValueA "value-3" ; ex:hasSingleValueA "value-4" .
+ex:funcItemThree a ex:Item ; rdfs:label "Func Item Three"@en ;
+  ex:hasSingleValueB "value-5" ; ex:hasSingleValueB "value-6" .
+
+# --- STR-001: individual typed with an undeclared class (3 separate
+# individuals, 3 separate undeclared classes). ------------------------------
+ex:undeclaredTypeItemOne a ex:UndeclaredTypeOne ; rdfs:label "Undeclared Type Item One"@en .
+ex:undeclaredTypeItemTwo a ex:UndeclaredTypeTwo ; rdfs:label "Undeclared Type Item Two"@en .
+ex:undeclaredTypeItemThree a ex:UndeclaredTypeThree ; rdfs:label "Undeclared Type Item Three"@en .
+
+# --- STR-002: undeclared predicate used (3 separate individuals, 3
+# separate undeclared predicates). ------------------------------------------
+ex:undeclaredPredItemOne a ex:Item ; rdfs:label "Undeclared Pred Item One"@en ; ex:undeclaredPredicateOne "x" .
+ex:undeclaredPredItemTwo a ex:Item ; rdfs:label "Undeclared Pred Item Two"@en ; ex:undeclaredPredicateTwo "y" .
+ex:undeclaredPredItemThree a ex:Item ; rdfs:label "Undeclared Pred Item Three"@en ; ex:undeclaredPredicateThree "z" .
+
+# --- QUA-003: deprecated term still used (3 separate individuals, one per
+# deprecated property declared in stress-ontology.ttl). --------------------
+ex:deprecatedUseItemOne a ex:Item ; rdfs:label "Deprecated Use Item One"@en ; ex:deprecatedPropOne "used-1" .
+ex:deprecatedUseItemTwo a ex:Item ; rdfs:label "Deprecated Use Item Two"@en ; ex:deprecatedPropTwo "used-2" .
+ex:deprecatedUseItemThree a ex:Item ; rdfs:label "Deprecated Use Item Three"@en ; ex:deprecatedPropThree "used-3" .
+
+# --- EFF-003: excessive property fan-out (> 50 values; 2 separate
+# individuals, 2 separate properties). ---------------------------------------
+ex:fanOutItemOne a ex:Item ; rdfs:label "Fan Out Item One"@en ;
+  ex:hasManyTagsOne "tag01", "tag02", "tag03", "tag04", "tag05", "tag06", "tag07", "tag08", "tag09", "tag10",
+    "tag11", "tag12", "tag13", "tag14", "tag15", "tag16", "tag17", "tag18", "tag19", "tag20",
+    "tag21", "tag22", "tag23", "tag24", "tag25", "tag26", "tag27", "tag28", "tag29", "tag30",
+    "tag31", "tag32", "tag33", "tag34", "tag35", "tag36", "tag37", "tag38", "tag39", "tag40",
+    "tag41", "tag42", "tag43", "tag44", "tag45", "tag46", "tag47", "tag48", "tag49", "tag50",
+    "tag51", "tag52", "tag53", "tag54", "tag55" .
+
+ex:fanOutItemTwo a ex:Item ; rdfs:label "Fan Out Item Two"@en ;
+  ex:hasManyTagsTwo "tagA01", "tagA02", "tagA03", "tagA04", "tagA05", "tagA06", "tagA07", "tagA08", "tagA09", "tagA10",
+    "tagA11", "tagA12", "tagA13", "tagA14", "tagA15", "tagA16", "tagA17", "tagA18", "tagA19", "tagA20",
+    "tagA21", "tagA22", "tagA23", "tagA24", "tagA25", "tagA26", "tagA27", "tagA28", "tagA29", "tagA30",
+    "tagA31", "tagA32", "tagA33", "tagA34", "tagA35", "tagA36", "tagA37", "tagA38", "tagA39", "tagA40",
+    "tagA41", "tagA42", "tagA43", "tagA44", "tagA45", "tagA46", "tagA47", "tagA48", "tagA49", "tagA50",
+    "tagA51", "tagA52", "tagA53", "tagA54", "tagA55" .
+
+# --- EFF-002: excessive blank-node ratio across the whole merged graph
+# (> 20%). 60 carrier individuals, each with one blank-node-valued
+# ex:hasComponent -- enough to push the merged (ontology + data) graph's
+# blank-node ratio over the threshold; tuned empirically (see
+# tests/test_engine_parity_stress.py, which asserts the actual ratio
+# achieved rather than hard-coding a guess). ---------------------------------
+ex:bnodeCarrier01 a ex:Item ; ex:hasComponent [ rdfs:label "component 01" ] .
+ex:bnodeCarrier02 a ex:Item ; ex:hasComponent [ rdfs:label "component 02" ] .
+ex:bnodeCarrier03 a ex:Item ; ex:hasComponent [ rdfs:label "component 03" ] .
+ex:bnodeCarrier04 a ex:Item ; ex:hasComponent [ rdfs:label "component 04" ] .
+ex:bnodeCarrier05 a ex:Item ; ex:hasComponent [ rdfs:label "component 05" ] .
+ex:bnodeCarrier06 a ex:Item ; ex:hasComponent [ rdfs:label "component 06" ] .
+ex:bnodeCarrier07 a ex:Item ; ex:hasComponent [ rdfs:label "component 07" ] .
+ex:bnodeCarrier08 a ex:Item ; ex:hasComponent [ rdfs:label "component 08" ] .
+ex:bnodeCarrier09 a ex:Item ; ex:hasComponent [ rdfs:label "component 09" ] .
+ex:bnodeCarrier10 a ex:Item ; ex:hasComponent [ rdfs:label "component 10" ] .
+ex:bnodeCarrier11 a ex:Item ; ex:hasComponent [ rdfs:label "component 11" ] .
+ex:bnodeCarrier12 a ex:Item ; ex:hasComponent [ rdfs:label "component 12" ] .
+ex:bnodeCarrier13 a ex:Item ; ex:hasComponent [ rdfs:label "component 13" ] .
+ex:bnodeCarrier14 a ex:Item ; ex:hasComponent [ rdfs:label "component 14" ] .
+ex:bnodeCarrier15 a ex:Item ; ex:hasComponent [ rdfs:label "component 15" ] .
+ex:bnodeCarrier16 a ex:Item ; ex:hasComponent [ rdfs:label "component 16" ] .
+ex:bnodeCarrier17 a ex:Item ; ex:hasComponent [ rdfs:label "component 17" ] .
+ex:bnodeCarrier18 a ex:Item ; ex:hasComponent [ rdfs:label "component 18" ] .
+ex:bnodeCarrier19 a ex:Item ; ex:hasComponent [ rdfs:label "component 19" ] .
+ex:bnodeCarrier20 a ex:Item ; ex:hasComponent [ rdfs:label "component 20" ] .
+ex:bnodeCarrier21 a ex:Item ; ex:hasComponent [ rdfs:label "component 21" ] .
+ex:bnodeCarrier22 a ex:Item ; ex:hasComponent [ rdfs:label "component 22" ] .
+ex:bnodeCarrier23 a ex:Item ; ex:hasComponent [ rdfs:label "component 23" ] .
+ex:bnodeCarrier24 a ex:Item ; ex:hasComponent [ rdfs:label "component 24" ] .
+ex:bnodeCarrier25 a ex:Item ; ex:hasComponent [ rdfs:label "component 25" ] .
+ex:bnodeCarrier26 a ex:Item ; ex:hasComponent [ rdfs:label "component 26" ] .
+ex:bnodeCarrier27 a ex:Item ; ex:hasComponent [ rdfs:label "component 27" ] .
+ex:bnodeCarrier28 a ex:Item ; ex:hasComponent [ rdfs:label "component 28" ] .
+ex:bnodeCarrier29 a ex:Item ; ex:hasComponent [ rdfs:label "component 29" ] .
+ex:bnodeCarrier30 a ex:Item ; ex:hasComponent [ rdfs:label "component 30" ] .
+ex:bnodeCarrier31 a ex:Item ; ex:hasComponent [ rdfs:label "component 31" ] .
+ex:bnodeCarrier32 a ex:Item ; ex:hasComponent [ rdfs:label "component 32" ] .
+ex:bnodeCarrier33 a ex:Item ; ex:hasComponent [ rdfs:label "component 33" ] .
+ex:bnodeCarrier34 a ex:Item ; ex:hasComponent [ rdfs:label "component 34" ] .
+ex:bnodeCarrier35 a ex:Item ; ex:hasComponent [ rdfs:label "component 35" ] .
+ex:bnodeCarrier36 a ex:Item ; ex:hasComponent [ rdfs:label "component 36" ] .
+ex:bnodeCarrier37 a ex:Item ; ex:hasComponent [ rdfs:label "component 37" ] .
+ex:bnodeCarrier38 a ex:Item ; ex:hasComponent [ rdfs:label "component 38" ] .
+ex:bnodeCarrier39 a ex:Item ; ex:hasComponent [ rdfs:label "component 39" ] .
+ex:bnodeCarrier40 a ex:Item ; ex:hasComponent [ rdfs:label "component 40" ] .
+ex:bnodeCarrier41 a ex:Item ; ex:hasComponent [ rdfs:label "component 41" ] .
+ex:bnodeCarrier42 a ex:Item ; ex:hasComponent [ rdfs:label "component 42" ] .
+ex:bnodeCarrier43 a ex:Item ; ex:hasComponent [ rdfs:label "component 43" ] .
+ex:bnodeCarrier44 a ex:Item ; ex:hasComponent [ rdfs:label "component 44" ] .
+ex:bnodeCarrier45 a ex:Item ; ex:hasComponent [ rdfs:label "component 45" ] .
+ex:bnodeCarrier46 a ex:Item ; ex:hasComponent [ rdfs:label "component 46" ] .
+ex:bnodeCarrier47 a ex:Item ; ex:hasComponent [ rdfs:label "component 47" ] .
+ex:bnodeCarrier48 a ex:Item ; ex:hasComponent [ rdfs:label "component 48" ] .
+ex:bnodeCarrier49 a ex:Item ; ex:hasComponent [ rdfs:label "component 49" ] .
+ex:bnodeCarrier50 a ex:Item ; ex:hasComponent [ rdfs:label "component 50" ] .
+ex:bnodeCarrier51 a ex:Item ; ex:hasComponent [ rdfs:label "component 51" ] .
+ex:bnodeCarrier52 a ex:Item ; ex:hasComponent [ rdfs:label "component 52" ] .
+ex:bnodeCarrier53 a ex:Item ; ex:hasComponent [ rdfs:label "component 53" ] .
+ex:bnodeCarrier54 a ex:Item ; ex:hasComponent [ rdfs:label "component 54" ] .
+ex:bnodeCarrier55 a ex:Item ; ex:hasComponent [ rdfs:label "component 55" ] .
+ex:bnodeCarrier56 a ex:Item ; ex:hasComponent [ rdfs:label "component 56" ] .
+ex:bnodeCarrier57 a ex:Item ; ex:hasComponent [ rdfs:label "component 57" ] .
+ex:bnodeCarrier58 a ex:Item ; ex:hasComponent [ rdfs:label "component 58" ] .
+ex:bnodeCarrier59 a ex:Item ; ex:hasComponent [ rdfs:label "component 59" ] .
+ex:bnodeCarrier60 a ex:Item ; ex:hasComponent [ rdfs:label "component 60" ] .

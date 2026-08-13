@@ -32,15 +32,27 @@ ex:rex ex:hasBirthDate "2019-06-15"^^xsd:date .
 ex:rex ex:legacyStatus "active" .
 
 # --- Invalid literal lexical form for xsd:date -> DAT-001 -------------------
+# Must be explicitly ^^xsd:date -- an untyped/plain literal here (as this
+# line originally was) never matches DAT-001's `?dt = xsd:date` branch at
+# all, so the check silently never fired despite this comment's claim; a
+# real, reproducible bug caught only by directly comparing the pyshacl and
+# native SHACL engines' raw findings against this fixture, not by reading
+# the check's own SPARQL in isolation.
 ex:milo a ex:Mammal ;
   rdfs:label "Milo"@en ;
-  ex:hasBirthDate "15/06/2019" .
+  ex:hasBirthDate "15/06/2019"^^xsd:date .
 
 # --- Dangling reference: ex:ghostOwner is never described elsewhere -> DAT-002
 ex:milo ex:hasOwner ex:ghostOwner .
 
 # --- Duplicate literal values for the same subject/predicate -> DAT-003 -----
-ex:rex rdfs:comment "A friendly dog."@en .
+# Two genuinely distinct RDF terms (one with a language tag, one without) --
+# two byte-identical triples (as this originally was) collapse into a
+# single triple when parsed, since an RDF graph is a set: nothing was ever
+# actually duplicated for DAT-003 to catch. Caught the same way as the
+# DAT-001 fix above -- comparing raw engine output against what the
+# fixture's own comment claimed, not by reading the check in isolation.
+ex:rex rdfs:comment "A friendly dog." .
 ex:rex rdfs:comment "A friendly dog."@en .
 
 # --- High fan-out on one property -> EFF-003 (51 values) -------------------
