@@ -107,7 +107,10 @@ including two cases (`STY-003`, many blank-node focus nodes at once;
 `STY-001`/`STY-002`, blank-node-typed anonymous class/property
 expressions) that each found a real native-engine bug, since fixed in
 `shacl` 0.1.4 and 0.1.5 respectively -- see that test module's docstring
-for the history.
+for the history. Re-verified at `shacl` 0.1.9: 0.1.6-0.1.9 added SHACL-AF
+`sh:rule` support and a recursion-guard performance fix, neither of which
+touches the `sh:sparql`/SELECT constraint path this suite's own checks
+use -- full parity holds.
 
 **Identity is proven; severity is not, and the two engines genuinely
 disagree on it.** pyshacl silently drops an `sh:severity` declared *inside*
@@ -174,9 +177,9 @@ default to `"both"` explicitly -- `tests/test_vehicle_gist_checks.py`
 pins an exact finding count against pyshacl specifically and needs that
 default to stay environment-independent.) `shacl` is on PyPI as of 0.1.4
 (0.1.5 for the isIRI($this) fix above -- this package's `native-shacl`
-extra pins `shacl>=0.1.5`), installed via the opt-in `uv sync --extra
-native-shacl` (same convention as this package's own `reasoner` extra) --
-see `shacl_native_runner.py`'s
+extra pins `shacl>=0.1.9`, kept current with upstream), installed via the
+opt-in `uv sync --extra native-shacl` (same convention as this package's
+own `reasoner` extra) -- see `shacl_native_runner.py`'s
 module docstring for why its SHACL-core (non-SPARQL) findings need a
 `sh:message`-text fallback to resolve a check id (blank node identifiers
 don't survive the Rust/Python boundary the way pyshacl's own in-process
