@@ -88,12 +88,10 @@ ontology-quality-suite checks --ontology examples/acme_robotics/acme-org-v1.ttl 
   --out-dir out/acme-checks --fail-on never
 ```
 
-With the real `org:`/`foaf:` imports resolved, this reports close to 300
-findings (Warning/Info hold steady at 162/84 across runs; the Violation
-count varies by a few from run to run -- a real, minor pre-existing
-nondeterminism somewhere in how a handful of checks evaluate the merged
-import graph, independent of anything in this walkthrough) -- but only a
-handful are Acme's own; the rest are the registry's full ~50-check pass
+With the real `org:`/`foaf:` imports resolved, this reports exactly 301
+findings (55 Violation / 162 Warning / 84 Info, identical run to run) --
+but only a handful are Acme's own; the rest are the registry's full
+~50-check pass
 finding real, pre-existing documentation/style gaps *inside the W3C
 Organization Ontology and FOAF themselves*. That's not a bug in the
 "checking the wrong thing" sense -- the suite is correctly checking

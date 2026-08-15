@@ -45,9 +45,9 @@ oq:QUA-001
       }
     """ ;
   ] ;
+  sh:severity sh:Warning ;
   sh:sparql [
     a sh:SPARQLConstraint ;
-    sh:severity sh:Warning ;
     sh:message "{$this} has no rdfs:label or skos:prefLabel." ;
     sh:select """
       PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -73,9 +73,9 @@ oq:QUA-001
 oq:QUA-002
   a sh:NodeShape ;
   sh:targetClass owl:Ontology ;
+  sh:severity sh:Info ;
   sh:sparql [
     a sh:SPARQLConstraint ;
-    sh:severity sh:Info ;
     sh:message "Ontology {$this} lacks owl:versionInfo, dcterms:title and rdfs:label/skos:prefLabel metadata." ;
     sh:select """
       PREFIX owl: <http://www.w3.org/2002/07/owl#>
@@ -106,9 +106,9 @@ oq:QUA-003
       }
     """ ;
   ] ;
+  sh:severity sh:Warning ;
   sh:sparql [
     a sh:SPARQLConstraint ;
-    sh:severity sh:Warning ;
     sh:message "{$this} still uses a term that is declared owl:deprecated true." ;
     sh:select """
       PREFIX owl: <http://www.w3.org/2002/07/owl#>

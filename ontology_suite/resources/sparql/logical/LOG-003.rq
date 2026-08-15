@@ -11,6 +11,10 @@ CONSTRUCT {
   _:r a sh:ValidationResult ;
     sh:resultSeverity sh:Warning ;
     sh:focusNode ?c ;
+    # Matches the SHACL twin's `sh:path owl:equivalentClass`
+    # (shapes/logical.ttl), so the two formulations of one finding dedup
+    # into a single row rather than one row each under `--engine both`.
+    sh:resultPath owl:equivalentClass ;
     sh:value ?d ;
     sh:sourceConstraintComponent oq:LOG-003 ;
     sh:resultMessage ?msg .

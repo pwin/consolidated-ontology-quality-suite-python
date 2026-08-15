@@ -98,3 +98,30 @@ def test_apply_repair_to_file_insert_appends_turtle_block(tmp_path):
     assert target.read_text(encoding="utf-8") == new_content
     # original content preserved verbatim (append-only)
     assert new_content.startswith("@prefix ex: <https://example.org/> .\nex:Existing a ex:Thing .\n")
+
+
+def test_multi_valued_and_path_expression_rows_do_not_break_the_update():
+    """`build_repair_update` binds ?focusNode/?path/?value in one VALUES
+    clause whether or not the template uses them, so a term that isn't a
+    single IRI makes the whole UPDATE fail to parse -- for every check, not
+    just the one the odd term came from.
+
+    Two `merge.py` outputs are legitimately not IRIs: a joined list, for a
+    result carrying several `sh:value`s (`STR-007` names both the subject
+    and the object of an example triple), and a rendered property path, for
+    a SHACL path expression (`LOG-001`'s `(rdfs:subClassOf)+`). `STR-007`'s
+    own template touches only `?focusNode`, so it must still apply cleanly
+    with either sitting in `?value`."""
+    g = Graph()
+    g.bind("ex", EX)
+    row = _row(
+        "STR-007",
+        focus_node=str(EX.undeclaredPredicate),
+        path=f"({str(EX.subClassOf)})+",
+        value=f"{EX.subject}, {EX.object}",
+    )
+
+    outcome = compute_repair(config.DEFAULT_REPAIRS_DIR, row, g, {"ex": str(EX)})
+
+    assert outcome is not None
+    assert (EX.undeclaredPredicate, RDF.type, RDF.Property) in outcome.result_graph

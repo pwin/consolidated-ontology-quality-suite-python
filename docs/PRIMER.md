@@ -123,13 +123,13 @@ ontology-quality-suite checks --ontology examples/ontology/domain.ttl --out-dir 
 the registry actually runs: pyshacl, the portable SPARQL layer, the
 optional native (Rust) SHACL engine, or a cross-validating pair of two of
 those (default: `native+sparql` if the optional `shacl` package is
-installed, else `both` -- `pipeline.default_engine()`). This matters for
-speed (pyshacl alone can be ~100x slower than the alternatives on a large
-ontology) and, subtly, for which severities get reported at all (pyshacl
-has a real, confirmed bug around `sh:severity` inside SPARQL-based
-constraints). Don't guess at this from the primer -- `docs/ARCHITECTURE.md`'s
-"Choosing which engine actually runs" section has the full comparison,
-benchmarks, and the severity caveat in detail.
+installed, else `both` -- `pipeline.default_engine()`). Every engine reports
+the same findings at the same severities, so this is purely a speed and
+cross-validation choice: pyshacl alone can be ~100x slower than the
+alternatives on a large ontology, and the paired engines add a drift signal
+(a check that fires under one formulation and not the other). See
+`docs/ARCHITECTURE.md`'s "Choosing which engine actually runs" for the full
+comparison and benchmarks.
 
 Want to know if the ontology fits a specific OWL2 profile (e.g. before
 feeding it to ELK)? Off by default -- ask explicitly:

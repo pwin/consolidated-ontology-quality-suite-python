@@ -8,7 +8,7 @@ Generated from `registry.json` by `docs/generate_checks_md.py` -- 50 checks acro
 
 - **Default severity:** Violation
 - **Metric:** literal well-formedness
-- **Description:** A literal's lexical form does not match the expected lexical pattern for its declared datatype (checked heuristically for xsd:date, xsd:integer, xsd:boolean).
+- **Description:** A literal is not valid for its declared datatype -- either its lexical form does not match the expected pattern (checked portably for xsd:date, xsd:integer and xsd:boolean) or it does not parse into that datatype's value space at all (checked for every XSD datatype the RDF parser validates, which also covers lexically well-formed impossibilities such as "2021-02-30"^^xsd:date).
 - **Remediation:** Correct the literal so its lexical form is valid for the declared datatype, or correct the declared datatype.
 - **Cucumber:** Data Quality / Typed literals are lexically valid for their datatype
 

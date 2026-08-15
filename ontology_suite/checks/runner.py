@@ -11,6 +11,8 @@ from typing import List, Optional
 from rdflib import Graph
 
 from .. import config, io_utils
+from .literal_typing import SOURCE_LABEL as LITERAL_TYPING_SOURCE
+from .literal_typing import run_literal_typing_check
 from .merge import ResultRow, build_unified_results
 from .registry import Registry
 from .shacl_runner import load_shapes_graph, run_shacl
@@ -68,7 +70,8 @@ def run_suite(
     sparql_results_graph, sparql_outcomes = run_sparql_checks(working_graph, sparql_dir)
 
     rows = build_unified_results(
-        shacl_results_graph, sparql_results_graph, registry, shapes_graph
+        shacl_results_graph, sparql_results_graph, registry, shapes_graph,
+        extra_results=[(run_literal_typing_check(working_graph), LITERAL_TYPING_SOURCE)],
     )
 
     return SuiteRun(

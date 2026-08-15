@@ -14,14 +14,23 @@ investigating.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Sequence, Tuple
 
-from rdflib import Graph, URIRef
-from rdflib.namespace import Namespace
+from rdflib import BNode, Graph
+from rdflib.collection import Collection
+from rdflib.namespace import RDF, Namespace
 
 from .registry import Registry
 
 SH = Namespace("http://www.w3.org/ns/shacl#")
+
+# SHACL property-path operators, in the form `sh:<op>Path <inner>` -> the
+# SPARQL 1.1 path-expression suffix that means the same thing.
+_PATH_SUFFIXES = {
+    SH.zeroOrMorePath: "*",
+    SH.oneOrMorePath: "+",
+    SH.zeroOrOnePath: "?",
+}
 
 SEVERITY_ORDER = {
     "http://www.w3.org/ns/shacl#Violation": 0,
@@ -49,6 +58,72 @@ class ResultRow:
     sources: List[str] = field(default_factory=list)
 
 
+def _path_expression(graph: Graph, node, _depth: int = 0) -> str:
+    """Render one ``sh:resultPath`` value as a stable, readable SPARQL 1.1
+    property-path expression.
+
+    A path is only sometimes a plain IRI. SHACL also allows *path
+    expressions*, which are encoded as blank-node structures
+    (``[ sh:oneOrMorePath rdfs:subClassOf ]``, ``[ sh:inversePath ... ]``,
+    an RDF list for a sequence, ``sh:alternativePath`` for ``|``). Rendering
+    those with a plain ``str()`` yields the blank node's *identifier* --
+    which rdflib mints fresh on every parse, so the same finding got a
+    different ``path`` string on every run. That made ``full_results.csv``
+    diff against itself with no input change, and, because ``path`` is part
+    of the dedup key in ``build_unified_results``, it also meant the pyshacl
+    and SPARQL formulations of the same path-expression finding could never
+    merge -- their blank node ids never match. LOG-001 (``sh:path [
+    sh:oneOrMorePath rdfs:subClassOf ]``) is this suite's own instance of it.
+
+    Falls back to ``str(node)`` for anything not recognized, so an
+    unexpected shape is degraded output rather than an exception.
+    """
+    if not isinstance(node, BNode) or _depth > 10:
+        return str(node)
+
+    for operator, suffix in _PATH_SUFFIXES.items():
+        inner = graph.value(node, operator)
+        if inner is not None:
+            return f"({_path_expression(graph, inner, _depth + 1)}){suffix}"
+
+    inverse = graph.value(node, SH.inversePath)
+    if inverse is not None:
+        return f"^({_path_expression(graph, inverse, _depth + 1)})"
+
+    alternative = graph.value(node, SH.alternativePath)
+    if alternative is not None:
+        members = list(Collection(graph, alternative))
+        return "|".join(_path_expression(graph, m, _depth + 1) for m in members)
+
+    if graph.value(node, RDF.first) is not None:  # sequence path (an RDF list)
+        members = list(Collection(graph, node))
+        return "/".join(_path_expression(graph, m, _depth + 1) for m in members)
+
+    return str(node)
+
+
+def _joined(values: List[str]) -> Optional[str]:
+    """One display string for a result property that may legitimately carry
+    several values, ordered so the same finding always renders identically.
+
+    Several of this suite's SPARQL CONSTRUCTs bind two values for one
+    finding on purpose -- ``LOG-004`` emits ``sh:value ?p1, ?p2`` (the two
+    inverses it is complaining about), ``LOG-006``/``LOG-007`` emit both the
+    domain and the range, ``REA-001`` both disjoint classes, ``STR-007``
+    both subject and object. Reading a single one of them back with
+    ``Graph.value()`` picks an arbitrary member of an unordered set: which
+    one came back varied per run, so rows collapsed differently under the
+    dedup key each time and finding *totals* fluctuated with no input change
+    (observed directly: LOG-004 reported 3, then 2, then 4 times across
+    three consecutive identical runs of the same fixture). Sorting and
+    joining makes the key order-independent, and shows both values in the
+    report instead of half the finding.
+    """
+    if not values:
+        return None
+    return ", ".join(sorted(set(values)))
+
+
 def _extract_rows(
     results_graph: Graph,
     registry: Registry,
@@ -59,8 +134,11 @@ def _extract_rows(
     for result in results_graph.subjects(SH.resultSeverity, None):
         severity = results_graph.value(result, SH.resultSeverity)
         focus = results_graph.value(result, SH.focusNode)
-        path = results_graph.value(result, SH.resultPath)
-        value = results_graph.value(result, SH.value)
+        path = _joined([
+            _path_expression(results_graph, p)
+            for p in results_graph.objects(result, SH.resultPath)
+        ])
+        value = _joined([str(v) for v in results_graph.objects(result, SH.value)])
         message = results_graph.value(result, SH.resultMessage)
         scc = results_graph.value(result, SH.sourceConstraintComponent)
         shape = results_graph.value(result, SH.sourceShape)
@@ -81,7 +159,7 @@ def _extract_rows(
         # importing gist 14.1.0, purely from this mismatch, not from any
         # actual difference in what the two engines found.
         if value is None and focus is not None:
-            value = focus
+            value = str(focus)
 
         rows.append(
             ResultRow(
@@ -90,8 +168,8 @@ def _extract_rows(
                 title=check.title if check else None,
                 severity=SEVERITY_LABEL.get(str(severity), str(severity)),
                 focus_node=str(focus) if focus is not None else "",
-                path=str(path) if path is not None else None,
-                value=str(value) if value is not None else None,
+                path=path,
+                value=value,
                 message=str(message) if message is not None else "",
                 remediation=check.remediation if check else None,
                 sources=[source_label],
@@ -105,12 +183,25 @@ def build_unified_results(
     sparql_results_graph: Graph,
     registry: Registry,
     shapes_graph: Optional[Graph] = None,
+    extra_results: Optional[Sequence[Tuple[Graph, str]]] = None,
 ) -> List[ResultRow]:
+    """``extra_results`` takes ``(results_graph, source_label)`` pairs for
+    findings produced by neither engine -- currently only
+    ``checks/literal_typing.py``, which covers the part of ``DAT-001`` no
+    SPARQL formulation can reach. They merge under the same dedup key as
+    everything else, so a finding both a portable formulation and a
+    supplement report stays one row with both labels in ``sources``, and is
+    listed last so an engine-produced row keeps its own message."""
     shacl_rows = _extract_rows(shacl_results_graph, registry, shapes_graph, "shacl")
     sparql_rows = _extract_rows(sparql_results_graph, registry, None, "sparql")
+    extra_rows = [
+        row
+        for graph, label in (extra_results or [])
+        for row in _extract_rows(graph, registry, None, label)
+    ]
 
     merged: Dict[tuple, ResultRow] = {}
-    for row in shacl_rows + sparql_rows:
+    for row in shacl_rows + sparql_rows + extra_rows:
         key = (row.check_id, row.focus_node, row.path, row.value)
         if key in merged:
             merged[key].sources = sorted(set(merged[key].sources + row.sources))

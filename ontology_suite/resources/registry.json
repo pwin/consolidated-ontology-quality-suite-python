@@ -172,7 +172,7 @@
       "metric": "literal well-formedness",
       "default_severity": "Violation",
       "title": "Literal lexical form invalid for its datatype",
-      "description": "A literal's lexical form does not match the expected lexical pattern for its declared datatype (checked heuristically for xsd:date, xsd:integer, xsd:boolean).",
+      "description": "A literal is not valid for its declared datatype -- either its lexical form does not match the expected pattern (checked portably for xsd:date, xsd:integer and xsd:boolean) or it does not parse into that datatype's value space at all (checked for every XSD datatype the RDF parser validates, which also covers lexically well-formed impossibilities such as \"2021-02-30\"^^xsd:date).",
       "remediation": "Correct the literal so its lexical form is valid for the declared datatype, or correct the declared datatype.",
       "cucumber_feature": "Data Quality",
       "cucumber_scenario": "Typed literals are lexically valid for their datatype"

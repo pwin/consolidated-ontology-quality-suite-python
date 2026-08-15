@@ -14,9 +14,9 @@ oq:DAT-001
     a sh:SPARQLTarget ;
     sh:select "SELECT DISTINCT ?this WHERE { ?this ?p ?o . FILTER(isLiteral(?o)) }" ;
   ] ;
+  sh:severity sh:Violation ;
   sh:sparql [
     a sh:SPARQLConstraint ;
-    sh:severity sh:Violation ;
     sh:message "A literal on {$this} does not match the lexical pattern expected for its datatype." ;
     sh:select """
       PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
@@ -47,9 +47,9 @@ oq:DAT-002
     a sh:SPARQLTarget ;
     sh:select "SELECT DISTINCT ?this WHERE { ?this ?p ?o . FILTER(isIRI(?o)) }" ;
   ] ;
+  sh:severity sh:Warning ;
   sh:sparql [
     a sh:SPARQLConstraint ;
-    sh:severity sh:Warning ;
     sh:message "{$this} references an IRI ({?value}) that is never used as a subject nor as a class." ;
     sh:select """
       PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -78,9 +78,9 @@ oq:DAT-003
     a sh:SPARQLTarget ;
     sh:select "SELECT DISTINCT ?this WHERE { ?this ?p ?o . FILTER(isLiteral(?o)) }" ;
   ] ;
+  sh:severity sh:Info ;
   sh:sparql [
     a sh:SPARQLConstraint ;
-    sh:severity sh:Info ;
     sh:message "{$this} has duplicate literal values for property {?path}." ;
     sh:select """
       SELECT $this ?path

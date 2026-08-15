@@ -49,7 +49,12 @@ undefined terms, structural patterns, contradiction patterns, etc.
    - always set `sh:resultSeverity`, `sh:focusNode`, `sh:resultMessage`, and
      `sh:sourceConstraintComponent oq:<id>`
    - set `sh:resultPath` and/or `sh:value` when there's a natural predicate
-     or offending value
+     or offending value. Binding *several* of either on one result is fine
+     and is sometimes the honest thing to do (`LOG-004` names both of the
+     inverses it is complaining about, `LOG-006`/`LOG-007` both the domain
+     and the range) -- `checks/merge.py` sorts and joins them, so the
+     finding renders and dedups identically however the engine happens to
+     order them
    - be self-contained (its own `PREFIX` declarations, no external state)
 
    Copy an existing query in the same category as a starting point. Before
@@ -67,6 +72,15 @@ undefined terms, structural patterns, contradiction patterns, etc.
    file's `WHERE` clause. If the shape's own IRI is exactly `oq:<id>`, no
    further annotation is needed; if a check needs several NodeShapes, add
    `oq:checkId "<id>"` to each shape node (see `ontology_suite/checks/registry.py::resolve_check_id`).
+
+   **Declare `sh:severity` on the shape node, matching the check's
+   `default_severity`** -- never inside the `sh:sparql [ ... ]` block. SHACL
+   defines `sh:severity` as a property of a shape; putting it on the nested
+   `sh:SPARQLConstraint` parses fine and is then read by some processors and
+   ignored by others (pyshacl silently substitutes `sh:Violation`), so the
+   same shape yields different severities under different `--engine` values.
+   `tests/test_shape_severity.py` fails on both mistakes -- wrong placement,
+   and a severity that disagrees with `registry.json`.
 
 5. **Regenerate `docs/CHECKS.md`:** `python docs/generate_checks_md.py`.
 

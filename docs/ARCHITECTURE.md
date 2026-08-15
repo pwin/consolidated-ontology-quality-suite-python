@@ -67,6 +67,21 @@ category, severity, and remediation text, shared by:
    graph pattern over a single merged graph -- OWL2 profile membership is a
    syntactic classification, and a real DL reasoner's output isn't RDF at
    all until this suite shapes it into a `ResultRow`.
+4. **A Python *supplement* to a portable check** --
+   `checks/literal_typing.py` is the only one, and it exists because
+   `DAT-001`'s question ("is this literal valid for its datatype?") is one
+   SPARQL cannot ask: there is no such operator, so both portable
+   formulations approximate it with a regex over the lexical form. Under
+   rdflib that regex cannot see an invalid `xsd:boolean` at all -- rdflib
+   rewrites `"yes"^^xsd:boolean` to `'false'` on parse, which the regex then
+   accepts -- and it cannot express value-space impossibilities like
+   `"2021-02-30"^^xsd:date`. The supplement emits ordinary
+   `sh:ValidationResult` triples tagged `oq:DAT-001` and merges through the
+   same dedup key as everything else, so a literal both it and the regex
+   catch stays one row with `literal-typing` added to `sources`. It runs
+   under every `--engine` value on purpose: the gap is in the check
+   formulations, not in one engine, and `--engine` is not supposed to change
+   which findings exist.
 
 See `docs/EXTENDING.md` for exactly how to add a check of any of these three
 kinds.
@@ -112,25 +127,33 @@ for the history. Re-verified at `shacl` 0.1.9: 0.1.6-0.1.9 added SHACL-AF
 touches the `sh:sparql`/SELECT constraint path this suite's own checks
 use -- full parity holds.
 
-**Identity is proven; severity is not, and the two engines genuinely
-disagree on it.** pyshacl silently drops an `sh:severity` declared *inside*
-an `sh:sparql [...]` SPARQLConstraint block and always reports `Violation`
-regardless of what the shape actually says; the native engine reports the
-declared severity correctly (per the SHACL-AF spec -- a pyshacl limitation,
-not a native-engine bug). Confirmed directly on this suite's own shapes:
-`examples/ontology/domain.ttl`'s 18 findings come back as 17 Violation/1
-Warning/0 Info under `--engine shacl`, but 1 Violation/15 Warning/2 Info
-under `--engine native` -- `QUA-001`/`QUA-002`/`STY-001`/`STY-002`/
-`STY-003`/`STR-003`/`EFF-001` all declare `sh:severity` this way in
-`resources/shapes/*.ttl`, and pyshacl reports every one of them as
-`Violation` regardless. (`sh:severity` declared directly on a SHACL-core
-shape -- e.g. `LOG-001`'s `sh:property [...]` -- is unaffected; it's
-specifically the SPARQLConstraint-nested form pyshacl drops.) This matters
-in practice because every subcommand defaults to `--fail-on Violation`:
-the same ontology can pass or fail purely depending on which `--engine`
-flag is passed -- see `tests/test_shacl_native_runner.py::test_native_and_pyshacl_disagree_on_sh_sparql_severity`,
-which pins the actual divergence rather than just excluding severity from
-the identity comparison.
+**Severity is part of parity too, since the shapes stopped declaring it in
+the wrong place.** SHACL defines `sh:severity` as a property of a *shape*.
+Every shape here used to declare it one level down, on the
+`sh:SPARQLConstraint` blank node inside its `sh:sparql [ ... ]` block --
+legal Turtle that no processor is obliged to read, and pyshacl does not: it
+fell back to the spec default and reported *every* SHACL-sourced finding as
+`Violation`. The native engine did read the nested form, so the two engines
+returned different severities for identical findings:
+`examples/ontology/domain.ttl`'s 18 findings came back as 17 Violation/1
+Warning/0 Info under `--engine shacl` and 1 Violation/15 Warning/2 Info
+under `--engine native`.
+
+That mattered because every subcommand defaults to `--fail-on Violation`:
+the same ontology passed or failed a CI gate purely on which `--engine` was
+passed, and a class named `person_record` (`STY-001`, registry default
+`Warning`) failed exactly as hard as a logical contradiction. Moving each
+declaration onto its enclosing shape fixed both engines at once -- both now
+report 1 Violation/15 Warning/2 Info, matching `registry.json` exactly.
+(`sh:severity` on a SHACL-core property shape -- e.g. `LOG-001`'s
+`sh:property [...]` -- was always fine; a property shape *is* a shape.)
+
+Guarded by `tests/test_shape_severity.py` (the placement itself, and each
+shape against its registry `default_severity`) and
+`tests/test_shacl_native_runner.py::test_every_severity_matches_the_registry_under_both_engines`
+(the observable behavior, under both engines). `_row_key` in that module
+now includes severity in the identity comparison, where it used to exclude
+it precisely because of this divergence.
 
 **Fixed history: blank-node focus nodes used to cross-join under the
 native engine.** Before `shacl` 0.1.4, a `sh:sparql`-formulated check
@@ -187,9 +210,10 @@ ones do).
 
 **Plain `uv sync` (no `--extra native-shacl`) still uninstalls `shacl`**
 -- standard behavior for any opt-in extra, easy to trip over: it silently
-changes the CLI's default engine back to `both`/pyshacl (with the
-severity consequences above) until reinstalled with `uv sync --extra
-native-shacl`.
+changes the CLI's default engine back to `both`/pyshacl until reinstalled
+with `uv sync --extra native-shacl`. Since the severity fix above that is a
+wall-clock change rather than a change in what gets reported, but a large
+one -- pyshacl is the slow path.
 
 `--inference rdfs` is supported under `--engine native`/`native+sparql` as
 of `shacl` v0.1.3 (materialised into the data graph before validation,

@@ -68,3 +68,59 @@ def test_every_registered_check_is_implemented_somewhere():
     implemented = _sparql_ids() | _shacl_ids() | native_python_ids
     unimplemented = sorted(set(ALL_IDS) - implemented)
     assert unimplemented == [], f"{unimplemented} are registered but have no known implementation"
+
+
+# ---------------------------------------------------------------------------
+# The behavioral counterpart to the two static tests above: a `.rq` twin that
+# *exists* but reports the same finding differently is not coverage. Each
+# engine's rows go through the same `(check_id, focus_node, path, value)`
+# dedup key, so a twin that omits an `sh:resultPath` or `sh:value` its shape
+# does emit doesn't merge with it -- the identical finding survives as two
+# rows, and `--engine both` silently over-counts relative to `--engine
+# sparql`. Three checks had drifted this way (LOG-001 and LOG-003 emitted no
+# `sh:resultPath`, STY-003 no `sh:value`), which is the entire 31-vs-28 gap
+# this test was written against.
+# ---------------------------------------------------------------------------
+import pytest
+import rdflib
+
+from ontology_suite import pipeline
+from ontology_suite.checks.registry import Registry
+
+PARITY_FIXTURES = {
+    "domain": ["examples/ontology/domain.ttl"],
+    "property_axioms": ["examples/property_axioms/ontology.ttl"],
+}
+
+
+def _rows(paths, engine):
+    graph = rdflib.Graph()
+    for path in paths:
+        graph.parse(config.REPO_ROOT / path, format="turtle")
+    registry = Registry.load(config.DEFAULT_REGISTRY_PATH)
+    return {
+        (r.check_id, r.severity, r.focus_node, r.path or "", r.value or "")
+        for r in pipeline.run_registry_suite_on_graph(graph, registry, engine=engine)
+    }
+
+
+@pytest.mark.parametrize("name", sorted(PARITY_FIXTURES))
+def test_sparql_only_reports_exactly_what_both_engines_report(name):
+    """`--engine sparql` must be a pure speed choice, not a different answer.
+
+    Both directions matter. Rows only `both` has mean a shape reports a
+    field its `.rq` twin doesn't (the drift above); rows only `sparql` has
+    would mean the reverse."""
+    paths = PARITY_FIXTURES[name]
+    both, sparql_only = _rows(paths, "both"), _rows(paths, "sparql")
+
+    shacl_extra = sorted(both - sparql_only)
+    sparql_extra = sorted(sparql_only - both)
+    assert shacl_extra == [], (
+        f"{name}: --engine both reports rows --engine sparql does not: {shacl_extra} -- "
+        "a SHACL shape and its .rq twin describe the same finding differently, so the two "
+        "no longer dedup into one row"
+    )
+    assert sparql_extra == [], (
+        f"{name}: --engine sparql reports rows --engine both does not: {sparql_extra}"
+    )

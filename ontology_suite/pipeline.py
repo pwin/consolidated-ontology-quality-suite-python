@@ -23,6 +23,8 @@ from typing import List, Optional
 from rdflib import Graph
 
 from . import config
+from .checks.literal_typing import SOURCE_LABEL as LITERAL_TYPING_SOURCE
+from .checks.literal_typing import run_literal_typing_check
 from .checks.merge import ResultRow, build_unified_results
 from .checks.registry import Registry
 from .checks.runner import load_graph
@@ -153,7 +155,16 @@ def run_registry_suite_on_graph(
     sparql_results = Graph()
     if engine in ("both", "sparql", "native+sparql"):
         sparql_results, _outcomes = run_sparql_checks(working_graph, sparql_dir)
-    return build_unified_results(shacl_results, sparql_results, registry, shapes_graph)
+
+    # Runs under every engine, deliberately: it covers a blind spot of the
+    # *check formulations* (a regex over a lexical form rdflib may already
+    # have rewritten -- see checks/literal_typing.py), not of one engine, so
+    # excluding it from any one engine would reintroduce exactly the kind of
+    # engine-dependent finding set --engine is not supposed to change.
+    extra_results = [(run_literal_typing_check(working_graph), LITERAL_TYPING_SOURCE)]
+    return build_unified_results(
+        shacl_results, sparql_results, registry, shapes_graph, extra_results=extra_results
+    )
 
 
 def format_import_report(path: str | Path, report: dict) -> str:

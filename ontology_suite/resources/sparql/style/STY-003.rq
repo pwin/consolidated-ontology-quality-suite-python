@@ -11,6 +11,12 @@ CONSTRUCT {
   _:r a sh:ValidationResult ;
     sh:resultSeverity sh:Info ;
     sh:focusNode ?e ;
+    # The offending label itself. The SHACL twin (shapes/style.ttl) selects
+    # it as `?value`, so omitting it here left the same finding with two
+    # different dedup keys in checks/merge.py -- value=<the label> from the
+    # shape, value=<the focus node> from this query via the None->focus
+    # normalization -- and both survived as separate rows.
+    sh:value ?l ;
     sh:sourceConstraintComponent oq:STY-003 ;
     sh:resultMessage ?msg .
 }

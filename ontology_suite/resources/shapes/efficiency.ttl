@@ -10,9 +10,9 @@
 oq:EFF-001
   a sh:NodeShape ;
   sh:targetClass owl:Class ;
+  sh:severity sh:Warning ;
   sh:sparql [
     a sh:SPARQLConstraint ;
-    sh:severity sh:Warning ;
     sh:message "{$this} sits at the bottom of a subClassOf chain at least 6 hops deep." ;
     sh:select """
       PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -37,9 +37,9 @@ oq:EFF-001
 oq:EFF-002
   a sh:NodeShape ;
   sh:targetNode oq:Graph ;
+  sh:severity sh:Warning ;
   sh:sparql [
     a sh:SPARQLConstraint ;
-    sh:severity sh:Warning ;
     sh:message "More than 20% of graph nodes are blank nodes." ;
     sh:select """
       SELECT $this
@@ -78,9 +78,9 @@ oq:EFF-003
     a sh:SPARQLTarget ;
     sh:select "SELECT DISTINCT ?this WHERE { ?this ?p ?o }" ;
   ] ;
+  sh:severity sh:Info ;
   sh:sparql [
     a sh:SPARQLConstraint ;
-    sh:severity sh:Info ;
     sh:message "{$this} has more than 50 values for the same property ({?path})." ;
     sh:select """
       PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>

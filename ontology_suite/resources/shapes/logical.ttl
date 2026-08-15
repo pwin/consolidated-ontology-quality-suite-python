@@ -37,9 +37,9 @@ oq:LOG-002
       SELECT DISTINCT ?this WHERE { ?p a owl:FunctionalProperty . ?this ?p ?o }
     """ ;
   ] ;
+  sh:severity sh:Violation ;
   sh:sparql [
     a sh:SPARQLConstraint ;
-    sh:severity sh:Violation ;
     sh:message "{$this} has more than one distinct value for a property declared owl:FunctionalProperty." ;
     sh:select """
       PREFIX owl: <http://www.w3.org/2002/07/owl#>

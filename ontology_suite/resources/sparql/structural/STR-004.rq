@@ -18,8 +18,10 @@ WHERE {
   ?focus a owl:Class .
   FILTER(!isBlank(?focus))
   # External W3C vocabulary (e.g. skos:Concept) is legitimately defined by
-  # its own spec elsewhere, not in this graph -- same exemption STR-001/
-  # STR-002/DAT-002/QUA-004/STY-004 already apply.
+  # its own spec elsewhere, not in this graph -- the same exemption
+  # STR-002/STR-006/STR-007/STR-009/DAT-002/QUA-004/STY-004 apply.
+  # (STR-001 is the deliberate exception: it exempts an explicit list of
+  # built-in classes instead -- see its own comment.)
   FILTER(!STRSTARTS(STR(?focus), "http://www.w3.org/"))
   FILTER NOT EXISTS { ?focus owl:equivalentClass ?x }
   FILTER NOT EXISTS { ?focus owl:intersectionOf ?x }

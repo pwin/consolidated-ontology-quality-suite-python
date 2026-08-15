@@ -10,9 +10,9 @@
 oq:STY-001
   a sh:NodeShape ;
   sh:targetClass owl:Class ;
+  sh:severity sh:Warning ;
   sh:sparql [
     a sh:SPARQLConstraint ;
-    sh:severity sh:Warning ;
     sh:message "The local name of class {$this} does not follow UpperCamelCase (PascalCase)." ;
     sh:select """
       SELECT $this
@@ -30,9 +30,9 @@ oq:STY-001
 oq:STY-002-obj
   a sh:NodeShape ;
   sh:targetClass owl:ObjectProperty ;
+  sh:severity sh:Warning ;
   sh:sparql [
     a sh:SPARQLConstraint ;
-    sh:severity sh:Warning ;
     sh:message "The local name of property {$this} does not follow lowerCamelCase." ;
     sh:select """
       SELECT $this
@@ -48,9 +48,9 @@ oq:STY-002-obj
 oq:STY-002-data
   a sh:NodeShape ;
   sh:targetClass owl:DatatypeProperty ;
+  sh:severity sh:Warning ;
   sh:sparql [
     a sh:SPARQLConstraint ;
-    sh:severity sh:Warning ;
     sh:message "The local name of property {$this} does not follow lowerCamelCase." ;
     sh:select """
       SELECT $this
@@ -71,9 +71,9 @@ oq:STY-002-data
 oq:STY-003
   a sh:NodeShape ;
   sh:targetSubjectsOf rdfs:label ;
+  sh:severity sh:Info ;
   sh:sparql [
     a sh:SPARQLConstraint ;
-    sh:severity sh:Info ;
     sh:message "A label on {$this} has no language tag." ;
     sh:select """
       PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>

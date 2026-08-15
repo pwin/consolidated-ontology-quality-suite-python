@@ -22,9 +22,22 @@ WHERE {
   FILTER NOT EXISTS { ?p a owl:ObjectProperty }
   FILTER NOT EXISTS { ?p a owl:DatatypeProperty }
   FILTER NOT EXISTS { ?p a owl:AnnotationProperty }
-  FILTER(!STRSTARTS(STR(?p), "http://www.w3.org/1999/02/22-rdf-syntax-ns#"))
-  FILTER(!STRSTARTS(STR(?p), "http://www.w3.org/2000/01/rdf-schema#"))
-  FILTER(!STRSTARTS(STR(?p), "http://www.w3.org/2002/07/owl#"))
+  # External W3C vocabulary is declared by its own spec, not by this graph
+  # -- the same exemption STR-004/STR-006/STR-007/STR-009/DAT-002/QUA-004/
+  # STY-004 all already apply, and the one this check used to *not* apply:
+  # it exempted rdf:/rdfs:/owl: by their three individual namespace IRIs
+  # only, so `skos:prefLabel` -- the label predicate the data-quality
+  # layer's own ANNOTATION_PREDICATES set recognizes by name, and which
+  # QUA-001/QUA-002/QUA-004 all accept as a valid label -- came back as a
+  # Violation-severity "undefined property" unless the ontology redeclared
+  # SKOS locally. Its own sibling STR-007 ("predicate has no declared
+  # rdf:type", the broader check) exempted it and stayed quiet on the same
+  # graph, so the two disagreed with each other about the same predicate.
+  # (STR-001 keeps an explicit term list rather than this prefix, and that
+  # is deliberate: it exempts specific built-in *classes* legitimately used
+  # as an rdf:type value, which is a narrower question than "is this
+  # predicate someone else's to declare".)
+  FILTER(!STRSTARTS(STR(?p), "http://www.w3.org/"))
   BIND(CONCAT("Property ", STR(?p), " is used on ", STR(?s),
               " but is never declared as rdf:Property/owl:ObjectProperty/",
               "owl:DatatypeProperty/owl:AnnotationProperty.") AS ?msg)

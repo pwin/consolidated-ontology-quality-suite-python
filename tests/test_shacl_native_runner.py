@@ -40,15 +40,15 @@ def _rows_for(data_graph, shapes, registry, run_fn):
 
 
 def _row_key(row):
-    """Deliberately excludes severity: pyshacl silently drops an
-    sh:severity declared inside an sh:sparql [...] SPARQLConstraint block
-    and always reports Violation regardless, while the native engine
-    reports the declared severity correctly (a confirmed pyshacl
-    limitation, not a native-engine bug -- see
-    checks/shacl_native_runner.py's module docstring, and
-    test_native_and_pyshacl_disagree_on_sh_sparql_severity below, which
-    pins the actual divergence rather than just excluding it here)."""
-    return (row.check_id, row.focus_node, row.value)
+    """Includes severity. It deliberately did not, for as long as the shapes
+    declared `sh:severity` *inside* their `sh:sparql [...]` SPARQLConstraint
+    blocks: pyshacl ignores it there and reports sh:Violation, the native
+    engine reads it, and the two engines returned different severities for
+    identical findings. Now that every severity sits on its enclosing shape
+    -- where SHACL defines it, and where both engines read it -- severity is
+    part of what parity means (see tests/test_shape_severity.py, which
+    guards the placement itself)."""
+    return (row.check_id, row.focus_node, row.value, row.severity)
 
 
 def test_native_matches_pyshacl_on_the_deliberately_flawed_domain_fixture(domain_graph, shapes, registry):
@@ -65,24 +65,45 @@ def test_native_matches_pyshacl_on_the_deliberately_flawed_domain_fixture(domain
     assert not any(r.check_id is None for r in rows_native)
 
 
-def test_native_and_pyshacl_disagree_on_sh_sparql_severity(domain_graph, shapes, registry):
-    """QUA-002 (resources/shapes/quality.ttl) declares `sh:severity sh:Info`
-    inside its `sh:sparql [...]` SPARQLConstraint block. pyshacl silently
-    drops that and reports Violation anyway; the native engine reports the
-    declared Info correctly (per the SHACL-AF spec). This pins the actual
-    divergence -- see checks/shacl_native_runner.py's module docstring for
-    why `_row_key` above excludes severity from the identity comparison,
-    and why this matters in practice: every subcommand defaults to
-    `--fail-on Violation`, so the same ontology can pass or fail purely
-    depending on which --engine is passed."""
+def test_native_and_pyshacl_agree_on_sh_sparql_severity(domain_graph, shapes, registry):
+    """The regression test for a divergence that used to be real and is
+    pinned here so it cannot come back quietly.
+
+    QUA-002 (resources/shapes/quality.ttl) is `sh:severity sh:Info`. While
+    that severity lived on the shape's nested `sh:SPARQLConstraint` blank
+    node, pyshacl dropped it and reported Violation while the native engine
+    read it and reported Info -- so the same ontology passed or failed the
+    default `--fail-on Violation` gate purely on which `--engine` was
+    passed. Moving the declaration onto the shape, which is where SHACL
+    defines `sh:severity`, made both engines read the same thing.
+
+    Checked here against both engines *and* against registry.json, so
+    "the engines agree" cannot be satisfied by both being wrong."""
     _conforms_py, rows_py = _rows_for(domain_graph, shapes, registry, run_shacl)
     _conforms_native, rows_native = _rows_for(domain_graph, shapes, registry, native_runner.run_shacl_native)
 
     qua002_py = [r for r in rows_py if r.check_id == "QUA-002"]
     qua002_native = [r for r in rows_native if r.check_id == "QUA-002"]
     assert qua002_py and qua002_native
-    assert all(r.severity == "Violation" for r in qua002_py)
-    assert all(r.severity == "Info" for r in qua002_native)
+    assert registry.get("QUA-002").default_severity == "Info"
+    assert all(r.severity == "Info" for r in qua002_py + qua002_native)
+
+
+def test_every_severity_matches_the_registry_under_both_engines(domain_graph, shapes, registry):
+    """The general form of the case above, across every check the fixture
+    trips: no SHACL-sourced finding may be reported at a severity other than
+    its registry `default_severity`, under either engine. The domain fixture
+    trips checks at all three severities (1 Violation / 15 Warning / 2 Info),
+    so a regression to "everything is a Violation" is caught here whichever
+    shape it happens in."""
+    for label, run_fn in (("pyshacl", run_shacl), ("native", native_runner.run_shacl_native)):
+        _conforms, rows = _rows_for(domain_graph, shapes, registry, run_fn)
+        mismatched = [
+            (r.check_id, r.severity, registry.get(r.check_id).default_severity)
+            for r in rows
+            if registry.get(r.check_id) and r.severity != registry.get(r.check_id).default_severity
+        ]
+        assert mismatched == [], f"{label} reported non-registry severities: {sorted(set(mismatched))}"
 
 
 def test_native_resolves_check_id_for_a_blank_node_rooted_shape(domain_graph, shapes, registry):

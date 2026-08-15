@@ -23,27 +23,29 @@ the ``sh:sparql``/SELECT constraint path this suite's own checks use --
 see the ``inference`` parameter's docstring below for the one visible,
 unused-by-this-suite surface change).
 
-**Identity is proven; severity is not, and the two engines genuinely
-disagree on it.** pyshacl silently drops an ``sh:severity`` declared
-*inside* an ``sh:sparql [...]`` SPARQLConstraint block and always reports
-``Violation`` regardless of what the shape actually says; the native engine
-reports the declared severity correctly (per the SHACL-AF spec -- this is a
-pyshacl limitation, not a native-engine bug). Confirmed directly on this
-suite's own shapes: ``examples/ontology/domain.ttl`` via ``--engine shacl``
-reports 17 Violation/1 Warning/0 Info for the same 18 findings
-``--engine native`` reports as 1 Violation/15 Warning/2 Info --
-``QUA-001``/``QUA-002``/``STY-001``/``STY-002``/``STY-003``/``STR-003``/
-``EFF-001`` all declare ``sh:severity`` this way in ``resources/shapes/*.ttl``
-and pyshacl reports every one of them as ``Violation`` regardless. (A
-``sh:severity`` declared directly on a SHACL-core shape, e.g. ``LOG-001``'s
-``sh:property [...]``, is unaffected -- pyshacl handles that form
-correctly; it's specifically the SPARQLConstraint-nested form it drops.)
-This matters in practice because every subcommand defaults to
-``--fail-on Violation``: the same ontology can pass or fail purely
-depending on which ``--engine`` flag is passed. ``tests/test_shacl_native_runner.py``'s
-``_row_key`` deliberately excludes severity from the identity comparison
-for exactly this reason -- it is not an oversight, it is documenting a
-known, confirmed divergence.
+**Fixed history: the two engines used to disagree on severity, because
+the shapes declared it in a place only one of them reads.** SHACL defines
+``sh:severity`` as a property of a *shape*. Every shape in
+``resources/shapes/*.ttl`` used to declare it one level down instead, on
+the ``sh:SPARQLConstraint`` blank node inside its ``sh:sparql [ ... ]``
+block. That is legal Turtle but not something a processor is obliged to
+look at, and pyshacl does not: it fell back to the SHACL spec default and
+reported *every* SHACL-sourced finding as ``Violation``. The native engine
+did read the nested form, so identical findings came back at different
+severities -- ``examples/ontology/domain.ttl``'s 18 findings as 17
+Violation/1 Warning/0 Info under ``--engine shacl``, and 1 Violation/15
+Warning/2 Info under ``--engine native``. Since every subcommand defaults
+to ``--fail-on Violation``, the same ontology passed or failed purely on
+which ``--engine`` was passed. Fixed by moving each declaration onto its
+enclosing shape: both engines now report 1 Violation/15 Warning/2 Info,
+matching ``registry.json``. (A ``sh:severity`` on a SHACL-core property
+shape, e.g. ``LOG-001``'s ``sh:property [...]``, was always read correctly
+by both -- a property shape *is* a shape -- and is left as it was.)
+``tests/test_shape_severity.py`` guards the placement;
+``tests/test_shacl_native_runner.py`` compares the resulting severities
+against the registry under both engines, and its ``_row_key`` now includes
+severity in the identity comparison, where it used to exclude it precisely
+because of this divergence.
 
 **Fixed history: blank-node focus nodes used to cross-join under a
 ``sh:sparql`` constraint.** Before ``shacl`` 0.1.4, a shape whose target
@@ -114,8 +116,9 @@ then fail with a clear ``RuntimeError`` (see ``run_shacl_native`` below --
 not silent corruption), but the CLI's own default engine
 (``pipeline.default_engine()``) auto-selects ``native+sparql`` *whenever the
 package is importable*, so losing it after a routine ``uv sync`` silently
-changes which engine every subcommand runs by default, with the severity
-consequences documented above. Always include the extra:
+changes which engine every subcommand runs by default -- a wall-clock and
+cross-validation change now, rather than the severity change it also used
+to be before the fix documented above. Always include the extra:
 ``uv sync --extra native-shacl`` (add ``--extra reasoner`` too if you also
 want the optional DL-reasoner path).
 

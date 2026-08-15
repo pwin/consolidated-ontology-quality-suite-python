@@ -1,0 +1,63 @@
+# A small ontology that deliberately seeds one error per check that no
+# other in-repo fixture trips -- see tests/test_check_firing_coverage.py,
+# which exists because this suite has four times shipped a check whose query
+# quietly matched nothing and looked exactly like a clean graph.
+#
+# Every seeded error is marked `# SEEDS:` with the check id it must produce.
+# The header, labels and versionInfo are all present and correct so that the
+# findings are attributable to the seeded errors rather than to background
+# noise from the metadata checks.
+
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix ex:   <https://example.org/axioms/> .
+
+<https://example.org/axioms>
+  a owl:Ontology ;
+  owl:versionInfo "1.0.0" ;
+  rdfs:label "Property axiom fixture"@en .
+
+ex:Person a owl:Class ; rdfs:label "Person"@en .
+ex:Place  a owl:Class ; rdfs:label "Place"@en .
+
+# SEEDS: LOG-004 -- two distinct *named* inverses of one property. Both must
+# be IRIs: the check deliberately ignores the anonymous
+# `[ owl:inverseOf P ]` idiom, which mints a fresh blank node per use while
+# denoting the same relation every time.
+ex:hasParent a owl:ObjectProperty ; rdfs:label "has parent"@en ;
+  owl:inverseOf ex:hasChild , ex:parentOf .
+ex:hasChild  a owl:ObjectProperty ; rdfs:label "has child"@en .
+ex:parentOf  a owl:ObjectProperty ; rdfs:label "parent of"@en .
+
+# SEEDS: LOG-005 -- a property declared its own inverse.
+ex:marriedTo a owl:ObjectProperty ; rdfs:label "married to"@en ;
+  owl:inverseOf ex:marriedTo .
+
+# SEEDS: LOG-006 -- symmetric property whose domain and range differ, which
+# a symmetric property cannot satisfy in both directions.
+ex:sibling a owl:ObjectProperty , owl:SymmetricProperty ; rdfs:label "sibling"@en ;
+  rdfs:domain ex:Person ; rdfs:range ex:Place .
+
+# SEEDS: LOG-007 -- the transitive analogue of the same mismatch.
+ex:partOf a owl:ObjectProperty , owl:TransitiveProperty ; rdfs:label "part of"@en ;
+  rdfs:domain ex:Person ; rdfs:range ex:Place .
+
+# SEEDS: STR-005 -- rdfs:domain pointing at something never typed anywhere
+# in the graph (a typo, or a class that was renamed and not followed
+# through).
+ex:worksAt a owl:ObjectProperty ; rdfs:label "works at"@en ;
+  rdfs:domain ex:NeverDeclared .
+
+# SEEDS: STY-005 -- two different local-name separator conventions in one
+# ontology. One alone is a style choice; mixing them is the finding.
+ex:snake_case  a owl:Class ; rdfs:label "Snake"@en .
+ex:hyphen-ated a owl:Class ; rdfs:label "Hyphen"@en .
+
+# SEEDS: STY-004 -- a skos:prefLabel that has drifted away from the local
+# name it is supposed to be the readable form of.
+ex:Vehicle a owl:Class ; skos:prefLabel "Completely Different"@en .
+
+# SEEDS: STR-009 -- a subject used in a triple that is never given any
+# rdf:type.
+ex:looseSubject rdfs:comment "used as a subject, never typed" .

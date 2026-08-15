@@ -41,6 +41,12 @@ from .project_standards import ProjectStandards, resolve_standards_iris
 
 WHERE_BLOCK = re.compile(r"\bWHERE\s*\{", re.IGNORECASE)
 
+# A single absolute IRI: a scheme, then no character SPARQL forbids inside
+# `<...>` and nothing that would make it two terms. Deliberately strict --
+# see `_format_iri_or_undef`, where anything else becomes UNDEF rather than
+# a term that parses but means nothing.
+ABSOLUTE_IRI = re.compile(r"^[A-Za-z][A-Za-z0-9+.\-]*:[^\s<>\"{}|^`\\]+$")
+
 # manifest.json's "policyStandardsKey" values are the webapp's own camelCase
 # ProjectStandards field names (projectStandardsCore.ts); project_standards.py
 # ports the same fields to snake_case, so the manifest's key needs translating
@@ -130,7 +136,27 @@ def _sparql_string_literal(value: str) -> str:
 
 
 def _format_iri_or_undef(iri: Optional[str]) -> str:
-    return f"<{iri}>" if iri else "UNDEF"
+    """A `ResultRow`'s focus/path/value as a SPARQL IRI term, or `UNDEF`.
+
+    Not every one of those three is an IRI. `merge.py` renders a result that
+    carries several `sh:value`s as a joined list (`STR-007` names both the
+    subject and the object of an example triple), and a SHACL *path
+    expression* as a property-path string (`LOG-001`'s
+    `(rdfs:subClassOf)+`). Wrapping either in angle brackets produces a
+    malformed IRI, and since `build_repair_update` binds all three variables
+    in one `VALUES` clause whether or not the template uses them, one bad
+    term makes the whole repair UPDATE fail to parse -- including for
+    templates like `STR-007.ru`, which only ever touches `?focusNode`.
+
+    Anything that isn't a single absolute IRI therefore becomes `UNDEF`,
+    which is exactly what the variable contract already means by "not
+    applicable". (This was silently wrong before rather than loud: a
+    blank-node-rooted path reached here as a bare identifier and produced a
+    syntactically valid but meaningless relative IRI.)
+    """
+    if not iri or not ABSOLUTE_IRI.match(iri):
+        return "UNDEF"
+    return f"<{iri}>"
 
 
 def build_repair_update(

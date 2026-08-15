@@ -22,9 +22,9 @@ oq:STR-001
       SELECT DISTINCT ?this WHERE { ?this a ?class . FILTER(isIRI(?class)) }
     """ ;
   ] ;
+  sh:severity sh:Violation ;
   sh:sparql [
     a sh:SPARQLConstraint ;
-    sh:severity sh:Violation ;
     sh:message "{$this} is typed with a class that is never declared (owl:Class/rdfs:Class) in this graph." ;
     sh:select """
       PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -63,9 +63,9 @@ oq:STR-002
       SELECT DISTINCT ?this WHERE { ?this ?p ?o }
     """ ;
   ] ;
+  sh:severity sh:Violation ;
   sh:sparql [
     a sh:SPARQLConstraint ;
-    sh:severity sh:Violation ;
     sh:message "A predicate used on {$this} is never declared as rdf:Property/owl:ObjectProperty/owl:DatatypeProperty/owl:AnnotationProperty." ;
     sh:select """
       PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -78,9 +78,12 @@ oq:STR-002
         FILTER NOT EXISTS { ?path a owl:ObjectProperty }
         FILTER NOT EXISTS { ?path a owl:DatatypeProperty }
         FILTER NOT EXISTS { ?path a owl:AnnotationProperty }
-        FILTER(!STRSTARTS(STR(?path), "http://www.w3.org/1999/02/22-rdf-syntax-ns#"))
-        FILTER(!STRSTARTS(STR(?path), "http://www.w3.org/2000/01/rdf-schema#"))
-        FILTER(!STRSTARTS(STR(?path), "http://www.w3.org/2002/07/owl#"))
+        # External W3C vocabulary is declared by its own spec, not by this
+        # graph -- kept identical to the .rq twin
+        # (sparql/structural/STR-002.rq), which carries the full rationale
+        # for why this is a whole-namespace prefix and not the three
+        # individual rdf:/rdfs:/owl: namespace IRIs it used to be.
+        FILTER(!STRSTARTS(STR(?path), "http://www.w3.org/"))
       }
     """ ;
   ] .
@@ -109,9 +112,9 @@ oq:STR-003
       SELECT DISTINCT ?this WHERE { { ?this a owl:ObjectProperty } UNION { ?this a owl:DatatypeProperty } }
     """ ;
   ] ;
+  sh:severity sh:Warning ;
   sh:sparql [
     a sh:SPARQLConstraint ;
-    sh:severity sh:Warning ;
     sh:message "Property {$this} declares neither rdfs:domain/range nor gist-style domainIncludes/rangeIncludes annotations, weakening structural precision." ;
     sh:select """
       PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>

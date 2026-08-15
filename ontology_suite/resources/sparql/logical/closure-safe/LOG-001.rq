@@ -11,6 +11,12 @@ CONSTRUCT {
   _:r a sh:ValidationResult ;
     sh:resultSeverity sh:Violation ;
     sh:focusNode ?c ;
+    # The path is what `?anc` was reached by. Emitted so this formulation
+    # and its SHACL twin (shapes/logical.ttl's `sh:path [ sh:oneOrMorePath
+    # rdfs:subClassOf ]`) produce the same dedup key in checks/merge.py --
+    # without it, the identical finding came back as two rows under
+    # `--engine both`, one with a path and one without.
+    sh:resultPath [ sh:oneOrMorePath rdfs:subClassOf ] ;
     sh:value ?anc ;
     sh:sourceConstraintComponent oq:LOG-001 ;
     sh:resultMessage ?msg .
