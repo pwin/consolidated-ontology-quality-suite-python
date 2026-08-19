@@ -80,3 +80,57 @@ jobs:
           name: dist
           path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
+
+  # Creates the GitHub Release for the tag that triggered this run, last, so
+  # a Release only ever exists for a version that actually reached PyPI.
+  #
+  # New as of v0.7.0. Before it, the pipeline published to PyPI and stopped
+  # there, and Releases were created by hand -- a habit that lapsed after
+  # v0.3.4, so six tagged, published versions (v0.3.5 through v0.7.0) had no
+  # Release object at all and the Releases page advertised v0.3.4 as "Latest"
+  # while PyPI was five versions ahead. Those were backfilled from their tag
+  # annotations and commit bodies; this job is why it cannot drift again.
+  #
+  # Notes come from the annotated tag's body when it has one, and otherwise
+  # from the tagged commit's body -- tags here are routinely cut with a
+  # single `git tag -a -m "one line"`, which leaves `%(contents:body)` empty,
+  # so reading the tag alone would have produced an empty Release. Caught by
+  # running this exact shell against v0.7.0 before committing it.
+  github-release:
+    needs: publish-pypi
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # the only job here that needs it; the rest stay read-only
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # tags, and their annotations, are absent from a shallow clone
+      - name: Create the GitHub Release for this tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+
+          BODY="$(git tag -l --format='%(contents:body)' "$TAG")"
+          if [ -z "$(printf '%s' "$BODY" | tr -d '[:space:]')" ]; then
+            BODY="$(git log -1 --format='%b' "$TAG" | sed '/^Co-Authored-By:/d')"
+          fi
+
+          TITLE="$(git tag -l --format='%(contents:subject)' "$TAG")"
+          [ -n "$TITLE" ] || TITLE="$(git log -1 --format='%s' "$TAG")"
+
+          {
+            printf '%s\n' "$BODY"
+            echo
+            echo "---"
+            echo
+            echo "Published to PyPI as [\`ontology-quality-suite==$VERSION\`](https://pypi.org/project/ontology-quality-suite/$VERSION/)."
+          } > release-notes.md
+
+          gh release create "$TAG" \
+            --title "$TITLE" \
+            --notes-file release-notes.md \
+            --verify-tag \
+            --latest
