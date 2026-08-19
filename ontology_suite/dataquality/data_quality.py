@@ -47,6 +47,7 @@ from rdflib import OWL, RDF, RDFS, XSD
 from rdflib.namespace import SKOS
 from rdflib.term import Literal
 
+from .. import hierarchy
 from ..sketch.graph_quality import (
     compute_metrics as compute_data_metrics,
     cross_namespace_groups,
@@ -201,17 +202,10 @@ def ontology_declarations(ontology_graph):
     }
 
 
-def _ancestors(cls, parents_of, memo, visiting=frozenset()):
-    if cls in memo:
-        return memo[cls]
-    if cls in visiting:
-        return set()
-    result = set()
-    for parent in parents_of.get(cls, ()):
-        result.add(parent)
-        result |= _ancestors(parent, parents_of, memo, visiting | {cls})
-    memo[cls] = result
-    return result
+# Shared with ontologyeval/sketch -- see ``ontology_suite/hierarchy.py``
+# for why this is iterative rather than recursive (the recursive form threw
+# RecursionError on a 1000-link subclass chain).
+_ancestors = hierarchy.ancestors
 
 
 def schema_richness(declarations, data_graph):

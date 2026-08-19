@@ -51,6 +51,7 @@ from collections import defaultdict
 from rdflib import RDF, RDFS, OWL
 from rdflib.term import BNode, Literal, URIRef
 
+from .. import hierarchy
 from .graph_quality import default_ignored_predicates, load_data_graph
 from .tarql_visualiser import (
     DEFAULT_BASE,
@@ -142,27 +143,12 @@ def induce_schema(graph):
     }
 
 
-def _ancestors(cls, parents_of, memo, visiting=frozenset()):
-    if cls in memo:
-        return memo[cls]
-    if cls in visiting:
-        return set()
-    result = set()
-    for parent in parents_of.get(cls, ()):
-        result.add(parent)
-        result |= _ancestors(parent, parents_of, memo, visiting | {cls})
-    memo[cls] = result
-    return result
-
-
-def _depth(cls, parents_of, memo, visiting=frozenset()):
-    if cls in memo:
-        return memo[cls]
-    if cls in visiting:
-        return 0
-    parents = parents_of.get(cls, ())
-    memo[cls] = 0 if not parents else 1 + max(_depth(p, parents_of, memo, visiting | {cls}) for p in parents)
-    return memo[cls]
+# Shared with ontologyeval/sketch/dataquality -- see
+# ``ontology_suite/hierarchy.py`` for why these are iterative rather than
+# recursive (a deep enough subclass chain overflowed CPython's stack from
+# what is only a metrics report).
+_ancestors = hierarchy.ancestors
+_depth = hierarchy.depth
 
 
 def compute_metrics(schema):

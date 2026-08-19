@@ -63,6 +63,8 @@ this class of bug is chronic).
 """
 import rdflib
 import pytest
+from rdflib.collection import Collection
+from rdflib.namespace import OWL, RDF, RDFS
 
 try:
     import shacl as _native_shacl_pkg  # type: ignore[import-not-found]
@@ -366,3 +368,60 @@ def test_sparql_only_layer_runs_cleanly_at_stress_scale(stress_graph, registry):
     assert not any(r.check_id is None for r in rows)
     fired = set(r.check_id for r in rows)
     assert set(EXPECTED_PYSHACL_COUNTS) <= fired
+
+
+def test_native_engine_handles_data_deeper_than_its_shape_recursion_limit(shapes, registry):
+    """The native engine caps *shape* descent, and that cap used to be a cap
+    on the data too.
+
+    Before shacl 0.1.10 the property descent ran on the Rust call stack, so
+    the documented "48 levels of nesting" worked out to a longest validating
+    chain of 46 -- and an RDF collection of 47 items is a 47-link
+    `rdf:rest` chain. Lists that long are ordinary. 0.1.10 moved the
+    `sh:property` descent onto an explicit heap stack (prompted, per its own
+    commit message, by the sibling VS Code extension's `metrics.ts` making
+    the same move for its subclass walk), so a 20,000-link chain now
+    validates.
+
+    Measured here, this suite was never actually exposed: its shapes carry
+    no recursive `sh:node` reference and only one level of `sh:property`,
+    so 0.1.9 and 0.1.10 return byte-identical findings for every size below
+    -- checked directly before the bump, not assumed. This test therefore
+    pins that independence rather than demonstrating a fix: it fails if a
+    future shape in this suite starts nesting deeply enough to reinherit the
+    engine's ceiling, or if the engine regresses on this axis.
+
+    Both shapes of input are covered, because they stress different things:
+    a long `rdfs:subClassOf` chain (which `LOG-001`'s `sh:oneOrMorePath`
+    walks) and a long `rdf:rest` chain (an ordinary `owl:unionOf` list).
+    """
+    ex = rdflib.Namespace("https://example.org/deep/")
+
+    def subclass_chain(n):
+        g = rdflib.Graph()
+        for i in range(n):
+            child, parent = ex[f"C{i}"], ex[f"C{i + 1}"]
+            g.add((child, RDF.type, OWL.Class))
+            g.add((parent, RDF.type, OWL.Class))
+            g.add((child, RDFS.subClassOf, parent))
+        g.add((ex.C0, OWL.disjointWith, ex[f"C{n}"]))  # so LOG-001 has something to find
+        return g
+
+    def collection(n):
+        g = rdflib.Graph()
+        g.add((ex.Enum, RDF.type, OWL.Class))
+        head = rdflib.BNode()
+        Collection(g, head, [ex[f"e{i}"] for i in range(n)])
+        g.add((ex.Enum, OWL.unionOf, head))
+        return g
+
+    # 46/47 straddle the old boundary exactly; 400 is well past it.
+    for build in (subclass_chain, collection):
+        for size in (46, 47, 400):
+            _conforms, results, _text = native_runner.run_shacl_native(build(size), shapes)
+            rows = build_unified_results(results, rdflib.Graph(), registry, shapes)
+            assert rows, f"{build.__name__}({size}) produced no findings at all"
+            assert not any(r.check_id is None for r in rows), (
+                f"{build.__name__}({size}): unresolved check id -- the engine returned "
+                "results it could not attribute, which is how a truncated descent shows up here"
+            )

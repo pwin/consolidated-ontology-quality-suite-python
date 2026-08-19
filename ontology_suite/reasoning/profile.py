@@ -87,17 +87,22 @@ def _readable_subject(graph: Graph, node, _seen=None):
     backward to the nearest named resource it's part of the definition of,
     so report messages read as "ex:Person" rather than a raw blank-node id.
     Falls back to ``node`` itself if no named ancestor is found."""
-    if not isinstance(node, BNode):
-        return node
-    _seen = _seen or set()
-    if node in _seen:
-        return node
-    _seen.add(node)
-    for s, _p, _o in graph.triples((None, None, node)):
-        if isinstance(s, URIRef):
-            return s
-        return _readable_subject(graph, s, _seen)
-    return node
+    _seen = _seen if _seen is not None else set()
+    current = node
+    # A linear walk, so a plain loop: each step follows the single first
+    # incoming edge, exactly as the recursive form's unconditional `return`
+    # inside the loop body did. It cost one frame per hop, and the chain
+    # length is set by how deeply the input nests blank nodes -- measured
+    # RecursionError at 1,000 hops, well inside what a machine-generated
+    # class expression can reach.
+    while isinstance(current, BNode) and current not in _seen:
+        _seen.add(current)
+        for subject, _p, _o in graph.triples((None, None, current)):
+            current = subject
+            break
+        else:
+            break
+    return current
 
 
 ALL_PROFILES = ("EL", "QL", "RL")

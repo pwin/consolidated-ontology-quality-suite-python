@@ -100,7 +100,7 @@ from rdflib import OWL, RDF, RDFS, XSD
 from rdflib.namespace import DCTERMS, SKOS
 from rdflib.term import BNode, Literal, URIRef
 
-from .. import io_utils
+from .. import hierarchy, io_utils
 
 ANNOTATION_PREDICATES = {RDFS.label, RDFS.comment, SKOS.definition, DCTERMS.description}
 PROPERTY_TYPES = {OWL.ObjectProperty, OWL.DatatypeProperty, OWL.AnnotationProperty, RDF.Property}
@@ -247,29 +247,17 @@ def load_without_imports(main_path):
     return graph, {"resolved": [], "unresolved": [], "excluded": excluded, "network_allowed": False}
 
 
-def _ancestors(cls, parents_of, memo, visiting=frozenset(), cyclic=None):
-    if cls in memo:
-        return memo[cls]
-    if cls in visiting:
-        if cyclic is not None:
-            cyclic.add(cls)
-        return set()
-    result = set()
-    for parent in parents_of.get(cls, ()):
-        result.add(parent)
-        result |= _ancestors(parent, parents_of, memo, visiting | {cls}, cyclic)
-    memo[cls] = result
-    return result
-
-
-def _depth(cls, parents_of, memo, visiting=frozenset()):
-    if cls in memo:
-        return memo[cls]
-    if cls in visiting:
-        return 0
-    parents = parents_of.get(cls, ())
-    memo[cls] = 0 if not parents else 1 + max(_depth(p, parents_of, memo, visiting | {cls}) for p in parents)
-    return memo[cls]
+# Both walks now live in ``ontology_suite/hierarchy.py``, shared with
+# ``sketch/ontology_quality.py`` and ``dataquality/data_quality.py``, which
+# each carried a byte-identical recursive copy of them. See that module for
+# why they are iterative: hierarchy depth is set by the input, not by
+# syntax, and against CPython's 1000-frame recursion limit ``compute_metrics``
+# below raised ``RecursionError`` on a subclass chain only 900 links deep.
+# Same signature, same results, same memo contents -- verified against the
+# recursive originals over random cyclic and acyclic graphs in
+# ``tests/test_hierarchy.py``.
+_ancestors = hierarchy.ancestors
+_depth = hierarchy.depth
 
 
 def _find_owning_named_term(node, graph, max_hops=4):

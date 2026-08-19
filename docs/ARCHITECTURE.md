@@ -86,6 +86,74 @@ category, severity, and remediation text, shared by:
 See `docs/EXTENDING.md` for exactly how to add a check of any of these three
 kinds.
 
+### Graph walks run on the heap, not the call stack
+
+`ontology_suite/hierarchy.py` holds the shared `ancestors` / `depth` /
+`descendants_inclusive` walks over a class hierarchy. They are iterative,
+over an explicit stack, and that is deliberate.
+
+Four modules -- `ontologyeval`, `sketch`, `dataquality`, and
+`versioning/diff.py` -- each carried their own recursive copy, and all four
+guarded *cycles* but not *descent*. Hierarchy depth follows the longest
+`rdfs:subClassOf` chain in the input, one Python frame per link, against
+CPython's default 1000-frame limit. Measured end to end:
+`ontologyeval.compute_metrics` raised `RecursionError` at a chain depth of
+900, `sketch.ontology_quality.compute_metrics` at 5,000 -- from what is only
+a metrics report. Called directly, `dataquality._ancestors` and
+`versioning.diff._descendants_inclusive` both went at 1,000.
+
+Those thresholds differ even between modules running structurally identical
+code, and that is the tell: memoisation hides the descent whenever classes
+happen to be visited shallowest-first, so how deep a document can go before
+it throws depends on the order its classes were declared in. Declaring the
+same chain the other way round -- just as valid a document -- was enough to
+trigger it.
+
+The blank-node walks in `reasoning/sampling.py` (Concise Bounded
+Description) and `reasoning/profile.py` had the same shape for a different
+reason: an RDF collection is a *chain* of blank nodes, one `rdf:rest` cell
+per member, so depth there is set by the longest list in the input, not by
+nesting. A 5,000-item `owl:oneOf` was enough. Both are now iterative;
+`docgen/class_diagrams.py`'s own CBD already was.
+
+Two fixes were considered and rejected, and the reasoning is worth keeping
+because it generalises:
+
+- **`sys.setrecursionlimit(N)`** does not grow the actual C stack, so a
+  limit high enough to cover a deep chain trades a catchable
+  `RecursionError` for an uncatchable interpreter crash. Strictly worse:
+  the failure stops being a traceback that names the input.
+  `tests/test_hierarchy.py` fails if any module reaches for it.
+- **A depth cap.** Any limit low enough to be safe under a 1000-frame
+  ceiling is also low enough to silently truncate a real answer.
+
+Walking on the heap removes the ceiling instead of choosing one: `depth`
+now reports 100,000 for a 100,000-link chain. `ancestors` and
+`descendants_inclusive` return a set per node, so their cost is quadratic
+in depth -- inherent to what they return, not to the walk, and the
+recursive form simply crashed before anyone could notice. Cycle handling,
+memo contents and return values are unchanged, verified against the
+recursive originals over random cyclic and acyclic graphs in every visit
+order.
+
+**What is deliberately still recursive.** Eight self-recursive functions
+remain, and the distinction that matters is *length* versus *nesting*.
+Length is set by the data and had to go: a 5,000-item list, a 100,000-link
+subclass chain. Nesting is set by how an expression is written, and stays
+shallow in any document a person or a generator actually produces. So
+`docgen/turtle_parser.py`, `docgen/extract_ontology_data.py` and
+`sketch/dot_export.py` all walk list *cells* iteratively -- verified against
+a 5,000-member `owl:unionOf` -- and recurse only per level of
+expression nesting, where they overflow somewhere past 400. Nobody writes
+400 nested `owl:complementOf`. `checks/registry.py`'s shape walk and
+`checks/merge.py`'s path-expression renderer are bounded by this repo's own
+shapes (one level of `sh:property`) and by an explicit depth guard
+respectively.
+
+The same argument, in the same week, produced `shacl` 0.1.10 upstream --
+see the `--engine` section below for why that one does not change anything
+here.
+
 ### Choosing which engine actually runs (`--engine`)
 
 Running both the SHACL and SPARQL formulation of every check is valuable
@@ -122,7 +190,7 @@ including two cases (`STY-003`, many blank-node focus nodes at once;
 `STY-001`/`STY-002`, blank-node-typed anonymous class/property
 expressions) that each found a real native-engine bug, since fixed in
 `shacl` 0.1.4 and 0.1.5 respectively -- see that test module's docstring
-for the history. Re-verified at `shacl` 0.1.9: 0.1.6-0.1.9 added SHACL-AF
+for the history. Re-verified at `shacl` 0.1.10: 0.1.6-0.1.10 added SHACL-AF
 `sh:rule` support and a recursion-guard performance fix, neither of which
 touches the `sh:sparql`/SELECT constraint path this suite's own checks
 use -- full parity holds.
@@ -200,7 +268,7 @@ default to `"both"` explicitly -- `tests/test_vehicle_gist_checks.py`
 pins an exact finding count against pyshacl specifically and needs that
 default to stay environment-independent.) `shacl` is on PyPI as of 0.1.4
 (0.1.5 for the isIRI($this) fix above -- this package's `native-shacl`
-extra pins `shacl>=0.1.9`, kept current with upstream), installed via the
+extra pins `shacl>=0.1.10`, kept current with upstream), installed via the
 opt-in `uv sync --extra native-shacl` (same convention as this package's
 own `reasoner` extra) -- see `shacl_native_runner.py`'s
 module docstring for why its SHACL-core (non-SPARQL) findings need a

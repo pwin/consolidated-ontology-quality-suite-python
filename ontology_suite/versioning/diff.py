@@ -41,6 +41,8 @@ from typing import Dict, FrozenSet, Optional, Set, Tuple
 from rdflib import Graph, OWL, RDF, RDFS
 from rdflib.term import URIRef
 
+from .. import hierarchy
+
 PROPERTY_TYPES = (OWL.ObjectProperty, OWL.DatatypeProperty, OWL.AnnotationProperty, RDF.Property)
 CHARACTERISTIC_TYPES = (
     OWL.FunctionalProperty, OWL.InverseFunctionalProperty, OWL.TransitiveProperty,
@@ -193,15 +195,11 @@ def _children_map(subclass_edges) -> Dict[URIRef, Set[URIRef]]:
     return children
 
 
-def _descendants_inclusive(cls: URIRef, children: Dict[URIRef, Set[URIRef]], memo: dict) -> Set[URIRef]:
-    if cls in memo:
-        return memo[cls]
-    memo[cls] = {cls}  # seed before recursing so a subclass cycle terminates
-    result = {cls}
-    for child in children.get(cls, ()):
-        result |= _descendants_inclusive(child, children, memo)
-    memo[cls] = result
-    return result
+# Iterative, in ``ontology_suite/hierarchy.py`` -- the recursive form here
+# cost one frame per subclass link and threw RecursionError at 1000, and
+# a version diff is exactly the place a machine-generated hierarchy shows
+# up. The memo-seeding cycle guard is preserved there verbatim.
+_descendants_inclusive = hierarchy.descendants_inclusive
 
 
 def _expand_with_subclasses(classes: FrozenSet[URIRef], children: Dict[URIRef, Set[URIRef]]) -> FrozenSet[URIRef]:

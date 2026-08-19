@@ -16,8 +16,8 @@ all 18 checks that have both a SHACL and SPARQL formulation, including two
 cases (``STY-003``, many blank-node focus nodes at once; ``STY-001``/
 ``STY-002``, blank-node-typed anonymous class/property expressions) that
 each found a real, since-fixed native-engine bug -- see that test module's
-own docstring for the history; requires ``shacl>=0.1.9``, re-verified at
-full parity at that version too (0.1.6-0.1.9 added SHACL-AF ``sh:rule``
+own docstring for the history; requires ``shacl>=0.1.10``, re-verified at
+full parity at that version too (0.1.6-0.1.10 added SHACL-AF ``sh:rule``
 support and a recursion-guard performance fix, neither of which touches
 the ``sh:sparql``/SELECT constraint path this suite's own checks use --
 see the ``inference`` parameter's docstring below for the one visible,
@@ -90,10 +90,10 @@ if a pre-0.1.5 wheel ever got reinstalled).
 ``shacl`` is on PyPI as of 0.1.4 (0.1.5 for the fix above) -- install with
 ``uv sync --extra native-shacl`` (an opt-in extra, same convention as this
 package's own ``reasoner`` extra; see ``pyproject.toml``, pinned
-``shacl>=0.1.9``). Not a hard dependency of this package proper -- still
+``shacl>=0.1.10``). Not a hard dependency of this package proper -- still
 imported lazily here (same convention as ``shacl_runner.py``'s own
 pyshacl import), so ``--engine shacl``/``sparql``
-and everything else works fine without it. Requires ``shacl>=0.1.9``
+and everything else works fine without it. Requires ``shacl>=0.1.10``
 (pinned in ``pyproject.toml``'s ``native-shacl`` extra, kept current with
 upstream rather than pinned at the 0.1.5 floor that would technically
 still work): 0.1.3/0.1.4 had the two blank-node focus-node bugs documented
@@ -102,15 +102,39 @@ nodes), and 0.1.3 specifically predates PyPI publication and this
 package's ``Report.turtle``-based result-graph consumption
 (``sh:ValidationReport``, not a hand-reconstructed flat list of
 ``Result`` objects -- see git history for the older, more manual approach
-this replaced). 0.1.6-0.1.9 are pure feature/perf additions (SHACL-AF
-rules, a recursion-guard speedup) with no behavior change to anything
-this suite's own checks exercise -- re-verified at 0.1.9, not just
+this replaced). 0.1.6-0.1.10 are feature/perf/robustness additions
+(SHACL-AF rules, a recursion-guard speedup, and in 0.1.10 the property
+descent moving off the Rust call stack) with no behavior change to
+anything this suite's own checks exercise -- re-verified at each, not
 assumed from the changelog.
+
+0.1.10 is worth a note because it looks more relevant than it is. Before
+it, the engine's shape-recursion cap was effectively a cap on the *data*:
+the documented "48 levels of nesting" worked out to a longest validating
+chain of 46 links, and an RDF collection of 47 items is a 47-link
+``rdf:rest`` chain -- lists that long are entirely ordinary. 0.1.10 moved
+the ``sh:property`` descent onto an explicit heap stack, so a 20,000-link
+chain validates. (Its own commit message credits the sibling VS Code
+extension's ``metrics.ts`` for the argument: any fixed recursion limit low
+enough to be safe is also low enough to truncate a real answer -- the same
+reasoning behind ``ontology_suite/hierarchy.py`` here.)
+
+This suite was never exposed to it, and that was measured rather than
+assumed: its shapes carry no recursive ``sh:node`` reference and only one
+level of ``sh:property``, so 0.1.9 and 0.1.10 return byte-identical
+findings on a 46-, 47- and 400-link subclass chain and the same three
+sizes of ``rdf:rest`` chain. ``tests/test_engine_parity_stress.py``'s
+``test_native_engine_handles_data_deeper_than_its_shape_recursion_limit``
+pins that independence, so it fails if a future shape here starts nesting
+deeply enough to inherit the ceiling. One upstream limit does remain, and
+does not apply to this suite's flat shape set: compiling a shapes graph
+still recurses per nested shape reference, so a shapes file nesting
+``sh:node`` some hundreds deep overflows at compile time.
 
 **Plain ``uv sync`` (no ``--extra native-shacl``) still uninstalls it** --
 standard behavior for any opt-in extra, not special to this package, but
 easy to trip over: running bare ``uv sync`` after having it installed
-removes it again, with no warning beyond the routine ``- shacl==0.1.9``
+removes it again, with no warning beyond the routine ``- shacl==0.1.10``
 line in ``uv sync``'s own output. ``--engine native``/``native+sparql``
 then fail with a clear ``RuntimeError`` (see ``run_shacl_native`` below --
 not silent corruption), but the CLI's own default engine

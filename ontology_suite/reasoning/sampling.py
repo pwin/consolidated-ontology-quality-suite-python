@@ -32,17 +32,34 @@ def concise_bounded_description(
     graph: Graph, node: Node, _seen: Optional[set] = None
 ) -> Iterator[Tuple[Node, Node, Node]]:
     """Yield every triple in ``node``'s Concise Bounded Description: triples
-    where ``node`` is the subject, recursing one level into any blank-node
-    object so multi-triple structures (restrictions, RDF lists) aren't cut
-    in half."""
+    where ``node`` is the subject, descending into any blank-node object so
+    multi-triple structures (restrictions, RDF lists) aren't cut in half.
+
+    Iterative, over an explicit frontier. The recursive form cost one Python
+    frame -- two, being a generator delegated to with ``yield from`` -- per
+    blank node in the chain, and an RDF collection is a *chain* of blank
+    nodes: one ``rdf:rest`` cell per member. So the depth here is set by the
+    longest list in the input, not by nesting, and any ``owl:oneOf``,
+    ``owl:unionOf`` or plain collection past ~5,000 members raised
+    ``RecursionError`` from a sampling helper (measured). ``docgen``'s own
+    CBD in ``docgen/class_diagrams.py`` was already written this way; this
+    one was the outlier.
+
+    Traversal order differs from the recursive form's depth-first order.
+    Both callers collect the triples into a set-semantics ``Graph``, so the
+    resulting graph is identical either way.
+    """
     seen = _seen if _seen is not None else set()
-    if node in seen:
-        return
-    seen.add(node)
-    for predicate, obj in graph.predicate_objects(node):
-        yield (node, predicate, obj)
-        if isinstance(obj, BNode):
-            yield from concise_bounded_description(graph, obj, seen)
+    frontier = [node]
+    while frontier:
+        current = frontier.pop()
+        if current in seen:
+            continue
+        seen.add(current)
+        for predicate, obj in graph.predicate_objects(current):
+            yield (current, predicate, obj)
+            if isinstance(obj, BNode) and obj not in seen:
+                frontier.append(obj)
 
 
 def sample_graph(graph: Graph, n: int, seed: Optional[int] = None) -> Graph:

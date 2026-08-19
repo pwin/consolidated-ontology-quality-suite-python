@@ -121,6 +121,17 @@ membership (`reasoning/profile.py`), a real DL reasoner's output
    included in `run_*_stage`'s returned `StageResult.rows`.
 4. Regenerate `docs/CHECKS.md`.
 
+**If it walks a hierarchy or a blank-node structure, walk it iteratively.**
+Depth is set by the input -- the longest `rdfs:subClassOf` chain, or the
+length of an RDF collection, which is a `rdf:rest` chain one cell per member
+-- and CPython's recursion limit is 1000 frames. Reuse
+`ontology_suite/hierarchy.py` rather than writing a fifth copy of the same
+walk; if you need a different shape, copy its explicit-stack pattern. Do not
+reach for `sys.setrecursionlimit` (it doesn't grow the C stack, so it trades
+a catchable error for a hard crash) or a depth cap (any value safe under a
+1000-frame ceiling also truncates real answers). `tests/test_hierarchy.py`
+guards both.
+
 There is deliberately no dedicated "native check registry" separate from
 `registry.json` -- one registry, three ways of producing a matching
 `ResultRow`.
