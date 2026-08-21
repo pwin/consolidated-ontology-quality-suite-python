@@ -343,6 +343,37 @@ A real user ran `ontology-quality-suite run --ontology ... --import-dir ...
 the flags never reached the stage producing most of the findings. Fixed by
 centralizing import resolution in one helper every stage calls.
 
+**An import that fails to resolve is reported, not just recorded.** The
+consequence of a missing `owl:imports` is not subtle: every term the
+absent ontology declares is undeclared as far as
+`data_quality.check_conformance` can tell, so one unresolved import becomes
+a flood of false `CNF-001`/`CNF-002` findings. That flood used to arrive
+with no stated cause -- `resolve_imports` returned the unresolved list, but
+only `--verbose` ever printed it. A second user report made the cost plain:
+an ontology importing three of its four modules produced 30 conformance
+warnings, 28 of them false, and diagnosing it meant knowing to re-run with
+`--verbose`. `pipeline.import_warnings` now turns the report's problem
+sections into `StageResult.warnings`, so they show in the default summary
+and name the consequence (`... every term they declare will be reported
+undeclared (CNF-001/CNF-002)`) rather than leaving the reader to connect
+cause to symptom. Three cases qualify:
+
+- **unresolved** -- no local candidate declared the imported IRI, and
+  either `--allow-network` was off or the fetch failed.
+- **unparsable** -- a candidate file could not be parsed at all. Previously
+  a bare `except Exception: continue` erased these without trace.
+- **ambiguous** -- more than one file under `--import-dir` declares the same
+  ontology IRI (a stale copy beside a current one, a file beside its
+  backup). The sort-first file still wins; what changed is that the
+  collision is now named instead of decided in silence.
+
+Identifying every candidate costs one parse per file in `--import-dir`,
+where the older early-`break` scan stopped at the first match. For more
+than one `owl:imports` this is a net saving -- the old scan restarted from
+the top for each pending IRI -- and it is what makes ambiguity detection
+possible at all. A single import inside a very large `--import-dir` is the
+one case that pays more.
+
 ### Loading files: local, http(s), and gzip (`io_utils.py`)
 
 Every loader in this suite -- `--ontology`, `--data`, `--old`/`--new` (
@@ -365,6 +396,19 @@ by testing actual behavior rather than assuming it:
    every read for the gzip magic bytes (not just a `.gz` suffix, so a
    server-side `Content-Encoding: gzip` response under a plain `.ttl` URL
    is also caught) and transparently decompresses.
+3. **The file extension lies, and when it does the failure is silent.**
+   `guess_format` maps `.owl` to `xml`, but Protege writes `.owl` files in
+   Turtle by default; the RDF/XML parser then throws on the first
+   `@prefix`. Reported by a user whose imports sat in `--import-dir` as
+   exactly such files: every import came back unresolved and every term
+   declared in them was flagged `CNF-001`/`CNF-002` against queries that
+   were correct. `sniff_format` reads the opening bytes, and
+   `resolve_format` lets the content override the extension -- but only
+   across format *families* (`_FORMAT_FAMILIES`). A `.n3` file opening with
+   `@prefix` sniffs as `turtle` and stays `n3`, because N3 is a superset
+   and downgrading it would reject the syntax the extension promised; a
+   sniff that finds nothing conclusive (N-Triples has no header) leaves the
+   guess alone. Bytes are evidence, an extension is only a claim.
 
 **`allow_network`'s asymmetry is deliberate, not a bug.** A source the
 caller names *explicitly* -- `--ontology <url>`, an entry in

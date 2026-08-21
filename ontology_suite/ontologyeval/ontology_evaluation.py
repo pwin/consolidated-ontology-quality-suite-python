@@ -193,7 +193,34 @@ def resolve_imports(main_path, import_dir=None, allow_network=False, glob_patter
 
     visited = {str(iri) for iri in _declared_ontology_iris(main_graph)}
     pending = {str(o) for o in main_graph.objects(None, OWL.imports)} - visited
-    resolved, unresolved = [], []
+    resolved, unresolved, ambiguous = [], [], []
+
+    # Each candidate is parsed at most once for its identity IRIs, and the
+    # result is remembered -- including a failure. A file that cannot be
+    # parsed is now *reported* rather than silently skipped: a `.owl` file
+    # holding Turtle used to vanish here with no trace, leaving its
+    # declarations missing and every term in it falsely flagged
+    # CNF-001/CNF-002.
+    #
+    # Cost note: identifying every candidate means parsing all of them once
+    # (n parses), where the old early-`break` scan stopped at the first
+    # match. For more than one owl:imports that is a net win -- the old scan
+    # re-parsed from the top for each pending IRI, up to n*k -- and it is
+    # what makes duplicate-IRI detection below possible at all. A single
+    # import in a very large --import-dir is the one case that pays more.
+    identity_cache: dict = {}
+    unparsable: dict = {}
+
+    def identities(path):
+        if path not in identity_cache:
+            try:
+                candidate_graph = _parse_file(path)
+            except Exception as exc:
+                identity_cache[path] = None
+                unparsable[path] = f"{type(exc).__name__}: {exc}"
+            else:
+                identity_cache[path] = {str(i) for i in _declared_ontology_iris(candidate_graph)}
+        return identity_cache[path]
 
     while pending:
         iri = pending.pop()
@@ -201,15 +228,19 @@ def resolve_imports(main_path, import_dir=None, allow_network=False, glob_patter
             continue
         visited.add(iri)
 
+        # Every candidate declaring this IRI, not just the first: two files
+        # claiming one ontology IRI (an old and a new copy of the same
+        # vocabulary, a file and its backup) used to resolve silently to
+        # whichever sorted first, so a stale copy could win and take its
+        # missing terms with it. The first still wins -- changing that would
+        # be a different decision -- but the collision is now reported.
+        matches = [c for c in candidate_files if iri in (identities(c) or ())]
         found_graph, found_source = None, None
-        for candidate in candidate_files:
-            try:
-                candidate_graph = _parse_file(candidate)
-            except Exception:
-                continue
-            if URIRef(iri) in _declared_ontology_iris(candidate_graph):
-                found_graph, found_source = candidate_graph, candidate
-                break
+        if matches:
+            found_source = matches[0]
+            found_graph = _parse_file(found_source)
+            if len(matches) > 1:
+                ambiguous.append({"iri": iri, "chosen": found_source, "also": matches[1:]})
 
         if found_graph is None and allow_network:
             try:
@@ -233,7 +264,14 @@ def resolve_imports(main_path, import_dir=None, allow_network=False, glob_patter
             if str(further) not in visited:
                 pending.add(str(further))
 
-    return merged, {"resolved": resolved, "unresolved": sorted(unresolved), "excluded": [], "network_allowed": allow_network}
+    return merged, {
+        "resolved": resolved,
+        "unresolved": sorted(unresolved),
+        "excluded": [],
+        "network_allowed": allow_network,
+        "unparsable": [{"source": k, "error": v} for k, v in sorted(unparsable.items())],
+        "ambiguous": ambiguous,
+    }
 
 
 def load_without_imports(main_path):
@@ -244,7 +282,10 @@ def load_without_imports(main_path):
     """
     graph = _parse_file(main_path)
     excluded = sorted({str(o) for o in graph.objects(None, OWL.imports)})
-    return graph, {"resolved": [], "unresolved": [], "excluded": excluded, "network_allowed": False}
+    return graph, {
+        "resolved": [], "unresolved": [], "excluded": excluded,
+        "network_allowed": False, "unparsable": [], "ambiguous": [],
+    }
 
 
 # Both walks now live in ``ontology_suite/hierarchy.py``, shared with

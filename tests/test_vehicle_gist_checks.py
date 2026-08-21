@@ -256,11 +256,16 @@ def test_checks_stage_forwards_import_args_to_load_ontology_graph(monkeypatch, t
 
     def fake_load_ontology_graph(
         ontology_path, *, import_dir=None, exclude_imports=False, allow_network=False, verbose=False,
+        warnings=None,
     ):
         captured["ontology_path"] = ontology_path
         captured["import_dir"] = import_dir
         captured["exclude_imports"] = exclude_imports
         captured["allow_network"] = allow_network
+        # The stage must hand over a real sink, not None: an unresolved
+        # owl:imports has to reach StageResult.warnings, or it stays
+        # invisible outside --verbose (see pipeline.import_warnings).
+        captured["warnings_is_sink"] = isinstance(warnings, list)
         return Graph()
 
     monkeypatch.setattr(pipeline, "load_ontology_graph", fake_load_ontology_graph)
@@ -276,6 +281,7 @@ def test_checks_stage_forwards_import_args_to_load_ontology_graph(monkeypatch, t
         "import_dir": VEHICLE_DIR,
         "exclude_imports": True,
         "allow_network": True,
+        "warnings_is_sink": True,
     }
 
 

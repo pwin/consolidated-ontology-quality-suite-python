@@ -55,6 +55,7 @@ from __future__ import annotations
 import gzip
 import io
 import os
+from codecs import BOM_UTF8
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -70,6 +71,19 @@ _EXTENSION_FORMATS = {
 }
 _GZIP_MAGIC = b"\x1f\x8b"
 FETCH_LIMIT = 1 << 30  # 1 GiB
+
+# Which formats are interchangeable enough that a content sniff should NOT
+# override the extension's more specific guess. N-Triples and N3 are both
+# read by the Turtle family, so a `.n3` file whose first directive is
+# `@prefix` must stay `n3` -- N3 is a superset, and downgrading it to
+# `turtle` would reject the very syntax the extension promised. Only a
+# sniff from a *different* family overrides, which is the case that
+# actually matters: Turtle content in a `.owl`/`.rdf` file, or RDF/XML
+# content in a `.ttl` one.
+_FORMAT_FAMILIES = {
+    "turtle": "turtle", "n3": "turtle", "nt": "turtle",
+    "xml": "xml", "json-ld": "json-ld",
+}
 
 
 def is_url(source: str | Path) -> bool:
@@ -129,15 +143,81 @@ def read_text(source: str | Path, *, allow_network: bool = True, encoding: str =
     return read_bytes(source, allow_network=allow_network).decode(encoding)
 
 
+def sniff_format(raw: bytes) -> str | None:
+    """The RDF serialization `raw` actually *is*, judged from its opening
+    bytes, or None when nothing conclusive shows. Deliberately conservative:
+    it recognizes only markers that cannot plausibly belong to another
+    serialization, and returns None -- leaving `guess_format`'s extension
+    guess in place -- for anything ambiguous. N-Triples, for instance, has
+    no distinguishing header at all.
+
+    This exists because the extension lies more often than you would think,
+    and when it does the failure is silent and expensive. Caught from real
+    user-reported output: an ontology whose `owl:imports` targets sat in
+    `--import-dir` as `.owl` files written in Turtle (what Protege emits by
+    default). `guess_format` mapped `.owl` -> `xml`, the RDF/XML parser
+    threw on the first `@prefix`, and `resolve_imports` swallowed that in a
+    bare `except Exception: continue` -- so every import came back
+    unresolved, and every term declared in one was reported undeclared
+    (`CNF-001`/`CNF-002`) against queries that were in fact correct. The
+    reverse case, RDF/XML content in a `.ttl` file, fails the same way.
+    """
+    head = raw[:8192]
+    if head[:3] == BOM_UTF8:
+        head = head[3:]
+    if head.lstrip()[:5].lower() == b"<?xml" or b"<rdf:RDF" in head:
+        return "xml"
+    for line in head.splitlines():
+        line = line.strip()
+        # Hand-written Turtle usually opens with a comment block; JSON-LD
+        # never does, so skipping comments costs nothing and gains the
+        # common case.
+        if not line or line.startswith(b"#"):
+            continue
+        if line[:1] in (b"{", b"["):
+            return "json-ld"
+        lowered = line.lower()
+        if any(lowered.startswith(d) for d in (b"@prefix", b"@base", b"prefix ", b"base ")):
+            return "turtle"
+        return None
+    return None
+
+
+def resolve_format(source: str | Path, raw: bytes) -> str:
+    """The format to parse `raw` from `source` as: `guess_format`'s
+    extension guess, unless `sniff_format` reads the content as a different
+    *family* entirely (see `_FORMAT_FAMILIES`), in which case the content
+    wins -- bytes are evidence, an extension is only a claim."""
+    guessed = guess_format(source)
+    sniffed = sniff_format(raw)
+    if sniffed and _FORMAT_FAMILIES.get(sniffed) != _FORMAT_FAMILIES.get(guessed):
+        return sniffed
+    return guessed
+
+
 def parse_graph(
     graph: Graph, source: str | Path, *, format: str | None = None, allow_network: bool = True
 ) -> Graph:
     """Parses `source` (local path, gzip-compressed local path, http(s)
-    URL, or gzip-compressed http(s) URL) into `graph` in place, guessing
-    the RDF format from `source`'s extension unless `format` is given.
-    Returns `graph`, for chaining."""
+    URL, or gzip-compressed http(s) URL) into `graph` in place. The format
+    comes from `format` when given, else from `resolve_format` -- the
+    extension's guess, overridden when the content plainly disagrees.
+    Returns `graph`, for chaining.
+
+    A parse failure is re-raised as a `ValueError` naming the format tried,
+    the extension's guess and the content sniff, so a caller that reports
+    the failure (`ontology_evaluation.resolve_imports`) can say *why* a file
+    was skipped rather than only that it was."""
     raw = read_bytes(source, allow_network=allow_network)
-    graph.parse(data=raw, format=format or guess_format(source))
+    chosen = format or resolve_format(source, raw)
+    try:
+        graph.parse(data=raw, format=chosen)
+    except Exception as exc:
+        raise ValueError(
+            f"could not parse {source} as {chosen!r} (extension suggests "
+            f"{guess_format(source)!r}, content sniffs as {sniff_format(raw)!r}): "
+            f"{type(exc).__name__}: {exc}"
+        ) from exc
     return graph
 
 

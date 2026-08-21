@@ -185,9 +185,49 @@ def format_import_report(path: str | Path, report: dict) -> str:
         )
         for iri in report["unresolved"]:
             lines.append(f"    {iri}")
+    for entry in report.get("ambiguous", []):
+        lines.append(f"  AMBIGUOUS: {entry['iri']} is declared by more than one file; used {entry['chosen']}")
+        for other in entry["also"]:
+            lines.append(f"    also declared by (ignored): {other}")
+    for entry in report.get("unparsable", []):
+        lines.append(f"  UNPARSABLE candidate skipped: {entry['source']}")
+        lines.append(f"    {entry['error']}")
     if not report["excluded"] and not report["resolved"] and not report["unresolved"]:
         lines.append("  no owl:imports found")
     return "\n".join(lines)
+
+
+def import_warnings(ontology_path: str | Path, report: dict) -> List[str]:
+    """The parts of an import report a user needs to see whether or not they
+    passed ``--verbose``.
+
+    An unresolved ``owl:imports`` is not a cosmetic detail: every term the
+    missing ontology declares becomes undeclared as far as
+    ``data_quality.check_conformance`` is concerned, so one unresolved
+    import turns into a flood of false ``CNF-001``/``CNF-002`` findings.
+    Caught from real user-reported output: an ontology that imported three
+    of its four modules produced 30 conformance warnings, 28 of them false,
+    with nothing in the default output pointing at the missing import --
+    the report existed, but only ``--verbose`` ever printed it. These go
+    into ``StageResult.warnings`` so the run summary shows them by default.
+    """
+    warnings: List[str] = []
+    if report["unresolved"]:
+        warnings.append(
+            f"{ontology_path}: {len(report['unresolved'])} owl:imports UNRESOLVED "
+            f"(--allow-network={report['network_allowed']}) -- every term they declare will be "
+            f"reported undeclared (CNF-001/CNF-002). Missing: {', '.join(report['unresolved'])}"
+        )
+    for entry in report.get("ambiguous", []):
+        warnings.append(
+            f"{ontology_path}: owl:imports {entry['iri']} is declared by more than one file under "
+            f"--import-dir; used {entry['chosen']}, ignored {', '.join(entry['also'])}"
+        )
+    for entry in report.get("unparsable", []):
+        warnings.append(
+            f"{ontology_path}: skipped unparsable import candidate {entry['source']} -- {entry['error']}"
+        )
+    return warnings
 
 
 def load_ontology_graph(
@@ -197,6 +237,7 @@ def load_ontology_graph(
     exclude_imports: bool = False,
     allow_network: bool = False,
     verbose: bool = False,
+    warnings: Optional[List[str]] = None,
 ) -> Graph:
     """Load an ontology file, transitively resolving its ``owl:imports`` the
     same way the ``ontology`` stage and ``version-diff`` already do (via
@@ -223,6 +264,8 @@ def load_ontology_graph(
         )
     if verbose:
         print(format_import_report(ontology_path, report))
+    if warnings is not None:
+        warnings.extend(import_warnings(ontology_path, report))
     return graph
 
 
@@ -275,6 +318,7 @@ def run_ontology_stage(
     return StageResult(
         name="ontology",
         rows=rows,
+        warnings=import_warnings(ontology_path, import_report),
         artifacts={
             "graph": graph,
             "import_report": import_report,
@@ -366,11 +410,12 @@ def run_checks_stage(
     if not ontology_path and not data_path:
         raise ValueError("run_checks_stage needs at least one of ontology_path or data_path")
 
+    warnings: List[str] = []
     working_graph = Graph()
     if ontology_path:
         ontology_graph = load_ontology_graph(
             ontology_path, import_dir=import_dir, exclude_imports=exclude_imports, allow_network=allow_network,
-            verbose=verbose,
+            verbose=verbose, warnings=warnings,
         )
         for triple in ontology_graph:
             working_graph.add(triple)
@@ -384,7 +429,7 @@ def run_checks_stage(
         print(f"[verbose] engine: {engine}")
     rows = run_registry_suite_on_graph(working_graph, registry, shapes_dir, sparql_dir, inference, engine=engine)
 
-    return StageResult(name="checks", rows=rows, artifacts={"graph": working_graph})
+    return StageResult(name="checks", rows=rows, artifacts={"graph": working_graph}, warnings=warnings)
 
 
 # --------------------------------------------------------------------------
@@ -424,10 +469,11 @@ def run_sketch_stage(
     schema_metrics = ontology_quality.compute_metrics(schema)
 
     rows: List[ResultRow] = []
+    warnings: List[str] = []
     if ontology_path:
         ontology_graph = load_ontology_graph(
             ontology_path, import_dir=import_dir, exclude_imports=exclude_imports, allow_network=allow_network,
-            verbose=verbose,
+            verbose=verbose, warnings=warnings,
         )
         declarations = data_quality.ontology_declarations(ontology_graph)
         conformance = data_quality.check_conformance(declarations, sketch_graph)
@@ -436,6 +482,7 @@ def run_sketch_stage(
     return StageResult(
         name="sketch",
         rows=rows,
+        warnings=warnings,
         artifacts={
             "sketch_path": sketch_path,
             "used_queries": used_queries,
@@ -517,11 +564,12 @@ def run_data_stage(
         for f in per_file:
             print(f"    {f['path']}  ({len(f['graph'])} triples, {f['ignored_triple_count']} ignored)")
 
+    warnings: List[str] = []
     ontology_graph: Optional[Graph] = None
     if ontology_path:
         ontology_graph = load_ontology_graph(
             ontology_path, import_dir=import_dir, exclude_imports=exclude_imports, allow_network=allow_network,
-            verbose=verbose,
+            verbose=verbose, warnings=warnings,
         )
 
     rows: List[ResultRow] = []
@@ -564,6 +612,7 @@ def run_data_stage(
     return StageResult(
         name="data",
         rows=rows,
+        warnings=warnings,
         artifacts={
             "per_file": per_file,
             "aggregate_graph": aggregate_graph,
