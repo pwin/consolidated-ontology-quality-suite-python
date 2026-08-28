@@ -5,11 +5,12 @@ Two things here are load-bearing and everything else is detail.
 The first is **skeleton comparison**. Comparing BIND expressions as raw text
 reports every difference, including the ordinary one where two files feed the
 same template from a differently-named CSV column -- which is most of them,
-and which makes the check noise. Measured on a real ten-query folder: raw-text
-comparison reports 37 target variables, skeleton comparison reports 7, and the
-30 it drops are all column-name differences. The `?surface_IRI` case in the
-fixture pins that behaviour from the other side: same template, different
-source variable, no finding.
+and which makes the check noise. Measured on a real ten-query folder: 37 target
+variables are bound in more than one file, 8 of those with differing
+expression text, and skeleton comparison reports 7 -- dropping the one case
+where two files feed an identical template from differently-named columns.
+The `?surface_IRI` case in the fixture pins that behaviour from the other
+side: same template, different source variable, no finding.
 
 The second is **comment and literal handling**. These queries build IRIs out
 of string literals containing `#`, `{`, quotes and backslashes, and they

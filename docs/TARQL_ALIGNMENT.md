@@ -1,5 +1,11 @@
 # TARQL/oxi-gen query <-> ontology alignment
 
+> This doc covers one specific question in depth: do the queries and the
+> ontology agree about prefixes, namespaces and declared terms?
+> `docs/TESTING_TARQL.md` is the wider guide to testing a query folder --
+> including the checks that need no ontology at all (BIND drift across files,
+> unbound `CONSTRUCT` variables) and the order to run everything in.
+
 `ontology_suite/sketch/prefix_alignment.py` checks whether a TARQL/oxi-gen
 CONSTRUCT query file still matches the ontology it's meant to triplify
 against. It exists for one recurring situation: an ontology changes (a

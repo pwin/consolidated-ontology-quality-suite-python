@@ -53,6 +53,12 @@ See `docs/CONSISTENCY_AND_REPAIR.md` for the local-file workflow,
 the inherited pipeline this all sits on top of, and
 `docs/UPSTREAM_README.md` for that pipeline's own original README.
 
+Working on TARQL/oxi-gen queries? `docs/TESTING_TARQL.md` is the guide to
+testing a query folder: what goes wrong in a `CONSTRUCT` query, which check
+catches each thing, what none of them catch, and a review order that puts the
+cheapest checks first. `ontology-quality-suite sketch --queries ...` needs no
+ontology and no CSV to run the BIND review half of it.
+
 Want to know what the suite actually checks, and how to add checks of your
 own? `docs/check-registry.html` is a standalone, self-contained page
 covering all the registered checks -- what each one asserts, its severity

@@ -50,9 +50,10 @@ Why not simply require every CONSTRUCT variable to be bound
 -----------------------------------------------------------
 Because TARQL's whole premise is the implicit column binding, that rule would
 fire on nearly every well-formed query. Measured against a real ten-query
-folder: 30 of 228 CONSTRUCT variables are unbound in their own file, and only
-one of those is a genuine defect. Separating the two by naming convention is
-what makes the finding actionable rather than a number nobody reads.
+folder: 32 of 228 CONSTRUCT variables are unbound in their own file, and
+exactly one of those is a genuine defect. Separating the two by naming
+convention is what makes the finding actionable rather than a number nobody
+reads.
 """
 from __future__ import annotations
 

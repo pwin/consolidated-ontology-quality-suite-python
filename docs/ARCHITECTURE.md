@@ -307,11 +307,19 @@ that depend on OWL2-RL-specific rules).
 3. **`sketch`** -- `tarql_visualiser.py` builds a Turtle "sketch" of the
    graph shape a folder of oxi-gen/tarql `CONSTRUCT` queries would build (no
    CSV needed); `graph_quality.py`/`ontology_quality.py` analyse it as
-   before. New: if an ontology is given, the sketch is run back through
+   before. If an ontology is given, the sketch is run back through
    `data_quality.py`'s own `ontology_declarations` + `check_conformance` --
    the exact same conformance logic the `data` stage uses against real
    triplified output -- to diff the query shape against what the ontology
    actually declares (`CNF-00x` findings, category `conformance`).
+
+   The stage also runs `sketch/bind_analysis.py` over the query *source*,
+   with or without an ontology, writing `bind-review.txt` beside
+   `sketch.ttl` (`TQL-00x` findings, category `tarql`). That half reads
+   text rather than the sketch graph, and has to: `tarql_visualiser`
+   keeps only each query's prefixes and its `CONSTRUCT` template, so the
+   `WHERE` clause and every `BIND` expression in it are gone before the
+   sketch graph exists. See `docs/TESTING_TARQL.md`.
 4. **`triplify`** -- `triplify/oxigen.py` shells out to a built `oxi-gen`
    binary per CSV/query pair (paired by `triplify/discovery.py`'s naming
    convention) to produce real Turtle data.
