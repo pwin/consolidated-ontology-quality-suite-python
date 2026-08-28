@@ -53,6 +53,17 @@ See `docs/CONSISTENCY_AND_REPAIR.md` for the local-file workflow,
 the inherited pipeline this all sits on top of, and
 `docs/UPSTREAM_README.md` for that pipeline's own original README.
 
+Want to know what the suite actually checks, and how to add checks of your
+own? `docs/check-registry.html` is a standalone, self-contained page
+covering all the registered checks -- what each one asserts, its severity
+and remediation, and whether it is implemented in SPARQL, SHACL or native
+Python -- plus the result contract a new check has to satisfy and how to
+run a project-local panel via `--registry`/`--shapes`/`--sparql`. It is
+generated from `registry.json` by `docs/generate_check_registry.py`, so it
+cannot drift from the suite; `tests/test_check_registry_doc.py` fails if
+the committed copy goes stale. `docs/CHECKS.md` is the terser Markdown
+reference over the same registry.
+
 Want one continuous, realistic worked example instead of task-by-task
 fixtures? `docs/ACME_ROBOTICS_WALKTHROUGH.md` runs nearly every stage above
 against a single small org chart built on two real external vocabularies

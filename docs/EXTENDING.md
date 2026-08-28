@@ -3,6 +3,12 @@
 There are three kinds of check, depending on what it needs to compute. Pick
 the lightest one that fits.
 
+> `docs/check-registry.html` covers the same ground as a self-contained
+> page, with the full catalogue of registered checks alongside it -- useful
+> for sharing with people who are choosing or reviewing checks rather than
+> writing them. Regenerate it with `python docs/generate_check_registry.py`
+> after any change here.
+
 **Paths below are relative to `ontology_suite/resources/`** (i.e.
 `registry.json` below means `ontology_suite/resources/registry.json`,
 `sparql/<category>/<id>.rq` means
