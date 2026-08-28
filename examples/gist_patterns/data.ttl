@@ -1,0 +1,73 @@
+# Data half of the gist pattern fixture -- see ontology.ttl's header.
+# Every seeded error is marked `# SEEDS:` with the check id it must produce.
+
+@prefix owl:   <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:   <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos:  <http://www.w3.org/2004/02/skos/core#> .
+@prefix xsd:   <http://www.w3.org/2001/XMLSchema#> .
+@prefix gist:  <https://w3id.org/semanticarts/ns/ontology/gist/> .
+@prefix ex:    <https://example.org/gistpatterns/> .
+@prefix exd:   <https://example.org/gistpatterns/data/> .
+
+# --- Units, correctly typed. -----------------------------------------------
+exd:MetreUnit a gist:UnitOfMeasure ;
+  rdfs:label "metre"@en ;
+  skos:prefLabel "metre"@en .
+
+exd:CountUnit a gist:UnitOfMeasure ;
+  rdfs:label "count"@en ;
+  skos:prefLabel "count"@en .
+
+# --- The clean case: DAT-004 must NOT fire on either of these. -------------
+# A magnitude typed directly as gist:Magnitude, with a unit.
+exd:MagnitudeWidth a gist:Magnitude ;
+  rdfs:label "carriageway width"@en ;
+  gist:hasUnitOfMeasure exd:MetreUnit .
+
+# A magnitude typed with a *subclass* of gist:Magnitude, with a unit. This
+# is what pins the rdfs:subClassOf* walk: without it the check would miss
+# every project-specific magnitude subclass, which is most of them in a real
+# gist-based model.
+exd:MagnitudeLinkLength a ex:LinkLength ;
+  rdfs:label "link length"@en ;
+  gist:hasUnitOfMeasure exd:MetreUnit .
+
+# SEEDS: DAT-004 -- a magnitude with no unit-of-measure link at all. This is
+# the shape real gist-based data actually goes wrong in: an aspect and a
+# numeric value are present, so the record looks populated, and the missing
+# unit is invisible until someone tries to compare two of them.
+exd:MagnitudeLaneCount a gist:Magnitude ;
+  rdfs:label "number of lanes"@en ;
+  gist:hasAspect exd:AspectLaneCount ;
+  gist:numericValue 2 .
+
+# SEEDS: DAT-004 -- a magnitude whose unit-of-measure link exists but points
+# at something that is not a gist:UnitOfMeasure. Harder to spot by eye than
+# the omission above, because the triple is present and looks right.
+exd:MagnitudeGradient a gist:Magnitude ;
+  rdfs:label "gradient"@en ;
+  gist:hasUnitOfMeasure exd:AspectLaneCount .
+
+exd:AspectLaneCount a gist:Aspect ;
+  rdfs:label "lane count"@en ;
+  skos:prefLabel "lane count"@en .
+
+gist:Aspect a owl:Class ;
+  rdfs:label "Aspect"@en ;
+  skos:prefLabel "Aspect"@en ;
+  skos:definition "A dimension along which a magnitude is measured."@en .
+
+gist:hasAspect a owl:ObjectProperty ;
+  rdfs:label "has aspect"@en ;
+  skos:prefLabel "has aspect"@en ;
+  skos:definition "Relates a magnitude to the aspect it measures."@en ;
+  rdfs:domain gist:Magnitude ;
+  rdfs:range gist:Aspect .
+
+gist:numericValue a owl:DatatypeProperty ;
+  rdfs:label "numeric value"@en ;
+  skos:prefLabel "numeric value"@en ;
+  skos:definition "The numeric part of a magnitude, meaningful only with its unit."@en ;
+  rdfs:domain gist:Magnitude ;
+  rdfs:range xsd:decimal .

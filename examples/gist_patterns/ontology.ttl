@@ -1,0 +1,105 @@
+# A small gist-shaped ontology that deliberately seeds one error per check
+# that no other in-repo fixture trips -- see tests/test_check_firing_coverage.py,
+# which exists because this suite has four times shipped a check whose query
+# quietly matched nothing and looked exactly like a clean graph.
+#
+# Every seeded error is marked `# SEEDS:` with the check id it must produce.
+# The ontology header is complete and correct (https scheme, an identifying
+# IRI distinct from the concept namespace, a versionIRI) so the findings are
+# attributable to the seeded errors rather than to background noise from
+# QUA-005/006/007/008.
+#
+# Two further findings are inherent rather than noise, and are left alone:
+# STR-004 fires on the five classes that have no superclass, which is what a
+# top-level class is; and STY-004 fires on ex:hasCarriageway because its
+# second prefLabel does not match its local name -- an unavoidable
+# consequence of seeding QUA-009's duplicate-label case, not a separate
+# defect. Both ids are already covered by other fixtures.
+#
+# gist terms are declared here rather than importing real gist: the checks
+# match Magnitude/UnitOfMeasure/unitOfMeasure by LOCAL NAME, never by a
+# hardcoded namespace, and a fixture that mints them under the real gist
+# namespace is the honest way to exercise that. It also keeps the fixture at
+# a dozen triples instead of gist's ~3,300.
+
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix gist: <https://w3id.org/semanticarts/ns/ontology/gist/> .
+@prefix ex:   <https://example.org/gistpatterns/> .
+
+<https://example.org/gistpatterns>
+  a owl:Ontology ;
+  owl:versionIRI <https://example.org/gistpatterns/1.0.0> ;
+  owl:versionInfo "1.0.0" ;
+  rdfs:label "gist pattern fixture"@en ;
+  skos:prefLabel "gist pattern fixture"@en ;
+  skos:definition "Fixture exercising the gist magnitude/unit pattern and the skos documentation checks."@en .
+
+# --- The gist terms the checks key off, declared locally. -------------------
+# Well documented, so they contribute no QUA-009/QUA-010 noise of their own.
+gist:Magnitude a owl:Class ;
+  rdfs:label "Magnitude"@en ;
+  skos:prefLabel "Magnitude"@en ;
+  skos:definition "A quantity, which is only meaningful in combination with a unit of measure."@en .
+
+gist:UnitOfMeasure a owl:Class ;
+  rdfs:label "Unit of Measure"@en ;
+  skos:prefLabel "Unit of Measure"@en ;
+  skos:definition "A standard quantity used to express the magnitude of a quantity of the same kind."@en .
+
+gist:hasUnitOfMeasure a owl:ObjectProperty ;
+  rdfs:label "has unit of measure"@en ;
+  skos:prefLabel "has unit of measure"@en ;
+  skos:definition "Relates a magnitude to the unit its value is expressed in."@en ;
+  rdfs:domain gist:Magnitude ;
+  rdfs:range gist:UnitOfMeasure .
+
+# A project subclass of Magnitude: DAT-004 walks rdfs:subClassOf*, so an
+# instance of this is still a magnitude and still owes a unit.
+ex:LinkLength a owl:Class ;
+  rdfs:subClassOf gist:Magnitude ;
+  rdfs:label "Link Length"@en ;
+  skos:prefLabel "Link Length"@en ;
+  skos:definition "The measured length of a road link."@en .
+
+# --- Terms that are correct, so the checks below are attributable. ---------
+ex:Road a owl:Class ;
+  rdfs:label "Road"@en ;
+  skos:prefLabel "Road"@en ;
+  skos:definition "A way with a prepared surface, used by vehicles."@en .
+
+ex:hasSurface a owl:ObjectProperty ;
+  rdfs:label "has surface"@en ;
+  skos:prefLabel "has surface"@en ;
+  skos:definition "Relates a road to the surface material it is built from."@en ;
+  rdfs:domain ex:Road ;
+  rdfs:range ex:Road .
+
+# SEEDS: QUA-009 -- a class with no skos:prefLabel at all. It has an
+# rdfs:label, which is what makes this distinct from QUA-001/QUA-004: both
+# of those accept rdfs:label as sufficient, so neither fires here.
+ex:Carriageway a owl:Class ;
+  rdfs:label "Carriageway"@en ;
+  skos:definition "The part of a road used by moving traffic."@en .
+
+# SEEDS: QUA-009 -- a property with *two* skos:prefLabel values. "One and
+# only one" is violated in the other direction: nothing is missing, but any
+# consumer rendering "the" label of this term has to choose arbitrarily.
+ex:hasCarriageway a owl:ObjectProperty ;
+  rdfs:label "has carriageway"@en ;
+  skos:prefLabel "has carriageway"@en , "carriageway of"@en ;
+  skos:definition "Relates a road to one of its carriageways."@en ;
+  rdfs:domain ex:Road ;
+  rdfs:range ex:Carriageway .
+
+# SEEDS: QUA-010 -- a fully labelled class with no skos:definition. It also
+# has an rdfs:subClassOf axiom, so it is formally defined and STR-004 does
+# not fire: the gap is prose, not logic, which is exactly the distinction
+# QUA-010 exists to draw.
+ex:Motorway a owl:Class ;
+  rdfs:subClassOf ex:Road ;
+  rdfs:label "Motorway"@en ;
+  skos:prefLabel "Motorway"@en .

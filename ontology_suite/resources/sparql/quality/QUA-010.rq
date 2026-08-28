@@ -1,0 +1,45 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX oq: <https://semantechs.co.uk/ontology-quality/>
+
+# QUA-010: Class or property definition without a skos:definition.
+#
+# Distinct from STR-004, which asks whether a class has a *formal*
+# definition -- an rdfs:subClassOf axiom, an owl:equivalentClass
+# restriction, a union/intersection/enumeration. That is a question about
+# logic. This is a question about prose: can a person who did not author
+# the term work out what it means? A class can be fully axiomatised and
+# still undocumented, and the reverse.
+#
+# skos:definition specifically, not rdfs:comment or dcterms:description.
+# The three are not interchangeable in practice: a comment is a note to
+# whoever maintains the ontology, a definition is the term's meaning. An
+# ontology that documents with rdfs:comment and wants that to count should
+# widen the property-path alternation below and in the SHACL twin
+# together, so the two formulations stay in step.
+#
+# Blank nodes excluded for the same reason as QUA-009: an anonymous class
+# expression is an owl:Class that can never carry a definition.
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Warning ;
+    sh:focusNode ?e ;
+    sh:resultPath skos:definition ;
+    sh:sourceConstraintComponent oq:QUA-010 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  {
+    { ?e a owl:Class } UNION { ?e a rdfs:Class } UNION
+    { ?e a owl:ObjectProperty } UNION { ?e a owl:DatatypeProperty } UNION
+    { ?e a owl:AnnotationProperty } UNION { ?e a rdf:Property }
+  }
+  FILTER(isIRI(?e))
+  FILTER(!STRSTARTS(STR(?e), "http://www.w3.org/"))
+  FILTER NOT EXISTS { ?e skos:definition [] }
+  BIND(CONCAT("Term ", STR(?e), " has no skos:definition.") AS ?msg)
+}

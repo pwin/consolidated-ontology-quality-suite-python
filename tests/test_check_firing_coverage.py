@@ -43,6 +43,16 @@ FIXTURES = {
     # above trips (LOG-004..007, STR-005, STR-009, STY-004, STY-005). Every
     # seeded error is marked `# SEEDS:` in the file with the id it produces.
     "property_axioms": ["examples/property_axioms/ontology.ttl"],
+    # The skos documentation checks (QUA-009/QUA-010) and the gist
+    # magnitude/unit pattern (DAT-004). Kept separate from the fixtures
+    # above rather than seeded into them: those are documented with
+    # rdfs:label throughout, and retrofitting skos:prefLabel/skos:definition
+    # onto every term to avoid a QUA-009/QUA-010 flood would have changed
+    # what several unrelated checks see.
+    "gist_patterns": [
+        "examples/gist_patterns/ontology.ttl",
+        "examples/gist_patterns/data.ttl",
+    ],
 }
 
 # Observed firing across the fixtures above. Pinned as an exact set: an id
@@ -50,10 +60,10 @@ FIXTURES = {
 # isn't here means a fixture drifted into tripping something new (worth a
 # look, then add it).
 EXPECTED_FIRING = {
-    "DAT-001", "DAT-002", "DAT-003",
+    "DAT-001", "DAT-002", "DAT-003", "DAT-004",
     "EFF-001", "EFF-002", "EFF-003",
     "LOG-001", "LOG-002", "LOG-003", "LOG-004", "LOG-005", "LOG-006", "LOG-007",
-    "QUA-001", "QUA-002", "QUA-003", "QUA-004", "QUA-007",
+    "QUA-001", "QUA-002", "QUA-003", "QUA-004", "QUA-007", "QUA-009", "QUA-010",
     "STR-001", "STR-002", "STR-003", "STR-004", "STR-005",
     "STR-006", "STR-007", "STR-008", "STR-009",
     "STY-001", "STY-002", "STY-003", "STY-004", "STY-005",

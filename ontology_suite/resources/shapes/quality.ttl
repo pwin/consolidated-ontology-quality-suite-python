@@ -2,6 +2,7 @@
 @prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix owl:     <http://www.w3.org/2002/07/owl#> .
 @prefix sh:      <http://www.w3.org/ns/shacl#> .
+@prefix skos:    <http://www.w3.org/2004/02/skos/core#> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix oq:      <https://semantechs.co.uk/ontology-quality/> .
 
@@ -118,4 +119,82 @@ oq:QUA-003
         { $this ?path ?o } UNION { $this a ?path }
       }
     """ ;
+  ] .
+
+# ---------------------------------------------------------------------------
+# QUA-009: Class or property definition without exactly one skos:prefLabel.
+#
+# Native SHACL core (sh:minCount + sh:maxCount on a nested sh:property),
+# not sh:sparql. The cardinality maps onto core exactly, and using a
+# genuinely different mechanism from the .rq twin is what makes the
+# cross-engine comparison worth running -- two copies of the same SPARQL
+# agree even when both are wrong.
+#
+# The nested `sh:property [ ... ]` reports its own blank node as
+# sh:sourceShape, one level below the oq:QUA-009 node this id is resolved
+# from; registry.py::resolve_check_id walks up through sh:property for
+# exactly this shape (step 4). That walk does *not* go a further level
+# through sh:or, which is why QUA-001 above had to use sh:sparql instead --
+# a plain property shape like this one is inside what it handles.
+#
+# Both constraints report sh:resultPath skos:prefLabel and no sh:value,
+# matching what sparql/quality/QUA-009.rq constructs, so the two engines'
+# rows merge on (check_id, focus_node, path, value) rather than surviving
+# as a duplicated pair.
+# ---------------------------------------------------------------------------
+oq:QUA-009
+  a sh:NodeShape ;
+  rdfs:label "QUA-009: class or property without exactly one skos:prefLabel" ;
+  sh:target [
+    a sh:SPARQLTarget ;
+    sh:select """
+      PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+      PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+      PREFIX owl: <http://www.w3.org/2002/07/owl#>
+      SELECT DISTINCT ?this
+      WHERE {
+        { ?this a owl:Class } UNION { ?this a rdfs:Class } UNION
+        { ?this a owl:ObjectProperty } UNION { ?this a owl:DatatypeProperty } UNION
+        { ?this a owl:AnnotationProperty } UNION { ?this a rdf:Property }
+        FILTER(isIRI(?this))
+        FILTER(!STRSTARTS(STR(?this), "http://www.w3.org/"))
+      }
+    """ ;
+  ] ;
+  sh:property [
+    sh:path skos:prefLabel ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:severity sh:Warning ;
+    sh:message "Term must have exactly one skos:prefLabel." ;
+  ] .
+
+# ---------------------------------------------------------------------------
+# QUA-010: Class or property definition without a skos:definition.
+# Same target set as QUA-009; native core again, minCount only.
+# ---------------------------------------------------------------------------
+oq:QUA-010
+  a sh:NodeShape ;
+  rdfs:label "QUA-010: class or property without a skos:definition" ;
+  sh:target [
+    a sh:SPARQLTarget ;
+    sh:select """
+      PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+      PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+      PREFIX owl: <http://www.w3.org/2002/07/owl#>
+      SELECT DISTINCT ?this
+      WHERE {
+        { ?this a owl:Class } UNION { ?this a rdfs:Class } UNION
+        { ?this a owl:ObjectProperty } UNION { ?this a owl:DatatypeProperty } UNION
+        { ?this a owl:AnnotationProperty } UNION { ?this a rdf:Property }
+        FILTER(isIRI(?this))
+        FILTER(!STRSTARTS(STR(?this), "http://www.w3.org/"))
+      }
+    """ ;
+  ] ;
+  sh:property [
+    sh:path skos:definition ;
+    sh:minCount 1 ;
+    sh:severity sh:Warning ;
+    sh:message "Term must have at least one skos:definition." ;
   ] .

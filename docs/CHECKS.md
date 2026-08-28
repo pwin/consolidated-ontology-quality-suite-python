@@ -1,6 +1,6 @@
 # Check catalogue
 
-Generated from `registry.json` by `docs/generate_checks_md.py` -- 50 checks across 8 categories. Do not hand-edit; re-run the generator instead.
+Generated from `registry.json` by `docs/generate_checks_md.py` -- 53 checks across 8 categories. Do not hand-edit; re-run the generator instead.
 
 ## Data quality (`data`)
 
@@ -27,6 +27,14 @@ Generated from `registry.json` by `docs/generate_checks_md.py` -- 50 checks acro
 - **Description:** The same subject/predicate pair has the same literal value asserted more than once.
 - **Remediation:** De-duplicate the repeated literal values; if intentional (e.g. multiple language variants), differentiate with language tags instead of duplicating.
 - **Cucumber:** Data Quality / Subjects do not carry duplicate literal values for the same property
+
+### `DAT-004` -- gist:Magnitude without a unit of measure
+
+- **Default severity:** Violation
+- **Metric:** quantity completeness
+- **Description:** An entity that is a SHACL instance of gist:Magnitude (the class itself or any rdfs:subClassOf* descendant) has no gist:hasUnitOfMeasure value, or has one whose target is not a gist:UnitOfMeasure. A magnitude without a unit is not a quantity: '221.78' is not a length, and the omission stays invisible until someone tries to compare or convert two of them. Pinned to gist's exact namespace (https://w3id.org/semanticarts/ns/ontology/gist/) in both the SHACL and SPARQL formulations, which is narrower than this suite's usual local-name matching of gist terms: a graph built on a pre-gist-12 vocabulary, where the property was named gist:unitOfMeasure rather than gist:hasUnitOfMeasure, is not checked rather than checked and found wanting.
+- **Remediation:** Add a gist:hasUnitOfMeasure link from the magnitude to an instance typed gist:UnitOfMeasure; if the link is already present, check its target is declared a unit rather than an aspect or an untyped IRI. If the graph uses gist's pre-12 gist:unitOfMeasure spelling, widen the path in both shapes/data.ttl and sparql/data/DAT-004.rq together.
+- **Cucumber:** Data Quality / Every magnitude carries a unit of measure
 
 ## Logical cogency (`logical`)
 
@@ -235,6 +243,22 @@ Generated from `registry.json` by `docs/generate_checks_md.py` -- 50 checks acro
 - **Description:** The ontology's identifying IRI, or its owl:versionIRI, uses a scheme other than https:// (typically plain http://). Using https guarantees the integrity/authenticity of the ontology document when it is actually dereferenced.
 - **Remediation:** Mint the ontology IRI and versionIRI under an https:// base.
 - **Cucumber:** Documentation Quality / The ontology's identifying and version IRIs use the https:// scheme
+
+### `QUA-009` -- Class or property without exactly one skos:prefLabel
+
+- **Default severity:** Warning
+- **Metric:** term documentation completeness
+- **Description:** A declared class or property has either no skos:prefLabel or more than one. Stricter than QUA-004, which accepts an rdfs:label instead and asks only that some label exist: this one applies to class/property declarations specifically, requires skos:prefLabel specifically, and constrains the count, because a term with several prefLabels forces any consumer rendering 'the' label of that term to choose between them arbitrarily. Anonymous class expressions (owl:Restriction and the other blank-node axiom forms) are exempt -- they are owl:Class instances that can never meaningfully carry a label.
+- **Remediation:** Add a skos:prefLabel if the term has none; if it has several, keep the one canonical label and move the rest to skos:altLabel.
+- **Cucumber:** Documentation Quality / Every class and property definition carries exactly one skos:prefLabel
+
+### `QUA-010` -- Class or property without a skos:definition
+
+- **Default severity:** Warning
+- **Metric:** term documentation completeness
+- **Description:** A declared class or property has no skos:definition. Distinct from STR-004, which asks whether a class is formally defined by an axiom (rdfs:subClassOf, owl:equivalentClass, a union/intersection/enumeration): that is a question about logic, this one is about prose, and a term can be fully axiomatised and still leave a reader unable to tell what it means. skos:definition specifically, not rdfs:comment -- a comment is a note to whoever maintains the ontology, a definition is the term's meaning.
+- **Remediation:** Add a skos:definition stating what the term means, in prose a reader outside the authoring team can act on.
+- **Cucumber:** Documentation Quality / Every class and property definition carries at least one skos:definition
 
 ## Reasoning (OWL2 profile & consistency) (`reasoning`)
 

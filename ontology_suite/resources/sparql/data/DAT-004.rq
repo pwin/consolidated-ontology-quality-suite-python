@@ -1,0 +1,67 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+PREFIX gist: <https://w3id.org/semanticarts/ns/ontology/gist/>
+PREFIX oq: <https://semantechs.co.uk/ontology-quality/>
+
+# DAT-004: gist:Magnitude without a unit of measure.
+#
+# A magnitude is a quantity, and a quantity without a unit is not a
+# quantity -- "221.78" is not a length. gist models this with a magnitude
+# pointing at a gist:UnitOfMeasure instance; a magnitude carrying only a
+# numeric value and an aspect is incomplete, and the incompleteness stays
+# invisible until someone tries to compare or convert two of them.
+#
+# Pinned to gist's exact namespace, matching shapes/data.ttl's native-core
+# twin term for term. This is narrower than STR-003's local-name matching
+# of gist's domainIncludes/rangeIncludes, and the narrowness is a real
+# limitation: gist renamed this property (unitOfMeasure -> hasUnitOfMeasure
+# at gist 12) and has published under more than one namespace, so a graph
+# on an older gist is not checked rather than checked and found wanting.
+# Widening it means changing both formulations together -- pinning only one
+# would make DAT-004's findings depend on --engine.
+#
+# Two branches, mirroring the two core constraints the shape uses. They
+# bind sh:resultPath (and sh:value, where the shape has an offending node
+# to point at) exactly as pyshacl reports them, so both engines' rows merge
+# on (check_id, focus_node, path, value) instead of the same finding
+# surviving twice under --engine both.
+#
+# Each branch contains a real triple pattern. A UNION of bare FILTERs
+# evaluates to zero rows in rdflib regardless of the data -- this suite
+# shipped exactly that bug in DAT-001 once, and it looks identical to a
+# clean graph.
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Violation ;
+    sh:focusNode ?m ;
+    sh:resultPath gist:hasUnitOfMeasure ;
+    sh:value ?offendingUnit ;
+    sh:sourceConstraintComponent oq:DAT-004 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  # SHACL's "instance of" is rdf:type/rdfs:subClassOf*, which is what
+  # sh:targetClass gives the twin for free; spelled out here.
+  ?m rdf:type/rdfs:subClassOf* gist:Magnitude .
+  FILTER(isIRI(?m))
+  {
+    # sh:minCount 1 -- no unit link at all. No offending node exists, so no
+    # sh:value is bound, matching how SHACL reports a cardinality failure.
+    ?m rdf:type ?anyType .
+    FILTER NOT EXISTS { ?m gist:hasUnitOfMeasure ?any }
+    BIND(CONCAT("Magnitude ", STR(?m),
+                " has no gist:hasUnitOfMeasure link to a gist:UnitOfMeasure.") AS ?msg)
+  }
+  UNION
+  {
+    # sh:class -- the link exists but does not reach a unit. The offending
+    # value is reported, as sh:ClassConstraintComponent does.
+    ?m gist:hasUnitOfMeasure ?offendingUnit .
+    FILTER NOT EXISTS { ?offendingUnit rdf:type/rdfs:subClassOf* gist:UnitOfMeasure }
+    BIND(CONCAT("Magnitude ", STR(?m), " has gist:hasUnitOfMeasure ", STR(?offendingUnit),
+                ", which is not typed gist:UnitOfMeasure.") AS ?msg)
+  }
+}

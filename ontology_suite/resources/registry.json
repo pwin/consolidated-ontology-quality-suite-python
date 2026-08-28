@@ -200,6 +200,17 @@
       "cucumber_scenario": "Subjects do not carry duplicate literal values for the same property"
     },
     {
+      "id": "DAT-004",
+      "category": "data",
+      "metric": "quantity completeness",
+      "default_severity": "Violation",
+      "title": "gist:Magnitude without a unit of measure",
+      "description": "An entity that is a SHACL instance of gist:Magnitude (the class itself or any rdfs:subClassOf* descendant) has no gist:hasUnitOfMeasure value, or has one whose target is not a gist:UnitOfMeasure. A magnitude without a unit is not a quantity: '221.78' is not a length, and the omission stays invisible until someone tries to compare or convert two of them. Pinned to gist's exact namespace (https://w3id.org/semanticarts/ns/ontology/gist/) in both the SHACL and SPARQL formulations, which is narrower than this suite's usual local-name matching of gist terms: a graph built on a pre-gist-12 vocabulary, where the property was named gist:unitOfMeasure rather than gist:hasUnitOfMeasure, is not checked rather than checked and found wanting.",
+      "remediation": "Add a gist:hasUnitOfMeasure link from the magnitude to an instance typed gist:UnitOfMeasure; if the link is already present, check its target is declared a unit rather than an aspect or an untyped IRI. If the graph uses gist's pre-12 gist:unitOfMeasure spelling, widen the path in both shapes/data.ttl and sparql/data/DAT-004.rq together.",
+      "cucumber_feature": "Data Quality",
+      "cucumber_scenario": "Every magnitude carries a unit of measure"
+    },
+    {
       "id": "STR-004",
       "category": "structural",
       "metric": "schema completeness",
@@ -495,6 +506,28 @@
       "remediation": "Mint the ontology IRI and versionIRI under an https:// base.",
       "cucumber_feature": "Documentation Quality",
       "cucumber_scenario": "The ontology's identifying and version IRIs use the https:// scheme"
+    },
+    {
+      "id": "QUA-009",
+      "category": "quality",
+      "metric": "term documentation completeness",
+      "default_severity": "Warning",
+      "title": "Class or property without exactly one skos:prefLabel",
+      "description": "A declared class or property has either no skos:prefLabel or more than one. Stricter than QUA-004, which accepts an rdfs:label instead and asks only that some label exist: this one applies to class/property declarations specifically, requires skos:prefLabel specifically, and constrains the count, because a term with several prefLabels forces any consumer rendering 'the' label of that term to choose between them arbitrarily. Anonymous class expressions (owl:Restriction and the other blank-node axiom forms) are exempt -- they are owl:Class instances that can never meaningfully carry a label.",
+      "remediation": "Add a skos:prefLabel if the term has none; if it has several, keep the one canonical label and move the rest to skos:altLabel.",
+      "cucumber_feature": "Documentation Quality",
+      "cucumber_scenario": "Every class and property definition carries exactly one skos:prefLabel"
+    },
+    {
+      "id": "QUA-010",
+      "category": "quality",
+      "metric": "term documentation completeness",
+      "default_severity": "Warning",
+      "title": "Class or property without a skos:definition",
+      "description": "A declared class or property has no skos:definition. Distinct from STR-004, which asks whether a class is formally defined by an axiom (rdfs:subClassOf, owl:equivalentClass, a union/intersection/enumeration): that is a question about logic, this one is about prose, and a term can be fully axiomatised and still leave a reader unable to tell what it means. skos:definition specifically, not rdfs:comment -- a comment is a note to whoever maintains the ontology, a definition is the term's meaning.",
+      "remediation": "Add a skos:definition stating what the term means, in prose a reader outside the authoring team can act on.",
+      "cucumber_feature": "Documentation Quality",
+      "cucumber_scenario": "Every class and property definition carries at least one skos:definition"
     },
     {
       "id": "CNF-001",

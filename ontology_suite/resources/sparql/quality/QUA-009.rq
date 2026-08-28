@@ -1,0 +1,56 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX oq: <https://semantechs.co.uk/ontology-quality/>
+
+# QUA-009: Class or property definition without exactly one skos:prefLabel.
+#
+# Stricter and narrower than QUA-004, which asks only that *some* resource
+# carry *either* a skos:prefLabel or an rdfs:label. This one applies to
+# declared classes and properties specifically, requires skos:prefLabel
+# specifically, and constrains the count: a term with three prefLabels is
+# as much a defect as one with none, because downstream tooling that
+# renders "the" label of a term then picks arbitrarily between them.
+#
+# Blank nodes are excluded deliberately. Every anonymous class expression
+# -- owl:Restriction, unionOf/intersectionOf members -- is an owl:Class,
+# and none of them can meaningfully carry a label. Omitting this filter is
+# a mistake this suite has made twice before (STR-001's owl:Restriction
+# flood, QUA-001's SHACL rewrite), both times producing findings that
+# outnumbered the real ones.
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Warning ;
+    sh:focusNode ?e ;
+    sh:resultPath skos:prefLabel ;
+    sh:sourceConstraintComponent oq:QUA-009 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  {
+    SELECT ?e (COUNT(DISTINCT ?label) AS ?n)
+    WHERE {
+      {
+        { ?e a owl:Class } UNION { ?e a rdfs:Class } UNION
+        { ?e a owl:ObjectProperty } UNION { ?e a owl:DatatypeProperty } UNION
+        { ?e a owl:AnnotationProperty } UNION { ?e a rdf:Property }
+      }
+      FILTER(isIRI(?e))
+      # The RDF/RDFS/OWL/SKOS built-ins are not this ontology's terms to
+      # document, and a graph that merely mentions `owl:Thing a owl:Class`
+      # is not thereby responsible for labelling it -- same exemption
+      # QUA-004 already applies for the identical reason.
+      FILTER(!STRSTARTS(STR(?e), "http://www.w3.org/"))
+      OPTIONAL { ?e skos:prefLabel ?label }
+    }
+    GROUP BY ?e
+  }
+  FILTER(?n != 1)
+  BIND(IF(?n = 0,
+          CONCAT("Term ", STR(?e), " has no skos:prefLabel."),
+          CONCAT("Term ", STR(?e), " has ", STR(?n), " skos:prefLabel values; exactly one is required.")
+       ) AS ?msg)
+}

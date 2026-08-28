@@ -189,15 +189,33 @@ def test_total_finding_count_is_small_and_accurate(registry_rows):
     gist's own ontology IRI, which carries skos:prefLabel but no
     rdfs:label). The real signal, once every one of those is fixed
     (including the tenth, EFF-002, fixed in a later session -- see this
-    file's own module docstring), is exactly 56: STR-003 (35, genuinely
+    file's own module docstring), is exactly 60: STR-003 (35, genuinely
     unconstrained gist properties, by design), STY-004 (9, real but
     mostly gist's deliberate abbreviation convention), QUA-004 (4),
-    STR-002/STR-007/STR-004 (2 each), QUA-001 (1), EFF-002 (1 -- this
-    graph is genuinely ~60% blank nodes, gist's own OWL restriction/axiom
-    style). A regression back toward hundreds of findings means one of
-    the fixed bugs came back."""
-    assert len(registry_rows) == 56, (
-        f"expected exactly 56 verified-genuine findings, got {len(registry_rows)} -- "
+    STR-002/STR-007/STR-004/QUA-010/DAT-004 (2 each), QUA-001 (1),
+    EFF-002 (1 -- this graph is genuinely ~60% blank nodes, gist's own OWL
+    restriction/axiom style). A regression back toward hundreds of
+    findings means one of the fixed bugs came back.
+
+    Was 56 before QUA-009/QUA-010/DAT-004 were added. All four new
+    findings were checked individually against the fixture and are
+    genuine, which is the bar for changing this number:
+
+    * QUA-010 x2 -- ex:hasPower and ex:hasUsablePower carry an
+      rdfs:label but no skos:definition. gist itself defines every one of
+      its ~300 terms, so none of the imported vocabulary contributes here.
+    * DAT-004 x2 -- _Magnitude_Power_90 and _Magnitude_Power_95 are typed
+      gist:Magnitude with a numeric value and no unit at all. Both are
+      real defects in the fixture, found by the new check rather than
+      introduced for it, and they are deliberately left unfixed so this
+      graph keeps exercising DAT-004.
+    * QUA-009 x0 -- gist gives every term exactly one skos:prefLabel and
+      so does the vehicle ontology, so the strictest of the three new
+      checks adds no noise at all to a real gist-based graph. That number
+      is worth watching: if it ever becomes non-zero here, either the
+      fixture regressed or QUA-009 grew a false positive."""
+    assert len(registry_rows) == 60, (
+        f"expected exactly 60 verified-genuine findings, got {len(registry_rows)} -- "
         "one of the false-positive-flood bugs this test module exists to catch may have regressed"
     )
 
@@ -348,7 +366,7 @@ def test_native_engine_matches_pyshacl_on_the_real_vehicle_gist_fixture(merged_g
     fixtures. `registry_rows` (this file's own fixture) runs `--engine
     both` (pyshacl); this reruns the same merged graph through
     `--engine native+sparql` and checks the total and per-check breakdown
-    match exactly (56/56, identical breakdown, confirmed both before and
+    match exactly (60/60, identical breakdown, confirmed both before and
     after this file's own bug #11 -- see this file's module docstring --
     was found and fixed upstream in shacl 0.1.5)."""
     from collections import Counter

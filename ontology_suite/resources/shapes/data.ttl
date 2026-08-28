@@ -3,6 +3,7 @@
 @prefix owl:  <http://www.w3.org/2002/07/owl#> .
 @prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
 @prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix gist:    <https://w3id.org/semanticarts/ns/ontology/gist/> .
 @prefix oq:   <https://semantechs.co.uk/ontology-quality/> .
 
 # ---------------------------------------------------------------------------
@@ -97,4 +98,44 @@ oq:DAT-003
         }
       }
     """ ;
+  ] .
+
+# ---------------------------------------------------------------------------
+# DAT-004: gist:Magnitude without a unit of measure.
+#
+# Native SHACL core, pinned to gist's exact namespace. Two core constraints
+# on one property shape carry the whole check:
+#
+#   sh:minCount 1  -- the magnitude has no unit link at all
+#   sh:class       -- it has one, but the target is not a unit
+#
+# Both subclass walks come free from SHACL's own semantics rather than
+# needing a property path: sh:targetClass matches SHACL instances of the
+# class, and sh:class tests them, and in both cases "instance of" is
+# defined as rdf:type/rdfs:subClassOf* -- so a project subclass of
+# gist:Magnitude is still targeted, and a subclass of gist:UnitOfMeasure
+# still satisfies the constraint.
+#
+# Pinning to <https://w3id.org/semanticarts/ns/ontology/gist/> is a
+# deliberate choice, and it is narrower than this suite's usual convention
+# of matching gist terms by local name (STR-003 does that because gist has
+# published under more than one namespace, and because the property itself
+# was renamed unitOfMeasure -> hasUnitOfMeasure at gist 12). The cost is
+# that a graph built on a pre-12 gist, or on an older gist namespace, is
+# not checked at all rather than checked and found wanting. The .rq twin is
+# pinned identically on purpose: pinning only one side would make DAT-004's
+# findings depend on --engine, and would break the
+# (check_id, focus_node, path, value) dedup key so the same finding
+# survived twice under --engine both.
+# ---------------------------------------------------------------------------
+oq:DAT-004
+  a sh:NodeShape ;
+  rdfs:label "DAT-004: gist:Magnitude without a unit of measure" ;
+  sh:targetClass gist:Magnitude ;
+  sh:property [
+    sh:path gist:hasUnitOfMeasure ;
+    sh:minCount 1 ;
+    sh:class gist:UnitOfMeasure ;
+    sh:severity sh:Violation ;
+    sh:message "A gist:Magnitude must have a gist:hasUnitOfMeasure value typed gist:UnitOfMeasure." ;
   ] .

@@ -426,9 +426,9 @@ a:focus-visible, summary:focus-visible {
   asserts, which of them are written in SPARQL and which in SHACL &mdash; and how to add your own
   to the panel without forking anything.</p>
   <div class="stats">
-    <div class="stat"><b>50</b><span>checks in the registry</span></div>
-    <div class="stat"><b>39</b><span>SPARQL formulations</span></div>
-    <div class="stat"><b>18</b><span>with a SHACL twin</span></div>
+    <div class="stat"><b>53</b><span>checks in the registry</span></div>
+    <div class="stat"><b>42</b><span>SPARQL formulations</span></div>
+    <div class="stat"><b>21</b><span>with a SHACL twin</span></div>
     <div class="stat"><b>11</b><span>native Python checks</span></div>
   </div>
 </header>
@@ -445,10 +445,10 @@ a:focus-visible, summary:focus-visible {
   <ul>
 <li><a href="#cat-structural">Structural integrity</a> <span class="toc-n">9</span></li>
 <li><a href="#cat-logical">Logical cogency</a> <span class="toc-n">7</span></li>
-<li><a href="#cat-quality">Documentation and metadata quality</a> <span class="toc-n">8</span></li>
+<li><a href="#cat-quality">Documentation and metadata quality</a> <span class="toc-n">10</span></li>
 <li><a href="#cat-efficiency">Structural and runtime efficiency</a> <span class="toc-n">3</span></li>
 <li><a href="#cat-style">Naming and style</a> <span class="toc-n">5</span></li>
-<li><a href="#cat-data">Data quality</a> <span class="toc-n">3</span></li>
+<li><a href="#cat-data">Data quality</a> <span class="toc-n">4</span></li>
 <li><a href="#cat-reasoning">Reasoning and profiles</a> <span class="toc-n">10</span></li>
 <li><a href="#cat-conformance">Conformance against a separate ontology</a> <span class="toc-n">5</span></li>
   </ul>
@@ -479,9 +479,9 @@ kinds:</p>
 <table>
 <thead><tr><th>Kind</th><th>Lives in</th><th>Count</th><th>Use when</th></tr></thead>
 <tbody>
-<tr><td><strong>Portable SPARQL</strong></td><td><code>sparql/&lt;category&gt;/&lt;id&gt;.rq</code></td><td>39</td>
+<tr><td><strong>Portable SPARQL</strong></td><td><code>sparql/&lt;category&gt;/&lt;id&gt;.rq</code></td><td>42</td>
 <td>The condition is a graph pattern over one merged graph. This is the default and covers most checks.</td></tr>
-<tr><td><strong>SHACL shape</strong></td><td><code>shapes/&lt;category&gt;.ttl</code></td><td>18</td>
+<tr><td><strong>SHACL shape</strong></td><td><code>shapes/&lt;category&gt;.ttl</code></td><td>21</td>
 <td>Always paired with a SPARQL twin, never alone &mdash; the pair exists to cross-validate.</td></tr>
 <tr><td><strong>Native Python</strong></td><td><code>reasoning/</code>, <code>dataquality/</code></td><td>11</td>
 <td>There is no single graph to pattern-match: profile membership, an external reasoner's verdict,
@@ -576,7 +576,7 @@ iterating.</p>
 
 <section class="band">
 <h2>The catalogue</h2>
-<p class="lede">All 50 checks, grouped by category. Severity is the registry default and can be
+<p class="lede">All 53 checks, grouped by category. Severity is the registry default and can be
 overridden per project; the badges say which formulations exist for each check and where to find
 them.</p>
 <section class="cat" id="cat-structural">
@@ -619,7 +619,7 @@ them.</p>
 <p class="desc">An owl:ObjectProperty or owl:DatatypeProperty declares neither rdfs:domain nor rdfs:range.</p>
 <p class="fix"><span class="fix-label">Fix</span>Add rdfs:domain and rdfs:range (or an equivalent OWL restriction) to make the property's intended usage explicit and enable stronger reasoning/validation.</p>
 <div class="check-foot"><span class="badge badge-sparql">SPARQL</span><span class="badge badge-shacl">SHACL</span></div>
-<p class="src">sparql/structural/STR-003.rq &middot; shapes/quality.ttl</p>
+<p class="src">sparql/structural/STR-003.rq &middot; shapes/data.ttl</p>
 </article>
 <article class="check sev-warning" id="STR-004">
 <header class="check-head">
@@ -788,7 +788,7 @@ them.</p>
 <section class="cat" id="cat-quality">
 <div class="cat-head">
 <h3>Documentation and metadata quality</h3>
-<p class="cat-meta"><span class="mono">quality</span> &middot; 8 checks &middot; 6 warning &middot; 2 info</p>
+<p class="cat-meta"><span class="mono">quality</span> &middot; 10 checks &middot; 8 warning &middot; 2 info</p>
 <p class="cat-blurb">Is the ontology usable by someone who did not write it? Labels, definitions, versioning and a coherent identity for the ontology as a published resource.</p>
 </div>
 <article class="check sev-warning" id="QUA-001">
@@ -886,6 +886,30 @@ them.</p>
 <p class="fix"><span class="fix-label">Fix</span>Mint the ontology IRI and versionIRI under an https:// base.</p>
 <div class="check-foot"><span class="badge badge-sparql">SPARQL</span></div>
 <p class="src">sparql/quality/QUA-008.rq</p>
+</article>
+<article class="check sev-warning" id="QUA-009">
+<header class="check-head">
+<span class="cid">QUA-009</span>
+<h4>Class or property without exactly one skos:prefLabel</h4>
+<span class="pill pill-warning">Warning</span>
+</header>
+<p class="metric">term documentation completeness</p>
+<p class="desc">A declared class or property has either no skos:prefLabel or more than one. Stricter than QUA-004, which accepts an rdfs:label instead and asks only that some label exist: this one applies to class/property declarations specifically, requires skos:prefLabel specifically, and constrains the count, because a term with several prefLabels forces any consumer rendering 'the' label of that term to choose between them arbitrarily. Anonymous class expressions (owl:Restriction and the other blank-node axiom forms) are exempt -- they are owl:Class instances that can never meaningfully carry a label.</p>
+<p class="fix"><span class="fix-label">Fix</span>Add a skos:prefLabel if the term has none; if it has several, keep the one canonical label and move the rest to skos:altLabel.</p>
+<div class="check-foot"><span class="badge badge-sparql">SPARQL</span><span class="badge badge-shacl">SHACL</span></div>
+<p class="src">sparql/quality/QUA-009.rq &middot; shapes/quality.ttl</p>
+</article>
+<article class="check sev-warning" id="QUA-010">
+<header class="check-head">
+<span class="cid">QUA-010</span>
+<h4>Class or property without a skos:definition</h4>
+<span class="pill pill-warning">Warning</span>
+</header>
+<p class="metric">term documentation completeness</p>
+<p class="desc">A declared class or property has no skos:definition. Distinct from STR-004, which asks whether a class is formally defined by an axiom (rdfs:subClassOf, owl:equivalentClass, a union/intersection/enumeration): that is a question about logic, this one is about prose, and a term can be fully axiomatised and still leave a reader unable to tell what it means. skos:definition specifically, not rdfs:comment -- a comment is a note to whoever maintains the ontology, a definition is the term's meaning.</p>
+<p class="fix"><span class="fix-label">Fix</span>Add a skos:definition stating what the term means, in prose a reader outside the authoring team can act on.</p>
+<div class="check-foot"><span class="badge badge-sparql">SPARQL</span><span class="badge badge-shacl">SHACL</span></div>
+<p class="src">sparql/quality/QUA-010.rq &middot; shapes/quality.ttl</p>
 </article>
 </section>
 <section class="cat" id="cat-efficiency">
@@ -1001,7 +1025,7 @@ them.</p>
 <section class="cat" id="cat-data">
 <div class="cat-head">
 <h3>Data quality</h3>
-<p class="cat-meta"><span class="mono">data</span> &middot; 3 checks &middot; 1 violation &middot; 1 warning &middot; 1 info</p>
+<p class="cat-meta"><span class="mono">data</span> &middot; 4 checks &middot; 2 violation &middot; 1 warning &middot; 1 info</p>
 <p class="cat-blurb">Checks that examine literal values and references in a populated graph, rather than the schema that governs them.</p>
 </div>
 <article class="check sev-violation" id="DAT-001">
@@ -1039,6 +1063,18 @@ them.</p>
 <p class="fix"><span class="fix-label">Fix</span>De-duplicate the repeated literal values; if intentional (e.g. multiple language variants), differentiate with language tags instead of duplicating.</p>
 <div class="check-foot"><span class="badge badge-sparql">SPARQL</span><span class="badge badge-shacl">SHACL</span></div>
 <p class="src">sparql/data/DAT-003.rq &middot; shapes/data.ttl</p>
+</article>
+<article class="check sev-violation" id="DAT-004">
+<header class="check-head">
+<span class="cid">DAT-004</span>
+<h4>gist:Magnitude without a unit of measure</h4>
+<span class="pill pill-violation">Violation</span>
+</header>
+<p class="metric">quantity completeness</p>
+<p class="desc">An entity that is a SHACL instance of gist:Magnitude (the class itself or any rdfs:subClassOf* descendant) has no gist:hasUnitOfMeasure value, or has one whose target is not a gist:UnitOfMeasure. A magnitude without a unit is not a quantity: '221.78' is not a length, and the omission stays invisible until someone tries to compare or convert two of them. Pinned to gist's exact namespace (https://w3id.org/semanticarts/ns/ontology/gist/) in both the SHACL and SPARQL formulations, which is narrower than this suite's usual local-name matching of gist terms: a graph built on a pre-gist-12 vocabulary, where the property was named gist:unitOfMeasure rather than gist:hasUnitOfMeasure, is not checked rather than checked and found wanting.</p>
+<p class="fix"><span class="fix-label">Fix</span>Add a gist:hasUnitOfMeasure link from the magnitude to an instance typed gist:UnitOfMeasure; if the link is already present, check its target is declared a unit rather than an aspect or an untyped IRI. If the graph uses gist's pre-12 gist:unitOfMeasure spelling, widen the path in both shapes/data.ttl and sparql/data/DAT-004.rq together.</p>
+<div class="check-foot"><span class="badge badge-sparql">SPARQL</span><span class="badge badge-shacl">SHACL</span></div>
+<p class="src">sparql/data/DAT-004.rq &middot; shapes/data.ttl</p>
 </article>
 </section>
 <section class="cat" id="cat-reasoning">
