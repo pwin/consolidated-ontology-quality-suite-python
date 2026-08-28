@@ -129,8 +129,21 @@ jobs:
             echo "Published to PyPI as [\`ontology-quality-suite==$VERSION\`](https://pypi.org/project/ontology-quality-suite/$VERSION/)."
           } > release-notes.md
 
+          # docs/check-registry.html rides along as a release asset. It is a
+          # single self-contained page (its only external reference is Google
+          # Fonts), so a reader can open it straight from the Releases page --
+          # which is the point: the people who most need "what does this suite
+          # check, and how do I add my own" are the ones least likely to be
+          # unpacking an sdist to find it. Guarded rather than assumed, so an
+          # older tag built before the page existed still releases cleanly.
+          ASSETS=()
+          if [ -f docs/check-registry.html ]; then
+            ASSETS+=("docs/check-registry.html#Check registry (self-contained HTML)")
+          fi
+
           gh release create "$TAG" \
             --title "$TITLE" \
             --notes-file release-notes.md \
             --verify-tag \
-            --latest
+            --latest \
+            "${ASSETS[@]}"
