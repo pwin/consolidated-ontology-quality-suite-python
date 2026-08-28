@@ -25,6 +25,7 @@ CATEGORY_TITLES = {
     "data": "Data quality",
     "reasoning": "Reasoning (OWL2 profile & consistency)",
     "conformance": "Ontology conformance (data/sketch vs. declarations)",
+    "tarql": "TARQL query consistency (query source, not a graph)",
 }
 
 

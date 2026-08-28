@@ -30,9 +30,12 @@ undefined terms, structural patterns, contradiction patterns, etc.
 1. **Pick an id and category.** Ids follow `<CATEGORY-PREFIX>-<NNN>`, e.g.
    `STY-006`. Categories currently in use: `structural` (STR), `logical`
    (LOG), `quality` (QUA), `efficiency` (EFF), `style` (STY), `data` (DAT),
-   `reasoning` (REA), `conformance` (CNF). Introduce a new category if the
-   check doesn't fit any of these -- just add it to `registry.json` and to
-   `CATEGORY_TITLES` in `docs/generate_checks_md.py`.
+   `reasoning` (REA), `conformance` (CNF), `tarql` (TQL). Introduce a new
+   category if the check doesn't fit any of these -- add it to
+   `registry.json`, to `CATEGORY_TITLES` in `docs/generate_checks_md.py`,
+   and to `CATEGORIES` in `docs/generate_check_registry.py` (both doc
+   generators carry their own map, and the second one fails its test if a
+   category is missing rather than silently dropping the checks in it).
 
 2. **Add an entry to `registry.json`:**
 
@@ -141,6 +144,17 @@ guards both.
 There is deliberately no dedicated "native check registry" separate from
 `registry.json` -- one registry, three ways of producing a matching
 `ResultRow`.
+
+`sketch/bind_analysis.py` is the clearest example of when this third kind is
+the *only* option rather than merely the easiest. It reviews the `BIND`
+statements across a folder of TARQL queries -- looking for one variable
+minted by structurally different expressions in different files, and for
+constructed-IRI variables used in a `CONSTRUCT` template but never bound.
+None of that is reachable from a graph pattern: `tarql_visualiser.parse_query`
+keeps only each query's prefixes and its `CONSTRUCT` template, so the `WHERE`
+clause and every `BIND` expression in it are gone before the sketch graph
+exists. A check of this kind reads the source text and returns `ResultRow`s
+directly.
 
 ## A note on testing new checks
 

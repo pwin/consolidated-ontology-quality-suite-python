@@ -64,6 +64,11 @@ def test_every_registered_check_is_implemented_somewhere():
         "REA-020", "REA-021", "REA-022",
         # dataquality/data_quality.py::conformance_to_rows
         "CNF-001", "CNF-002", "CNF-003", "CNF-004", "CNF-005",
+        # sketch/bind_analysis.py::bind_report_to_rows -- reads TARQL query
+        # source. There is no graph for a .rq/shape to match against: the
+        # sketch graph keeps only each query's CONSTRUCT template, so every
+        # BIND expression is discarded before it exists.
+        "TQL-001", "TQL-002", "TQL-003",
     }
     implemented = _sparql_ids() | _shacl_ids() | native_python_ids
     unimplemented = sorted(set(ALL_IDS) - implemented)

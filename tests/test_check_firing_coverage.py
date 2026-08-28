@@ -86,6 +86,12 @@ NOT_PRODUCED_BY_THE_REGISTRY_SUITE = {
     # reasoning/backends/external_backend.py -- an external DL reasoner's
     # output. Exercised by tests/test_external_reasoner.py.
     "REA-020", "REA-021", "REA-022",
+    # sketch/bind_analysis.py -- reads TARQL query *source*, not a graph.
+    # tarql_visualiser keeps only each query's CONSTRUCT template and
+    # discards the WHERE clause, so every BIND expression is gone before a
+    # sketch graph exists and no graph pattern can reach them. Exercised by
+    # tests/test_bind_analysis.py.
+    "TQL-001", "TQL-002", "TQL-003",
 }
 
 # Registry checks that *are* part of the SPARQL/SHACL suite and that no

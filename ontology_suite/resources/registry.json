@@ -583,6 +583,39 @@
       "remediation": "Expected for a partial batch/sketch; investigate only if this class should always be populated by a complete export.",
       "cucumber_feature": "Conformance",
       "cucumber_scenario": "Report which declared classes, if any, a graph never populates"
+    },
+    {
+      "id": "TQL-001",
+      "category": "tarql",
+      "metric": "query-set consistency",
+      "default_severity": "Warning",
+      "title": "Variable bound by structurally different expressions across queries",
+      "description": "One target variable is bound by BIND in more than one query file, using expressions that differ structurally -- compared as skeletons, with every ?var reduced to ? so that feeding the same template from a differently-named column is not reported. A structural difference means the same conceptual node is minted as two different IRIs, which does not show up as an error in either query: both are valid, both produce triples, and the two IRIs simply never join. It surfaces much later as a dangling reference or a duplicate entity, a long way from the query that caused it.",
+      "remediation": "Decide which expression is correct and use it in every file, or rename the variables so the two are not mistaken for one another.",
+      "cucumber_feature": "TARQL Query Consistency",
+      "cucumber_scenario": "A variable bound in several queries is built the same way in each"
+    },
+    {
+      "id": "TQL-002",
+      "category": "tarql",
+      "metric": "query completeness",
+      "default_severity": "Violation",
+      "title": "Constructed-IRI variable used in CONSTRUCT but never bound",
+      "description": "A variable whose name follows the constructed-IRI convention (?something_IRI) appears in a CONSTRUCT template but is never bound by a BIND nor matched in the WHERE clause. The naming convention says it is built rather than read from a CSV column, so nothing will ever bind it and every triple mentioning it is silently dropped for every input row.",
+      "remediation": "Add the missing BIND, or correct the variable name if it should read a column directly.",
+      "cucumber_feature": "TARQL Query Consistency",
+      "cucumber_scenario": "Every constructed-IRI variable used in a CONSTRUCT template is bound in its query"
+    },
+    {
+      "id": "TQL-003",
+      "category": "tarql",
+      "metric": "query completeness",
+      "default_severity": "Info",
+      "title": "CONSTRUCT variable not bound in the query",
+      "description": "A variable appears in a CONSTRUCT template but is not bound by a BIND and does not appear in the WHERE clause. This is ordinarily correct rather than a defect: TARQL binds each CSV header as a variable of the same name, so most such variables are simply columns. It is reported at Info because the only way to tell a column from a typo is to read the CSV header, which is a reviewer's judgement rather than something the query text can settle.",
+      "remediation": "Check the variable against the CSV header. If there is no such column it is a typo, and the triple is silently dropped for every row.",
+      "cucumber_feature": "TARQL Query Consistency",
+      "cucumber_scenario": "Every unbound CONSTRUCT variable corresponds to a real CSV column"
     }
   ]
 }

@@ -124,7 +124,12 @@ def test_unresolved_import_reaches_stage_warnings_without_verbose(tmp_path):
         str(queries), tmp_path / "out", ontology_path=str(main), import_dir=str(imports),
     )
 
-    assert [r.check_id for r in stage.rows] == ["CNF-001", "CNF-002"]
+    # Filtered to the conformance rows: run_sketch_stage also runs the TARQL
+    # BIND review (sketch/bind_analysis.py), whose findings have nothing to do
+    # with import resolution and would otherwise make this assertion depend on
+    # an unrelated check.
+    conformance = [r.check_id for r in stage.rows if r.check_id.startswith("CNF-")]
+    assert conformance == ["CNF-001", "CNF-002"]
     assert len(stage.warnings) == 1
     warning = stage.warnings[0]
     assert "UNRESOLVED" in warning
@@ -151,5 +156,5 @@ def test_resolved_imports_produce_no_warning_noise(tmp_path):
         str(queries), tmp_path / "out", ontology_path=str(main), import_dir=str(imports),
     )
 
-    assert stage.rows == []
+    assert [r for r in stage.rows if r.check_id.startswith("CNF-")] == []
     assert stage.warnings == []

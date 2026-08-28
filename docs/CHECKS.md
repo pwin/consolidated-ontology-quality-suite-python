@@ -1,6 +1,6 @@
 # Check catalogue
 
-Generated from `registry.json` by `docs/generate_checks_md.py` -- 53 checks across 8 categories. Do not hand-edit; re-run the generator instead.
+Generated from `registry.json` by `docs/generate_checks_md.py` -- 56 checks across 9 categories. Do not hand-edit; re-run the generator instead.
 
 ## Data quality (`data`)
 
@@ -441,3 +441,29 @@ Generated from `registry.json` by `docs/generate_checks_md.py` -- 53 checks acro
 - **Description:** The subject of a triple is never given an rdf:type anywhere in the graph.
 - **Remediation:** Declare an rdf:type for the subject, or fix the IRI if it was a typo.
 - **Cucumber:** Structural Integrity / Every subject used in the graph is typed somewhere
+
+## TARQL query consistency (query source, not a graph) (`tarql`)
+
+### `TQL-001` -- Variable bound by structurally different expressions across queries
+
+- **Default severity:** Warning
+- **Metric:** query-set consistency
+- **Description:** One target variable is bound by BIND in more than one query file, using expressions that differ structurally -- compared as skeletons, with every ?var reduced to ? so that feeding the same template from a differently-named column is not reported. A structural difference means the same conceptual node is minted as two different IRIs, which does not show up as an error in either query: both are valid, both produce triples, and the two IRIs simply never join. It surfaces much later as a dangling reference or a duplicate entity, a long way from the query that caused it.
+- **Remediation:** Decide which expression is correct and use it in every file, or rename the variables so the two are not mistaken for one another.
+- **Cucumber:** TARQL Query Consistency / A variable bound in several queries is built the same way in each
+
+### `TQL-002` -- Constructed-IRI variable used in CONSTRUCT but never bound
+
+- **Default severity:** Violation
+- **Metric:** query completeness
+- **Description:** A variable whose name follows the constructed-IRI convention (?something_IRI) appears in a CONSTRUCT template but is never bound by a BIND nor matched in the WHERE clause. The naming convention says it is built rather than read from a CSV column, so nothing will ever bind it and every triple mentioning it is silently dropped for every input row.
+- **Remediation:** Add the missing BIND, or correct the variable name if it should read a column directly.
+- **Cucumber:** TARQL Query Consistency / Every constructed-IRI variable used in a CONSTRUCT template is bound in its query
+
+### `TQL-003` -- CONSTRUCT variable not bound in the query
+
+- **Default severity:** Info
+- **Metric:** query completeness
+- **Description:** A variable appears in a CONSTRUCT template but is not bound by a BIND and does not appear in the WHERE clause. This is ordinarily correct rather than a defect: TARQL binds each CSV header as a variable of the same name, so most such variables are simply columns. It is reported at Info because the only way to tell a column from a typo is to read the CSV header, which is a reviewer's judgement rather than something the query text can settle.
+- **Remediation:** Check the variable against the CSV header. If there is no such column it is a typo, and the triple is silently dropped for every row.
+- **Cucumber:** TARQL Query Consistency / Every unbound CONSTRUCT variable corresponds to a real CSV column

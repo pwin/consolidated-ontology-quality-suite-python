@@ -1,0 +1,19 @@
+# Part of a two-query fixture for sketch/bind_analysis.py. The pair exists to
+# seed one finding per TQL check -- see tests/test_bind_analysis.py.
+#
+# This file is the "correct" half: ?road_IRI is minted here the way the
+# reviewer should expect, and lanes_to_rdf.rq then mints it differently.
+prefix ex:    <https://example.org/roads/>
+prefix exd:   <https://example.org/roads/data/>
+prefix tarql: <http://tarql.github.io/tarql#>
+prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#>
+
+CONSTRUCT {
+  ?road_IRI a ex:Road ;
+    rdfs:label ?roadname ;              # a CSV column -- SEEDS: TQL-003
+    ex:hasSurface ?surface_IRI .
+}
+WHERE {
+  BIND(tarql:expandPrefixedName(CONCAT("exd:_Road_", ?roadid)) AS ?road_IRI)
+  BIND(tarql:expandPrefixedName(CONCAT("exd:_Surface_", ?surface)) AS ?surface_IRI)
+}

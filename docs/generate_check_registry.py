@@ -67,6 +67,11 @@ CATEGORIES = [
      "The only group that compares two things rather than examining one. A data graph, or a "
      "query-shape sketch of one, is diffed against the declarations of the ontology it is "
      "supposed to conform to."),
+    ("tarql", "TARQL query consistency",
+     "The only group that reads query <em>source</em> rather than a graph. A folder of TARQL "
+     "queries is a program, and like any program it drifts: the same conceptual IRI ends up minted "
+     "two ways in two files, and nothing about either query is invalid. These findings come from "
+     "the query text, so no SPARQL or SHACL formulation of them is possible."),
 ]
 
 CLOSURE_SAFE = {"LOG-001", "LOG-002", "LOG-004", "LOG-005"}

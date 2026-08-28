@@ -38,7 +38,7 @@ from .docgen import class_diagrams as class_diagrams_module
 from .ontologyeval import ontology_evaluation
 from .reasoning import consistency, profile
 from .reasoning.sampling import sample_graph
-from .sketch import graph_quality, ontology_quality, prefix_alignment, tarql_visualiser
+from .sketch import bind_analysis, graph_quality, ontology_quality, prefix_alignment, tarql_visualiser
 from .triplify import discovery, oxigen
 
 
@@ -479,6 +479,18 @@ def run_sketch_stage(
         conformance = data_quality.check_conformance(declarations, sketch_graph)
         rows = data_quality.conformance_to_rows(conformance, "sketch")
 
+    # The BIND review reads the query *text*, not the sketch graph, so it runs
+    # whether or not an --ontology was given -- it is the one part of this
+    # stage that needs nothing but the queries themselves. It also cannot be
+    # expressed as a registry SPARQL/SHACL check at all: `visualise_folder`
+    # above keeps only each query's CONSTRUCT template, discarding the WHERE
+    # clause and with it every BIND expression, before the sketch graph
+    # exists. See sketch/bind_analysis.py.
+    bind_report = bind_analysis.analyse([str(p) for p in used_queries])
+    rows += bind_analysis.bind_report_to_rows(bind_report)
+    bind_report_path = out_dir / "bind-review.txt"
+    _write_text(bind_report_path, bind_analysis.format_bind_report(bind_report))
+
     return StageResult(
         name="sketch",
         rows=rows,
@@ -486,6 +498,8 @@ def run_sketch_stage(
         artifacts={
             "sketch_path": sketch_path,
             "used_queries": used_queries,
+            "bind_report": bind_report,
+            "bind_report_path": bind_report_path,
             "ignored_legend_triples": ignored_count,
             "graph_metrics": graph_metrics,
             "schema_metrics": schema_metrics,

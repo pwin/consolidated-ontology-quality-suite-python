@@ -1,0 +1,22 @@
+# Second half of the bind_analysis fixture -- see roads_to_rdf.rq.
+prefix ex:    <https://example.org/roads/>
+prefix exd:   <https://example.org/roads/data/>
+prefix tarql: <http://tarql.github.io/tarql#>
+prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#>
+
+CONSTRUCT {
+  ?lane_IRI a ex:Lane ;
+    ex:partOf ?road_IRI ;
+    ex:hasDirection ?direction_IRI .    # SEEDS: TQL-002 -- never bound below
+}
+WHERE {
+  BIND(tarql:expandPrefixedName(CONCAT("exd:_Lane_", ?laneid)) AS ?lane_IRI)
+  # SEEDS: TQL-001 -- ?road_IRI is minted here with a REPLACE() that
+  # roads_to_rdf.rq does not apply, so the two files produce different IRIs
+  # for the same road whenever ?roadid contains a space.
+  BIND(tarql:expandPrefixedName(CONCAT("exd:_Road_", REPLACE(?roadid, " ", "_"))) AS ?road_IRI)
+  # Bound from a differently-named column but with an identical template:
+  # deliberately NOT a TQL-001 finding, which is what pins skeleton
+  # comparison rather than raw-text comparison.
+  BIND(tarql:expandPrefixedName(CONCAT("exd:_Surface_", ?surfacename)) AS ?surface_IRI)
+}

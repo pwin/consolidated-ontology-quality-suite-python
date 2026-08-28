@@ -399,7 +399,10 @@ def cmd_sketch(args) -> int:
         import_dir=args.import_dir, exclude_imports=args.exclude_imports, allow_network=args.allow_network,
         verbose=args.verbose,
     )
-    artifacts = [("sketch.ttl", stage.artifacts["sketch_path"])]
+    artifacts = [
+        ("sketch.ttl", stage.artifacts["sketch_path"]),
+        ("bind-review.txt", stage.artifacts["bind_report_path"]),
+    ]
     _write_reports(stage.rows, registry, out_dir, "TARQL/oxi-gen Sketch Report", artifacts)
     counts = _print_summary(stage.rows, out_dir, stage.warnings)
     gm = stage.artifacts["graph_metrics"]
@@ -661,7 +664,10 @@ def cmd_run(args) -> int:
         )
         rows += stage.rows
         warnings += stage.warnings
-        artifacts += [("sketch.ttl", stage.artifacts["sketch_path"])]
+        artifacts += [
+            ("sketch.ttl", stage.artifacts["sketch_path"]),
+            ("bind-review.txt", stage.artifacts["bind_report_path"]),
+        ]
 
     triplified_paths: List[str] = []
     if args.csv_dir and args.queries:
