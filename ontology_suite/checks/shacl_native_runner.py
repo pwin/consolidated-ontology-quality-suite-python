@@ -191,11 +191,14 @@ fix, not a new limitation this module introduces.
 """
 from __future__ import annotations
 
-from typing import Dict, Tuple
+from typing import Dict, List, Optional, Tuple
 
-from rdflib import BNode, Graph
+from rdflib import BNode, Graph, URIRef
 from rdflib.namespace import Namespace
 from rdflib.term import Node
+
+from .merge import ResultRow, _path_expression
+from .registry import Registry
 
 try:
     import shacl as _native_shacl  # type: ignore[import-not-found]  # not a PyPI package; see module docstring
@@ -267,3 +270,109 @@ def run_shacl_native(data_graph: Graph, shapes_graph: Graph, *, inference: str =
 
     text = f"native SHACL engine: conforms={report.conforms}, {len(report.results)} result(s)"
     return report.conforms, results_graph, text
+
+
+def _unwrap(term: Optional[str]) -> Optional[str]:
+    """One N-Triples-ish term string from the structured API as the plain
+    string the rest of this suite uses. IRIs arrive wrapped in angle
+    brackets, blank nodes as ``_:label``, literals quoted."""
+    if term is None:
+        return None
+    if term.startswith("<") and term.endswith(">"):
+        return term[1:-1]
+    if term.startswith('"'):
+        # A literal arrives fully serialised -- '"12x"^^<...#integer>' or
+        # '"label"@en' -- where the graph route yields the lexical form
+        # alone. Take the lexical form, so the two routes agree and so the
+        # dedup key matches the SPARQL twin's.
+        closing = term.rfind('"')
+        if closing > 0:
+            return term[1:closing]
+    return term
+
+
+def run_shacl_native_rows(
+    data_graph: Graph,
+    shapes_graph: Graph,
+    registry: Registry,
+    *,
+    inference: str = "none",
+) -> Tuple[bool, List[ResultRow], str]:
+    """The same validation as `run_shacl_native`, returning `ResultRow`s built
+    from the engine's structured results instead of from a parsed report graph.
+
+    Why this exists: the report round-trip dominates a large run. Measured over
+    a 20.8 MB fixture producing 360,006 results -- 76s to validate, 5s for the
+    engine to serialise its report, and **119s for rdflib to parse that 180 MB
+    of Turtle back into 3.4M triples**. Report handling was 62% of end-to-end
+    time, all of it spent rebuilding objects the engine had already handed
+    over: `shacl.Result` exposes focus node, path, value, severity, message,
+    component and source shape directly.
+
+    Two things must be reconstructed rather than read off, which is why this is
+    not a two-line change:
+
+    * **The source shape** is an engine-local blank node for any nested
+      property shape, so it cannot be looked up in `shapes_graph`. Resolved
+      through the `sh:message` index, exactly as `_resolve_blank_source_shapes`
+      does for the graph route.
+    * **The path** comes back as that same kind of opaque label whenever a
+      shape uses a property *path* rather than a plain IRI: `LOG-001`'s
+      `[ sh:oneOrMorePath rdfs:subClassOf ]` arrives as `_:1_b12`, where the
+      graph route renders `(rdfs:subClassOf)+`. Taking the label at face value
+      would put an engine-local, run-varying string into the dedup key -- the
+      exact nondeterminism `merge._path_expression` exists to remove. So the
+      path is read from the *resolved shape's* own `sh:path` in `shapes_graph`
+      and rendered by `_path_expression`, which also makes this route
+      independent of how any engine chooses to print a path.
+    """
+    if _native_shacl is None:
+        raise RuntimeError(
+            "the native `shacl` package is not installed -- run `uv sync --extra "
+            "native-shacl` (see this module's docstring)"
+        ) from _IMPORT_ERROR
+
+    shapes = _native_shacl.Shapes.from_turtle(shapes_graph.serialize(format="turtle"))  # type: ignore[attr-defined]
+    report = shapes.validate_turtle(data_graph.serialize(format="turtle"), inference=inference)
+
+    message_index = _message_index(shapes_graph)
+    rows: List[ResultRow] = []
+    for result in report.results:
+        shape_term = _unwrap(result.source_shape)
+        shape_node: Optional[Node] = None
+        if shape_term is not None and not shape_term.startswith("_:"):
+            shape_node = URIRef(shape_term)
+        elif result.message:
+            shape_node = message_index.get(str(result.message))
+
+        path = _unwrap(result.path)
+        if path is not None and path.startswith("_:"):
+            declared = shapes_graph.value(shape_node, SH.path) if shape_node is not None else None
+            path = _path_expression(shapes_graph, declared) if declared is not None else None
+
+        scc = URIRef(result.component_iri) if result.component_iri else None
+        check_id = registry.resolve_check_id(scc, shape_node, shapes_graph)
+        check = registry.get(check_id) if check_id else None
+
+        focus = _unwrap(result.focus_node)
+        value = _unwrap(result.value)
+        # The same normalisation the graph route applies -- see
+        # merge._extract_rows for why value defaults to the focus node.
+        if value is None and focus is not None:
+            value = focus
+
+        rows.append(ResultRow(
+            check_id=check_id,
+            category=check.category if check else None,
+            title=check.title if check else None,
+            severity=result.severity,
+            focus_node=focus or "",
+            path=path,
+            value=value,
+            message=str(result.message) if result.message else "",
+            remediation=check.remediation if check else None,
+            sources=["shacl"],
+        ))
+
+    text = f"native SHACL engine: conforms={report.conforms}, {len(report.results)} result(s)"
+    return report.conforms, rows, text

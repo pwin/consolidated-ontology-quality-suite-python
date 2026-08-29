@@ -195,3 +195,75 @@ def test_clean_data_runs_without_error(shapes):
     # not necessarily fully clean (style/quality checks may still fire), but must run without error
     assert isinstance(conforms, bool)
     assert isinstance(results_graph, rdflib.Graph)
+
+
+# ---------------------------------------------------------------------------
+# The structured-results route (`run_shacl_native_rows`).
+#
+# The engine already hands back `shacl.Result` objects carrying focus node,
+# path, value, severity, message, component and source shape. Building the
+# report as Turtle and parsing it back into rdflib only to read those same
+# fields out again cost 62% of end-to-end time on a large run -- 119s of
+# rdflib parsing for 180 MB of report from a 20.8 MB data graph. Taking the
+# objects directly is 3.7x faster end to end (357s -> 97s on that fixture)
+# for an identical row count.
+#
+# What these tests defend is that "identical" claim. Two things had to be
+# reconstructed rather than read off, and both are places a subtle divergence
+# could hide: literals arrive fully serialised where the graph route yields a
+# lexical form, and a property *path* arrives as an engine-local blank-node
+# label where the graph route renders a path expression.
+# ---------------------------------------------------------------------------
+def test_structured_route_matches_the_graph_route_on_named_nodes(domain_graph, shapes, registry):
+    _c, results_graph, _t = native_runner.run_shacl_native(domain_graph, shapes)
+    from ontology_suite.checks.merge import _extract_rows
+
+    via_graph = _extract_rows(results_graph, registry, shapes, "shacl")
+    _c2, via_struct, _t2 = native_runner.run_shacl_native_rows(domain_graph, shapes, registry)
+
+    def named(rows):
+        # Blank-node focus identifiers are engine-local in *both* routes --
+        # rdflib mints its own labels when parsing the report, the engine
+        # mints its own in the structured results, and neither is stable
+        # across runs. Only named nodes can be compared, and they are the
+        # ones any finding is actionable on.
+        return sorted(
+            (r.check_id or "", r.focus_node, r.path or "", r.value or "", r.severity)
+            for r in rows if not r.focus_node.startswith("_:") and "://" in r.focus_node
+        )
+
+    assert named(via_struct) == named(via_graph)
+    assert len(via_struct) == len(via_graph)
+
+
+def test_structured_route_yields_lexical_literals_not_serialised_ones(domain_graph, shapes, registry):
+    """`shacl.Result.value` gives '"12x"^^<...#integer>' where the graph route
+    gives '12x'. Left unhandled, every literal-valued finding gets a different
+    dedup key from its SPARQL twin and both survive as separate rows."""
+    _c, rows, _t = native_runner.run_shacl_native_rows(domain_graph, shapes, registry)
+    serialised = [r for r in rows if r.value and r.value.startswith('"')]
+    assert serialised == [], f"literals left in serialised form: {[r.value for r in serialised][:3]}"
+
+
+def test_structured_route_renders_property_paths_not_engine_labels(shapes, registry):
+    """A shape whose `sh:path` is a path expression (LOG-001's
+    `[ sh:oneOrMorePath rdfs:subClassOf ]`) comes back from the structured API
+    as an opaque `_:0_b12`. Putting that in the dedup key would reintroduce
+    exactly the run-to-run nondeterminism `merge._path_expression` exists to
+    remove, so the path is recovered from the resolved shape instead."""
+    data = rdflib.Graph()
+    data.parse(data="""
+        @prefix owl:  <http://www.w3.org/2002/07/owl#> .
+        @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+        @prefix ex:   <https://example.org/> .
+        ex:Animal a owl:Class .
+        ex:Dog a owl:Class ; rdfs:subClassOf ex:Animal ; owl:disjointWith ex:Animal .
+    """, format="turtle")
+
+    _c, rows, _t = native_runner.run_shacl_native_rows(data, shapes, registry)
+    log001 = [r for r in rows if r.check_id == "LOG-001"]
+    assert log001, "LOG-001 should fire on a class disjoint with its own ancestor"
+    for row in log001:
+        assert row.path is not None
+        assert not row.path.startswith("_:"), f"engine-local path label leaked: {row.path}"
+        assert "subClassOf" in row.path

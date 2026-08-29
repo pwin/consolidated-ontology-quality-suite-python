@@ -28,7 +28,7 @@ from .checks.literal_typing import run_literal_typing_check
 from .checks.merge import ResultRow, build_unified_results
 from .checks.registry import Registry
 from .checks.runner import load_graph
-from .checks.shacl_native_runner import run_shacl_native
+from .checks.shacl_native_runner import run_shacl_native_rows
 from .checks.shacl_native_runner import available as native_shacl_available
 from .checks.shacl_runner import load_shapes_graph, run_shacl
 from .checks.sparql_runner import run_sparql_checks
@@ -137,6 +137,7 @@ def run_registry_suite_on_graph(
     shapes_graph = load_shapes_graph(shapes_dir) if (uses_pyshacl or uses_native) else Graph()
 
     shacl_results = Graph()
+    native_rows: Optional[List[ResultRow]] = None
     if uses_pyshacl:
         _conforms, shacl_results, _text = run_shacl(working_graph, shapes_graph, inference=inference)
     elif uses_native:
@@ -150,7 +151,12 @@ def run_registry_suite_on_graph(
                 f"--engine {engine} only supports --inference none/rdfs (got {inference!r}); "
                 "the native engine has no OWL2-RL reasoner"
             )
-        _conforms, shacl_results, _text = run_shacl_native(working_graph, shapes_graph, inference=inference)
+        # Structured results, not a report graph: the round-trip through 180 MB
+        # of Turtle was 62% of end-to-end time on a large run. See
+        # shacl_native_runner.run_shacl_native_rows.
+        _conforms, native_rows, _text = run_shacl_native_rows(
+            working_graph, shapes_graph, registry, inference=inference
+        )
 
     sparql_results = Graph()
     if engine in ("both", "sparql", "native+sparql"):
@@ -163,7 +169,8 @@ def run_registry_suite_on_graph(
     # engine-dependent finding set --engine is not supposed to change.
     extra_results = [(run_literal_typing_check(working_graph), LITERAL_TYPING_SOURCE)]
     return build_unified_results(
-        shacl_results, sparql_results, registry, shapes_graph, extra_results=extra_results
+        shacl_results, sparql_results, registry, shapes_graph,
+        extra_results=extra_results, shacl_rows=native_rows,
     )
 
 

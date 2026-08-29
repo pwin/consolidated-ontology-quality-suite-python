@@ -184,6 +184,7 @@ def build_unified_results(
     registry: Registry,
     shapes_graph: Optional[Graph] = None,
     extra_results: Optional[Sequence[Tuple[Graph, str]]] = None,
+    shacl_rows: Optional[List[ResultRow]] = None,
 ) -> List[ResultRow]:
     """``extra_results`` takes ``(results_graph, source_label)`` pairs for
     findings produced by neither engine -- currently only
@@ -192,7 +193,13 @@ def build_unified_results(
     everything else, so a finding both a portable formulation and a
     supplement report stays one row with both labels in ``sources``, and is
     listed last so an engine-produced row keeps its own message."""
-    shacl_rows = _extract_rows(shacl_results_graph, registry, shapes_graph, "shacl")
+    # ``shacl_rows`` lets a caller hand over rows it already has, skipping the
+    # results-graph round-trip entirely -- the native engine's structured
+    # results take that path (see shacl_native_runner.run_shacl_native_rows,
+    # and the measurement in its docstring for why). The graph route stays the
+    # default so pyshacl, which only reports as RDF, is unaffected.
+    if shacl_rows is None:
+        shacl_rows = _extract_rows(shacl_results_graph, registry, shapes_graph, "shacl")
     sparql_rows = _extract_rows(sparql_results_graph, registry, None, "sparql")
     extra_rows = [
         row
