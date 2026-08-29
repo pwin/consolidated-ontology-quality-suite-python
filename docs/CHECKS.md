@@ -244,13 +244,13 @@ Generated from `registry.json` by `docs/generate_checks_md.py` -- 56 checks acro
 - **Remediation:** Mint the ontology IRI and versionIRI under an https:// base.
 - **Cucumber:** Documentation Quality / The ontology's identifying and version IRIs use the https:// scheme
 
-### `QUA-009` -- Class or property without exactly one skos:prefLabel
+### `QUA-009` -- Class or property without one skos:prefLabel per language
 
 - **Default severity:** Warning
 - **Metric:** term documentation completeness
-- **Description:** A declared class or property has either no skos:prefLabel or more than one. Stricter than QUA-004, which accepts an rdfs:label instead and asks only that some label exist: this one applies to class/property declarations specifically, requires skos:prefLabel specifically, and constrains the count, because a term with several prefLabels forces any consumer rendering 'the' label of that term to choose between them arbitrarily. Anonymous class expressions (owl:Restriction and the other blank-node axiom forms) are exempt -- they are owl:Class instances that can never meaningfully carry a label.
-- **Remediation:** Add a skos:prefLabel if the term has none; if it has several, keep the one canonical label and move the rest to skos:altLabel.
-- **Cucumber:** Documentation Quality / Every class and property definition carries exactly one skos:prefLabel
+- **Description:** A declared class or property has no skos:prefLabel, or has more than one for a single language. Not 'exactly one' outright: SKOS defines prefLabel as unique per language tag, so a bilingual ontology carrying "Road"@en and "Ffordd"@cy is correct and flagging it would be wrong about SKOS rather than strict about it. An untagged literal counts as its own language -- RDF 1.1 gives it the datatype xsd:string and no tag, so 'the unlocalised label' is a real slot with room for one value. That case needs stating because SHACL's own sh:uniqueLang ignores untagged values, and untagged is how gist-based ontologies label everything. Stricter and narrower than QUA-004, which accepts an rdfs:label instead and only asks that some label exist. Anonymous class expressions are exempt: they are owl:Class instances that can never carry a label.
+- **Remediation:** Add a skos:prefLabel if the term has none. If it has several sharing one language (including several with no language tag at all), keep the canonical one for that language and move the rest to skos:altLabel.
+- **Cucumber:** Documentation Quality / Every class and property definition carries one skos:prefLabel per language
 
 ### `QUA-010` -- Class or property without a skos:definition
 

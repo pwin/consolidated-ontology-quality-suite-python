@@ -6,21 +6,32 @@ PREFIX sh: <http://www.w3.org/ns/shacl#>
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 PREFIX oq: <https://semantechs.co.uk/ontology-quality/>
 
-# QUA-009: Class or property definition without exactly one skos:prefLabel.
+# QUA-009: Class or property definition without exactly one skos:prefLabel
+# per language.
 #
-# Stricter and narrower than QUA-004, which asks only that *some* resource
-# carry *either* a skos:prefLabel or an rdfs:label. This one applies to
-# declared classes and properties specifically, requires skos:prefLabel
-# specifically, and constrains the count: a term with three prefLabels is
-# as much a defect as one with none, because downstream tooling that
-# renders "the" label of a term then picks arbitrarily between them.
+# Not "exactly one, full stop". SKOS itself defines prefLabel as unique *per
+# language tag*, so a bilingual ontology carrying "Road"@en and "Ffordd"@cy
+# is correct, and a check that flagged it would be wrong about SKOS rather
+# than strict about it. The rule enforced here is: at least one prefLabel,
+# and no more than one for any given language.
 #
-# Blank nodes are excluded deliberately. Every anonymous class expression
-# -- owl:Restriction, unionOf/intersectionOf members -- is an owl:Class,
-# and none of them can meaningfully carry a label. Omitting this filter is
-# a mistake this suite has made twice before (STR-001's owl:Restriction
-# flood, QUA-001's SHACL rewrite), both times producing findings that
-# outnumbered the real ones.
+# An untagged literal counts as its own language. RDF 1.1 gives a plain
+# literal the datatype xsd:string and no language tag, so "the unlocalised
+# label" is a real, distinct slot and there can only be one of it. This
+# matters more than it sounds for gist-based ontologies, which label
+# everything with untagged `"Event"^^xsd:string` -- SHACL's own
+# sh:uniqueLang ignores untagged values entirely (verified against both
+# pyshacl and the native engine), so the twin shape pairs it with a
+# qualified cardinality on xsd:string to cover exactly this case. Without
+# that, the commonest duplicate-label shape in the ontologies this suite is
+# aimed at would pass both engines silently.
+#
+# Blank nodes are excluded deliberately. Every anonymous class expression --
+# owl:Restriction, unionOf/intersectionOf members -- is an owl:Class, and
+# none of them can meaningfully carry a label. Omitting this filter is a
+# mistake this suite has made twice before (STR-001's owl:Restriction flood,
+# QUA-001's SHACL rewrite), both times producing findings that outnumbered
+# the real ones.
 CONSTRUCT {
   _:r a sh:ValidationResult ;
     sh:resultSeverity sh:Warning ;
@@ -31,26 +42,50 @@ CONSTRUCT {
 }
 WHERE {
   {
-    SELECT ?e (COUNT(DISTINCT ?label) AS ?n)
-    WHERE {
-      {
-        { ?e a owl:Class } UNION { ?e a rdfs:Class } UNION
-        { ?e a owl:ObjectProperty } UNION { ?e a owl:DatatypeProperty } UNION
-        { ?e a owl:AnnotationProperty } UNION { ?e a rdf:Property }
-      }
-      FILTER(isIRI(?e))
-      # The RDF/RDFS/OWL/SKOS built-ins are not this ontology's terms to
-      # document, and a graph that merely mentions `owl:Thing a owl:Class`
-      # is not thereby responsible for labelling it -- same exemption
-      # QUA-004 already applies for the identical reason.
-      FILTER(!STRSTARTS(STR(?e), "http://www.w3.org/"))
-      OPTIONAL { ?e skos:prefLabel ?label }
-    }
-    GROUP BY ?e
+    { ?e a owl:Class } UNION { ?e a rdfs:Class } UNION
+    { ?e a owl:ObjectProperty } UNION { ?e a owl:DatatypeProperty } UNION
+    { ?e a owl:AnnotationProperty } UNION { ?e a rdf:Property }
   }
-  FILTER(?n != 1)
-  BIND(IF(?n = 0,
-          CONCAT("Term ", STR(?e), " has no skos:prefLabel."),
-          CONCAT("Term ", STR(?e), " has ", STR(?n), " skos:prefLabel values; exactly one is required.")
-       ) AS ?msg)
+  FILTER(isIRI(?e))
+  # The RDF/RDFS/OWL/SKOS built-ins are not this ontology's terms to
+  # document, and a graph that merely mentions `owl:Thing a owl:Class` is not
+  # thereby responsible for labelling it -- the same exemption QUA-004
+  # already applies for the identical reason.
+  FILTER(!STRSTARTS(STR(?e), "http://www.w3.org/"))
+  {
+    # sh:minCount 1 -- no prefLabel in any language.
+    #
+    # `?e a ?anyType` is not redundant with the target pattern above: a UNION
+    # branch is evaluated on its own solution mapping before being joined, so
+    # a branch containing only FILTER and BIND sees ?e unbound, STR(?e)
+    # errors, and ?msg comes out unbound -- the finding still fires (?e
+    # arrives from the join) but carries an empty message. Caught by
+    # tests/test_qua009_pref_label_cardinality.py, and it is the same shape
+    # as the DAT-001 bug where a UNION of bare FILTERs matched nothing at all.
+    ?e a ?anyType .
+    FILTER NOT EXISTS { ?e skos:prefLabel [] }
+    BIND(CONCAT("Term ", STR(?e), " has no skos:prefLabel.") AS ?msg)
+  }
+  UNION
+  {
+    # sh:uniqueLang / the qualified xsd:string cardinality -- more than one
+    # prefLabel sharing a language. LANG() returns "" for an untagged
+    # literal, which is what makes untagged its own slot here rather than a
+    # blind spot.
+    {
+      SELECT ?e ?tag (COUNT(?label) AS ?n)
+      WHERE {
+        ?e skos:prefLabel ?label .
+        BIND(LANG(?label) AS ?tag)
+      }
+      GROUP BY ?e ?tag
+      HAVING (COUNT(?label) > 1)
+    }
+    BIND(IF(?tag = "",
+            CONCAT("Term ", STR(?e), " has ", STR(?n),
+                   " untagged skos:prefLabel values; at most one is allowed per language."),
+            CONCAT("Term ", STR(?e), " has ", STR(?n), " skos:prefLabel values tagged @",
+                   ?tag, "; at most one is allowed per language.")
+         ) AS ?msg)
+  }
 }

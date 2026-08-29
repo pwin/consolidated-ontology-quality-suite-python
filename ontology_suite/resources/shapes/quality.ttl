@@ -2,6 +2,7 @@
 @prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix owl:     <http://www.w3.org/2002/07/owl#> .
 @prefix sh:      <http://www.w3.org/ns/shacl#> .
+@prefix xsd:     <http://www.w3.org/2001/XMLSchema#> .
 @prefix skos:    <http://www.w3.org/2004/02/skos/core#> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix oq:      <https://semantechs.co.uk/ontology-quality/> .
@@ -122,29 +123,33 @@ oq:QUA-003
   ] .
 
 # ---------------------------------------------------------------------------
-# QUA-009: Class or property definition without exactly one skos:prefLabel.
+# QUA-009: Class or property definition without exactly one skos:prefLabel
+# per language.
 #
-# Native SHACL core (sh:minCount + sh:maxCount on a nested sh:property),
-# not sh:sparql. The cardinality maps onto core exactly, and using a
-# genuinely different mechanism from the .rq twin is what makes the
-# cross-engine comparison worth running -- two copies of the same SPARQL
-# agree even when both are wrong.
+# Native SHACL core, three constraints on one property shape:
 #
-# The nested `sh:property [ ... ]` reports its own blank node as
-# sh:sourceShape, one level below the oq:QUA-009 node this id is resolved
-# from; registry.py::resolve_check_id walks up through sh:property for
-# exactly this shape (step 4). That walk does *not* go a further level
-# through sh:or, which is why QUA-001 above had to use sh:sparql instead --
-# a plain property shape like this one is inside what it handles.
+#   sh:minCount 1                      at least one prefLabel
+#   sh:uniqueLang true                 no two sharing a language tag
+#   sh:qualifiedValueShape/MaxCount    at most one *untagged* value
 #
-# Both constraints report sh:resultPath skos:prefLabel and no sh:value,
-# matching what sparql/quality/QUA-009.rq constructs, so the two engines'
-# rows merge on (check_id, focus_node, path, value) rather than surviving
-# as a duplicated pair.
+# The third exists because sh:uniqueLang alone is not enough. It considers
+# only literals that carry a language tag; two untagged values do not share
+# a tag, so they pass it. Verified against pyshacl and the native engine
+# both -- and untagged is exactly how gist-based ontologies label
+# everything ("Event"^^xsd:string), so without the qualified cardinality the
+# commonest duplicate-label shape in this suite's target audience would pass
+# silently. RDF 1.1 types a plain literal as xsd:string, which is what makes
+# `sh:qualifiedValueShape [ sh:datatype xsd:string ]` select exactly the
+# untagged ones.
+#
+# All three are core rather than sh:sparql, so this cross-validates the .rq
+# twin through a genuinely different mechanism. Confirmed identical between
+# pyshacl and the native engine across the untagged-pair, same-tag-pair,
+# different-tag-pair, single and absent cases.
 # ---------------------------------------------------------------------------
 oq:QUA-009
   a sh:NodeShape ;
-  rdfs:label "QUA-009: class or property without exactly one skos:prefLabel" ;
+  rdfs:label "QUA-009: class or property without one skos:prefLabel per language" ;
   sh:target [
     a sh:SPARQLTarget ;
     sh:select """
@@ -164,9 +169,11 @@ oq:QUA-009
   sh:property [
     sh:path skos:prefLabel ;
     sh:minCount 1 ;
-    sh:maxCount 1 ;
+    sh:uniqueLang true ;
+    sh:qualifiedValueShape [ sh:datatype xsd:string ] ;
+    sh:qualifiedMaxCount 1 ;
     sh:severity sh:Warning ;
-    sh:message "Term must have exactly one skos:prefLabel." ;
+    sh:message "Term must have at least one skos:prefLabel, and at most one per language." ;
   ] .
 
 # ---------------------------------------------------------------------------

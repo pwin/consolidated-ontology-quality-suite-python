@@ -85,15 +85,34 @@ ex:Carriageway a owl:Class ;
   rdfs:label "Carriageway"@en ;
   skos:definition "The part of a road used by moving traffic."@en .
 
-# SEEDS: QUA-009 -- a property with *two* skos:prefLabel values. "One and
-# only one" is violated in the other direction: nothing is missing, but any
-# consumer rendering "the" label of this term has to choose arbitrarily.
+# SEEDS: QUA-009 -- a property with two skos:prefLabel values *in the same
+# language*. Nothing is missing; any consumer rendering "the" @en label of
+# this term has to choose between them arbitrarily.
 ex:hasCarriageway a owl:ObjectProperty ;
   rdfs:label "has carriageway"@en ;
   skos:prefLabel "has carriageway"@en , "carriageway of"@en ;
   skos:definition "Relates a road to one of its carriageways."@en ;
   rdfs:domain ex:Road ;
   rdfs:range ex:Carriageway .
+
+# SEEDS: QUA-009 -- two *untagged* prefLabels. SKOS's own sh:uniqueLang does
+# not catch this (it compares language tags, and neither of these has one),
+# so this case is what pins the qualified xsd:string cardinality in the
+# shape. It is also the commonest form of the defect in gist-based
+# ontologies, which label everything untagged.
+ex:Verge a owl:Class ;
+  rdfs:label "Verge"@en ;
+  skos:prefLabel "Verge" , "Roadside verge" ;
+  skos:definition "The strip of land beside a carriageway."@en .
+
+# Deliberately NOT a finding: two prefLabels in *different* languages is
+# exactly what SKOS permits, and flagging it would be wrong about SKOS
+# rather than strict about it. This pins the rule from the other side.
+ex:Bridge a owl:Class ;
+  rdfs:subClassOf ex:Road ;
+  rdfs:label "Bridge"@en ;
+  skos:prefLabel "Bridge"@en , "Pont"@cy ;
+  skos:definition "A structure carrying a road over an obstacle."@en .
 
 # SEEDS: QUA-010 -- a fully labelled class with no skos:definition. It also
 # has an rdfs:subClassOf axiom, so it is formally defined and STR-004 does
