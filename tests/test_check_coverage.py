@@ -70,9 +70,84 @@ def test_every_registered_check_is_implemented_somewhere():
         # BIND expression is discarded before it exists.
         "TQL-001", "TQL-002", "TQL-003",
     }
-    implemented = _sparql_ids() | _shacl_ids() | native_python_ids
+    implemented = _sparql_ids() | _shacl_ids() | native_python_ids | EXTENSION_ONLY_IDS
     unimplemented = sorted(set(ALL_IDS) - implemented)
     assert unimplemented == [], f"{unimplemented} are registered but have no known implementation"
+
+
+# Declared here, implemented in the VS Code extension
+# (consolidated_ontology_suite_webapp/src/checks/) and nowhere in this repo.
+#
+# The registry is shared data, not this package's private table -- the same
+# file ships in the extension, and `ontologySuite.checksRegistryPath` can
+# point it at a checkout of *this* repo. So an id the extension emits has to
+# be declared here too, or that configuration produces findings the registry
+# cannot name: title, severity and remediation all fall back to whatever the
+# emitting code hardcoded. That is the failure the extension had, under two
+# different ids, before its registryCoverage.test.ts was written.
+#
+# Being declared is not the same as being runnable, which is why they are
+# named here rather than folded into `native_python_ids` above: nothing in
+# this package can produce them, and a reader of registry.json deserves to
+# be able to find that out. The mirror -- the nine checks only this CLI can
+# produce -- is pinned in that repo's checks/registryCoverage.test.ts.
+EXTENSION_ONLY_IDS = {
+    # checks/vocabularyChecks.ts -- a closed-world scan of the axiom
+    # positions. Not expressible in SHACL (open-world semantics never
+    # contradict an undeclared term existing) and not worth a .rq twin,
+    # since the namespace guard that makes it usable needs the set of
+    # namespaces the graph declares anything in.
+    "VOC-001",
+    # checks/reasoningRunner.ts -- reported off the EYE closure's own
+    # contradiction reasons. This repo's reasoning tier is owlrl and does
+    # not surface either reason.
+    "REA-005", "REA-006",
+}
+
+
+def test_the_dual_formulation_set_has_not_grown_unnoticed():
+    """Every check with both formulations is either seeded into the engine
+    parity stress fixture or named as deliberately absent from it.
+
+    `tests/test_engine_parity_stress.py` is what establishes that pyshacl and
+    the native Rust engine agree *at scale* -- multiple instances of the same
+    flaw, which is where the three real engine bugs this suite has found all
+    lived. Its docstring claimed to cover "all 18 checks that have both a
+    SHACL shape and a portable SPARQL twin", and by the time anyone counted
+    there were 21: DAT-004, QUA-009 and QUA-010 had grown both formulations
+    and been added to no fixture, so the sentence had become false with
+    nothing to report it. A number written in prose cannot fail; this can.
+
+    Lives here rather than in that module because that module skips entirely
+    when the optional `shacl` package is absent, and this property holds
+    whether or not the native engine is installed.
+    """
+    from tests.test_engine_parity_stress import (
+        EXPECTED_PYSHACL_COUNTS,
+        UNSEEDED_DUAL_FORMULATION,
+    )
+
+    dual = _sparql_ids() & _shacl_ids()
+    accounted = set(EXPECTED_PYSHACL_COUNTS) | UNSEEDED_DUAL_FORMULATION
+    assert dual == accounted, (
+        f"{sorted(dual - accounted)} have both a SHACL and a SPARQL formulation but are neither "
+        "seeded into examples/checks_stress_test/ nor listed in that module's "
+        "UNSEEDED_DUAL_FORMULATION -- engine parity is unverified at scale for them, and the "
+        "module docstring's count is now wrong. "
+        f"(Listed but no longer dual-formulation: {sorted(accounted - dual)})"
+    )
+
+
+def test_extension_only_ids_are_not_implemented_here():
+    """The other direction, and the one that rots quietly: if this repo ever
+    grows an implementation for one of these, the exemption above stops being
+    true and starts hiding a real coverage claim."""
+    here = _sparql_ids() | _shacl_ids()
+    overlap = sorted(EXTENSION_ONLY_IDS & here)
+    assert overlap == [], (
+        f"{overlap} now have an implementation in this repo -- drop them from "
+        "EXTENSION_ONLY_IDS and from docs/generate_check_registry.py's EXTENSION_ONLY"
+    )
 
 
 # ---------------------------------------------------------------------------

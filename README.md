@@ -70,6 +70,15 @@ cannot drift from the suite; `tests/test_check_registry_doc.py` fails if
 the committed copy goes stale. `docs/CHECKS.md` is the terser Markdown
 reference over the same registry.
 
+`registry.json`, the shapes, the queries and the repair templates are shared
+data rather than this package's private tables: the same files ship inside the
+VS Code extension, which loads them at runtime and can be pointed at a checkout
+of this repo instead (`ontologySuite.checksRegistryPath`). So the registry
+declares every check *any* implementation produces -- three of them the CLI
+cannot run, marked as such in `docs/CHECKS.md` -- and
+`tests/test_shared_registry_parity.py` fails if the two copies stop agreeing,
+whenever a machine has both checked out.
+
 Want one continuous, realistic worked example instead of task-by-task
 fixtures? `docs/ACME_ROBOTICS_WALKTHROUGH.md` runs nearly every stage above
 against a single small org chart built on two real external vocabularies

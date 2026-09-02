@@ -34,10 +34,12 @@ from rdflib import Graph, Namespace, URIRef
 from rdflib.namespace import RDF
 
 # Must match the actual `PREFIX oq:` every shapes/*.ttl and sparql/**/*.rq
-# file in this repo uses -- registry.json's own "namespace" metadata field
-# says `https://example.org/ontology-quality/` (unused elsewhere; kept only
-# as descriptive metadata), which is *not* what's actually asserted in the
-# data. Only `resolve_check_id`'s oq:checkId lookup (step 3/4 below) needs
+# file in this repo uses. registry.json's own "namespace" metadata field now
+# carries this same IRI; for a long time it carried a different placeholder
+# in each of the two copies of the registry, and neither was the one the
+# data asserts -- harmless only because nothing reads the field, which is
+# exactly how it stayed wrong through both.
+# Only `resolve_check_id`'s oq:checkId lookup (step 3/4 below) needs
 # this to be exactly right -- the two local-name-only steps before it work
 # regardless of namespace -- but when it's wrong, that lookup silently
 # matches nothing. This was caught as a real, previously-unnoticed bug: it

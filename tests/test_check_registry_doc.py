@@ -71,8 +71,15 @@ def test_severity_and_title_come_from_the_registry(generator, registry):
 
 
 def test_headline_counts_match_the_resource_tree(generator, registry):
-    """The four numbers in the masthead are load-bearing -- they are the
-    first thing a reader takes away about the panel's shape."""
+    """The five numbers in the masthead are load-bearing -- they are the
+    first thing a reader takes away about the panel's shape.
+
+    The last two are the pair that can quietly lie. Every registered check
+    with no `.rq` file used to be counted "native Python", which was true
+    while this repo was the only implementation. It stopped being true when
+    the shared registry took on the ids only the VS Code extension can
+    produce, and nothing about the page would have looked wrong -- it would
+    simply have credited this suite with three checks it cannot run."""
     from ontology_suite import config
 
     rq_ids = {p.stem for p in config.DEFAULT_SPARQL_DIR.rglob("*.rq")}
@@ -86,8 +93,19 @@ def test_headline_counts_match_the_resource_tree(generator, registry):
         len(registry["checks"]),
         len(rq_ids),
         len(shacl_ids),
-        len(registry["checks"]) - len(rq_ids),
+        len(registry["checks"]) - len(rq_ids) - len(generator.EXTENSION_ONLY),
+        len(generator.EXTENSION_ONLY),
     ], "masthead counts disagree with registry.json / the resource tree"
+
+
+def test_extension_only_checks_are_not_advertised_as_python(generator):
+    """A check this suite cannot run must not carry the Python badge. The
+    badge is the only thing on the page that distinguishes them, since the
+    entry, the prose and the severity are shared."""
+    for cid in generator.EXTENSION_ONLY:
+        block = generator.DOC[generator.DOC.index(f'id="{cid}"'):][:1800]
+        assert "VS Code extension" in block, f"{cid} is not marked extension-only"
+        assert ">Python</span>" not in block, f"{cid} is badged as a native Python check"
 
 
 def test_page_is_self_contained(generator):

@@ -1,6 +1,8 @@
 # Check catalogue
 
-Generated from `registry.json` by `docs/generate_checks_md.py` -- 56 checks across 9 categories. Do not hand-edit; re-run the generator instead.
+Generated from `registry.json` by `docs/generate_checks_md.py` -- 59 checks across 10 categories. Do not hand-edit; re-run the generator instead.
+
+`registry.json` is shared data: the same file ships in the VS Code extension, which loads it at runtime and can be pointed at a checkout of this repo instead. So it declares every check *any* implementation produces, and the 3 the CLI cannot run are marked below.
 
 ## Data quality (`data`)
 
@@ -8,7 +10,7 @@ Generated from `registry.json` by `docs/generate_checks_md.py` -- 56 checks acro
 
 - **Default severity:** Violation
 - **Metric:** literal well-formedness
-- **Description:** A literal is not valid for its declared datatype -- either its lexical form does not match the expected pattern (checked portably for xsd:date, xsd:integer and xsd:boolean) or it does not parse into that datatype's value space at all (checked for every XSD datatype the RDF parser validates, which also covers lexically well-formed impossibilities such as "2021-02-30"^^xsd:date).
+- **Description:** A literal is not valid for its declared datatype -- either its lexical form does not match the expected pattern (checked portably for xsd:date, xsd:integer and xsd:boolean) or it does not denote a value of that datatype at all, which also covers lexically well-formed impossibilities such as "2021-02-30"^^xsd:date. How far the value-space half reaches depends on the implementation: the Python suite defers to its RDF parser and so covers every XSD datatype that parser validates, while the VS Code extension decides the value space itself and covers date, dateTime, gMonth and gDay.
 - **Remediation:** Correct the literal so its lexical form is valid for the declared datatype, or correct the declared datatype.
 - **Cucumber:** Data Quality / Typed literals are lexically valid for their datatype
 
@@ -158,16 +160,16 @@ Generated from `registry.json` by `docs/generate_checks_md.py` -- 56 checks acro
 
 - **Default severity:** Violation
 - **Metric:** ontology conformance
-- **Description:** A subject uses a property whose type (nor any ancestor) matches any of the property's declared rdfs:domain classes, in a real data graph or a CONSTRUCT-query sketch.
-- **Remediation:** Fix the subject's asserted type in the data/query, or add/relax the property's rdfs:domain in the ontology.
+- **Description:** A subject uses a property whose type (nor any ancestor) matches any of the property's declared domain classes -- rdfs:domain, or gist-style domainIncludes annotations, whichever the property uses -- in a real data graph or a CONSTRUCT-query sketch.
+- **Remediation:** Fix the subject's asserted type in the data/query, or add/relax the property's declared domain (rdfs:domain or domainIncludes) in the ontology.
 - **Cucumber:** Conformance / Every property use satisfies the property's declared rdfs:domain
 
 ### `CNF-004` -- rdfs:range violation
 
 - **Default severity:** Violation
 - **Metric:** ontology conformance
-- **Description:** A property's value (literal datatype, or resource type) doesn't match any of the property's declared rdfs:range classes/datatypes, in a real data graph or a CONSTRUCT-query sketch.
-- **Remediation:** Fix the value's type/datatype in the data/query, or add/relax the property's rdfs:range in the ontology.
+- **Description:** A property's value (literal datatype, or resource type) doesn't match any of the property's declared range classes/datatypes -- rdfs:range, or gist-style rangeIncludes annotations, whichever the property uses -- in a real data graph or a CONSTRUCT-query sketch.
+- **Remediation:** Fix the value's type/datatype in the data/query, or add/relax the property's declared range (rdfs:range or rangeIncludes) in the ontology.
 - **Cucumber:** Conformance / Every property value satisfies the property's declared rdfs:range
 
 ### `CNF-005` -- Ontology class never populated
@@ -293,6 +295,24 @@ Generated from `registry.json` by `docs/generate_checks_md.py` -- 56 checks acro
 - **Description:** After owlrl closure, an individual is typed owl:Nothing, the empty class -- a direct sign that at least one class it is typed with is unsatisfiable given the ontology's axioms.
 - **Remediation:** Pair this suite with a real OWL2 DL reasoner (see docs/REASONING.md) to identify exactly which class is unsatisfiable and why; owlrl's rule-based closure can detect that something is wrong but not always explain the minimal contradicting axiom set.
 - **Cucumber:** Reasoning / No individual is inferred to be a member of owl:Nothing
+
+### `REA-005` -- Individual both owl:sameAs and owl:differentFrom the same node
+
+- **Not available in the CLI** -- implemented in the VS Code extension only.
+- **Default severity:** Violation
+- **Metric:** logical consistency
+- **Description:** After closure, one individual is asserted (or inferred) to be both owl:sameAs and owl:differentFrom the same other individual. The two are direct contradictions: sameAs says the IRIs denote one thing, differentFrom says they denote two, and no model satisfies both. Usually an alignment merged from two sources that disagreed, and it stays invisible until something reasons over the identity links rather than reading them.
+- **Remediation:** Decide which is correct and remove the other. If the pair came from an automated alignment, the differentFrom is usually the assertion to trust and the sameAs the one to withdraw.
+- **Cucumber:** Reasoning / No individual is asserted both identical to and distinct from another
+
+### `REA-006` -- Reasoner-derived contradiction (unclassified)
+
+- **Not available in the CLI** -- implemented in the VS Code extension only.
+- **Default severity:** Violation
+- **Metric:** logical consistency
+- **Description:** The reasoning ruleset derived a contradiction it labelled with a reason this suite does not yet render specifically. Reported rather than dropped: an unrecognised reason is still a contradiction the reasoner found, and silently discarding it would be the worst of the available answers. Firing at all means the ruleset has grown a case its reader has not -- the fix is to add it, not to widen this.
+- **Remediation:** Read the message for the raw reason and the nodes involved. If this recurs, the reason needs adding to the reader in checks/reasoningRunner.ts so it reports under a specific id.
+- **Cucumber:** Reasoning / An unrecognised reasoner contradiction is still reported
 
 ### `REA-010` -- Ontology exceeds the OWL2 EL profile
 
@@ -467,3 +487,14 @@ Generated from `registry.json` by `docs/generate_checks_md.py` -- 56 checks acro
 - **Description:** A variable appears in a CONSTRUCT template but is not bound by a BIND and does not appear in the WHERE clause. This is ordinarily correct rather than a defect: TARQL binds each CSV header as a variable of the same name, so most such variables are simply columns. It is reported at Info because the only way to tell a column from a typo is to read the CSV header, which is a reviewer's judgement rather than something the query text can settle.
 - **Remediation:** Check the variable against the CSV header. If there is no such column it is a typo, and the triple is silently dropped for every row.
 - **Cucumber:** TARQL Query Consistency / Every unbound CONSTRUCT variable corresponds to a real CSV column
+
+## Vocabulary integrity (closed-world axiom references) (`vocabulary`)
+
+### `VOC-001` -- Undeclared term referenced by an axiom
+
+- **Not available in the CLI** -- implemented in the VS Code extension only.
+- **Default severity:** Warning
+- **Metric:** referential integrity of term references
+- **Description:** A term-referencing axiom points at an IRI that nothing declares. SHACL's open-world semantics never flag this: nothing *contradicts* an undeclared class existing, it is simply never asserted to. Covers the object position of rdfs:subClassOf/subPropertyOf/domain/range, owl:equivalentClass/disjointWith/inverseOf/onProperty/onClass/someValuesFrom/allValuesFrom and sh:targetClass/class/path. Deliberately NOT the rdf:type object or the predicate position, which are STR-001 and STR-002 -- reporting those here produced two findings with different ids for one defect. Scoped to namespaces this graph already declares at least one term in, so an external vocabulary that was never imported is left alone rather than flooded.
+- **Remediation:** Check the spelling against the declaring ontology, or add the missing owl:imports if the term is meant to come from elsewhere.
+- **Cucumber:** Vocabulary Integrity / Every term an axiom references is declared somewhere

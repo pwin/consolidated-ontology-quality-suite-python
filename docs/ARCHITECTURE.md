@@ -185,7 +185,9 @@ exact same ~3,300-triple fixture used above, against `shacl` v0.1.3:
 ids, zero discrepancies either direction; see `tests/test_shacl_native_runner.py`.
 A larger, denser stress fixture (`examples/checks_stress_test/`,
 `tests/test_engine_parity_stress.py`) confirms the same full parity at
-scale for all 18 checks that have both a SHACL and SPARQL formulation,
+scale for 18 of the 21 checks that have both a SHACL and SPARQL formulation
+(the three it does not seed are named in that module, and the set is pinned
+by a test so the number cannot drift again unremarked),
 including two cases (`STY-003`, many blank-node focus nodes at once;
 `STY-001`/`STY-002`, blank-node-typed anonymous class/property
 expressions) that each found a real native-engine bug, since fixed in

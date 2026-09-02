@@ -1,8 +1,16 @@
-"""Detailed pyshacl-vs-native-engine parity check for all 18 checks that
-have both a SHACL shape (resources/shapes/*.ttl) and a portable SPARQL
+"""Detailed pyshacl-vs-native-engine parity check for 18 of the 21 checks
+that have both a SHACL shape (resources/shapes/*.ttl) and a portable SPARQL
 twin (resources/sparql/**/*.rq) formulation -- the ones `--engine` actually
 lets you choose between. Skipped entirely if the optional `shacl` (native
 Rust engine) package isn't installed.
+
+It used to be all of them, and the docstring went on saying so after it
+stopped being true: three checks added later (DAT-004, QUA-009, QUA-010)
+grew both formulations without being seeded into this fixture, and nothing
+noticed, because a coverage claim in prose cannot fail.
+`test_the_dual_formulation_set_has_not_grown_unnoticed` below now states the
+same thing as an assertion, so the next one is a failing test rather than a
+sentence that quietly became wrong.
 
 `examples/checks_stress_test/` (stress-ontology.ttl + stress-data.ttl) is a
 deliberately larger, more repetitive composite fixture than
@@ -83,12 +91,10 @@ pytestmark = pytest.mark.skipif(
 
 STRESS_DIR = config.REPO_ROOT / "examples" / "checks_stress_test"
 
-# The 18 checks with both a SHACL shape and a portable SPARQL twin -- see
-# pipeline.py's run_registry_suite_on_graph docstring ("18 of 50, at last
-# count"). Expected pyshacl finding counts, confirmed against this exact
-# fixture (deterministic -- pyshacl has no known nondeterminism here,
-# unlike the unrelated, already-documented issue in some SPARQL-only
-# checks against real imported vocabularies).
+# Expected pyshacl finding counts for the checks this fixture seeds,
+# confirmed against it exactly (deterministic -- pyshacl has no known
+# nondeterminism here, unlike the unrelated, already-documented issue in
+# some SPARQL-only checks against real imported vocabularies).
 EXPECTED_PYSHACL_COUNTS = {
     "DAT-001": 2, "DAT-002": 3, "DAT-003": 3,
     "EFF-001": 4, "EFF-002": 1, "EFF-003": 2,
@@ -97,6 +103,19 @@ EXPECTED_PYSHACL_COUNTS = {
     "STR-001": 3, "STR-002": 3, "STR-003": 6,
     "STY-001": 3, "STY-002": 3, "STY-003": 65,
 }
+
+# Dual-formulation checks this fixture does not seed, so parity between the
+# two engines is unverified at scale for them. Each is covered one-instance
+# elsewhere (DAT-004 and QUA-009/QUA-010 by examples/gist_patterns/ and
+# tests/test_qua009_pref_label_cardinality.py, which runs all three engines),
+# which is what makes this a gap in *stress* coverage rather than in coverage.
+#
+# Seeding them here is not free: the fixture is shared, and the gist
+# magnitude/unit pattern and the SKOS documentation checks both report once
+# per term, so adding them shifts the counts above for unrelated checks. That
+# is a decision to take deliberately, not a line to slip into another change
+# -- which is why they are named rather than quietly absent.
+UNSEEDED_DUAL_FORMULATION = {"DAT-004", "QUA-009", "QUA-010"}
 
 
 @pytest.fixture(scope="module")

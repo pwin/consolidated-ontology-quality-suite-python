@@ -92,6 +92,15 @@ NOT_PRODUCED_BY_THE_REGISTRY_SUITE = {
     # sketch graph exists and no graph pattern can reach them. Exercised by
     # tests/test_bind_analysis.py.
     "TQL-001", "TQL-002", "TQL-003",
+    # Declared in the shared registry, implemented only in the VS Code
+    # extension (consolidated_ontology_suite_webapp/src/checks/): VOC-001 is
+    # a closed-world scan of the axiom positions, REA-005/REA-006 are
+    # contradiction reasons off that project's EYE closure, which this
+    # repo's owlrl tier does not surface. Nothing here can make them fire,
+    # by design -- the registry is shared data, and an id the extension
+    # emits has to be declared somewhere both sides can read. Pinned as an
+    # exact set in tests/test_check_coverage.py's EXTENSION_ONLY_IDS.
+    "REA-005", "REA-006", "VOC-001",
 }
 
 # Registry checks that *are* part of the SPARQL/SHACL suite and that no

@@ -67,6 +67,10 @@ CATEGORIES = [
      "The only group that compares two things rather than examining one. A data graph, or a "
      "query-shape sketch of one, is diffed against the declarations of the ontology it is "
      "supposed to conform to."),
+    ("vocabulary", "Vocabulary integrity",
+     "A closed-world reading of the axioms: an IRI an axiom points at that nothing anywhere "
+     "declares. SHACL cannot express this -- open-world semantics never contradict an undeclared "
+     "term merely existing -- so it has no shape and no query, only an implementation."),
     ("tarql", "TARQL query consistency",
      "The only group that reads query <em>source</em> rather than a graph. A folder of TARQL "
      "queries is a program, and like any program it drifts: the same conceptual IRI ends up minted "
@@ -75,6 +79,16 @@ CATEGORIES = [
 ]
 
 CLOSURE_SAFE = {"LOG-001", "LOG-002", "LOG-004", "LOG-005"}
+
+# Declared in the shared registry, implemented only in the VS Code extension
+# (consolidated_ontology_suite_webapp, src/checks/). They are in the registry
+# because the registry is the shared vocabulary across all four
+# implementations -- an id emitted by any of them and declared by none is the
+# failure this panel has already had once -- but the badge has to say so, or
+# the page reads as a promise the Python CLI does not keep. The mirror of
+# this list lives in that repo's checks/registryCoverage.test.ts, which names
+# the checks only the Python CLI can produce.
+EXTENSION_ONLY = {"REA-005", "REA-006", "VOC-001"}
 SEV_CLASS = {"Violation": "violation", "Warning": "warning", "Info": "info"}
 
 
@@ -94,7 +108,10 @@ def render_check(c):
     if shp:
         badges.append('<span class="badge badge-shacl">SHACL</span>')
     if not rq and not shp:
-        badges.append('<span class="badge badge-native">Python</span>')
+        badges.append(
+            '<span class="badge badge-native">VS Code extension</span>' if cid in EXTENSION_ONLY
+            else '<span class="badge badge-native">Python</span>'
+        )
     if cid in CLOSURE_SAFE:
         badges.append('<span class="badge badge-closure">re-run post-closure</span>')
 
@@ -151,7 +168,7 @@ toc_items = "\n".join(
 n_total = len(checks)
 n_sparql = len(rq_paths)
 n_shacl = sum(1 for c in checks if shape_file(c["id"]))
-n_native = n_total - n_sparql
+n_native = n_total - n_sparql - len(EXTENSION_ONLY)
 
 SHACL_EXAMPLE = 'oq:STR-003\n  a sh:NodeShape ;\n  rdfs:label "STR-003: property missing both domain and range" ;\n  sh:severity sh:Warning ;                 # on the shape, never on the constraint\n  sh:target [\n    a sh:SPARQLTarget ;\n    sh:select """SELECT ?this WHERE { ?this a owl:ObjectProperty }""" ;\n  ] ;\n  sh:sparql [\n    a sh:SPARQLConstraint ;\n    sh:message "{$this} declares neither domain nor range." ;\n    sh:select """SELECT $this WHERE { ... }""" ;\n  ] .'
 
@@ -587,6 +604,7 @@ a:focus-visible, summary:focus-visible {{
     <div class="stat"><b>{n_sparql}</b><span>SPARQL formulations</span></div>
     <div class="stat"><b>{n_shacl}</b><span>with a SHACL twin</span></div>
     <div class="stat"><b>{n_native}</b><span>native Python checks</span></div>
+    <div class="stat"><b>{len(EXTENSION_ONLY)}</b><span>extension-only</span></div>
   </div>
 </header>
 
@@ -761,9 +779,10 @@ a graph pattern is a SPARQL check.</p>
 <h4>Pick an id and category</h4>
 <p>Ids follow <code>&lt;PREFIX&gt;-&lt;NNN&gt;</code>. In use today: <code>STR</code> structural,
 <code>LOG</code> logical, <code>QUA</code> quality, <code>EFF</code> efficiency, <code>STY</code>
-style, <code>DAT</code> data, <code>REA</code> reasoning, <code>CNF</code> conformance. A new
-category is fine &mdash; add it to the registry and to <code>CATEGORY_TITLES</code> in
-<code>docs/generate_checks_md.py</code>.</p>
+style, <code>DAT</code> data, <code>REA</code> reasoning, <code>CNF</code> conformance,
+<code>VOC</code> vocabulary, <code>TQL</code> tarql. A new category is fine &mdash; add it to the
+registry and to <code>CATEGORIES</code> in <code>docs/generate_check_registry.py</code>, which is
+this page's generator.</p>
 </li>
 <li>
 <h4>Add the registry entry</h4>

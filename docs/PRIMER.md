@@ -66,7 +66,7 @@ need; the sections below are about *deciding* that.
 | You want to... | Run | Docs |
 |---|---|---|
 | Assess an ontology's own quality/expressivity/consistency | `ontology` | this doc §4 |
-| Run the full registry (56 checks, 9 categories) against ontology and/or data | `checks` | `CHECKS.md` |
+| Run the full registry (56 of its 59 checks; the other three are the VS Code extension's) against ontology and/or data | `checks` | `CHECKS.md` |
 | Check TARQL/oxi-gen queries against the ontology, no CSV needed | `sketch` | `TESTING_TARQL.md` |
 | Review a query folder for BIND drift and unbound variables, no ontology or CSV needed | `sketch` | `TESTING_TARQL.md` |
 | Actually produce RDF from CSV | `triplify` | this doc §5 |

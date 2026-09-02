@@ -426,10 +426,11 @@ a:focus-visible, summary:focus-visible {
   asserts, which of them are written in SPARQL and which in SHACL &mdash; and how to add your own
   to the panel without forking anything.</p>
   <div class="stats">
-    <div class="stat"><b>56</b><span>checks in the registry</span></div>
+    <div class="stat"><b>59</b><span>checks in the registry</span></div>
     <div class="stat"><b>42</b><span>SPARQL formulations</span></div>
     <div class="stat"><b>21</b><span>with a SHACL twin</span></div>
     <div class="stat"><b>14</b><span>native Python checks</span></div>
+    <div class="stat"><b>3</b><span>extension-only</span></div>
   </div>
 </header>
 
@@ -449,8 +450,9 @@ a:focus-visible, summary:focus-visible {
 <li><a href="#cat-efficiency">Structural and runtime efficiency</a> <span class="toc-n">3</span></li>
 <li><a href="#cat-style">Naming and style</a> <span class="toc-n">5</span></li>
 <li><a href="#cat-data">Data quality</a> <span class="toc-n">4</span></li>
-<li><a href="#cat-reasoning">Reasoning and profiles</a> <span class="toc-n">10</span></li>
+<li><a href="#cat-reasoning">Reasoning and profiles</a> <span class="toc-n">12</span></li>
 <li><a href="#cat-conformance">Conformance against a separate ontology</a> <span class="toc-n">5</span></li>
+<li><a href="#cat-vocabulary">Vocabulary integrity</a> <span class="toc-n">1</span></li>
 <li><a href="#cat-tarql">TARQL query consistency</a> <span class="toc-n">3</span></li>
   </ul>
   <h2>Extending</h2>
@@ -577,7 +579,7 @@ iterating.</p>
 
 <section class="band">
 <h2>The catalogue</h2>
-<p class="lede">All 56 checks, grouped by category. Severity is the registry default and can be
+<p class="lede">All 59 checks, grouped by category. Severity is the registry default and can be
 overridden per project; the badges say which formulations exist for each check and where to find
 them.</p>
 <section class="cat" id="cat-structural">
@@ -1036,7 +1038,7 @@ them.</p>
 <span class="pill pill-violation">Violation</span>
 </header>
 <p class="metric">literal well-formedness</p>
-<p class="desc">A literal is not valid for its declared datatype -- either its lexical form does not match the expected pattern (checked portably for xsd:date, xsd:integer and xsd:boolean) or it does not parse into that datatype's value space at all (checked for every XSD datatype the RDF parser validates, which also covers lexically well-formed impossibilities such as "2021-02-30"^^xsd:date).</p>
+<p class="desc">A literal is not valid for its declared datatype -- either its lexical form does not match the expected pattern (checked portably for xsd:date, xsd:integer and xsd:boolean) or it does not denote a value of that datatype at all, which also covers lexically well-formed impossibilities such as "2021-02-30"^^xsd:date. How far the value-space half reaches depends on the implementation: the Python suite defers to its RDF parser and so covers every XSD datatype that parser validates, while the VS Code extension decides the value space itself and covers date, dateTime, gMonth and gDay.</p>
 <p class="fix"><span class="fix-label">Fix</span>Correct the literal so its lexical form is valid for the declared datatype, or correct the declared datatype.</p>
 <div class="check-foot"><span class="badge badge-sparql">SPARQL</span><span class="badge badge-shacl">SHACL</span></div>
 <p class="src">sparql/data/DAT-001.rq &middot; shapes/data.ttl</p>
@@ -1081,7 +1083,7 @@ them.</p>
 <section class="cat" id="cat-reasoning">
 <div class="cat-head">
 <h3>Reasoning and profiles</h3>
-<p class="cat-meta"><span class="mono">reasoning</span> &middot; 10 checks &middot; 6 violation &middot; 4 info</p>
+<p class="cat-meta"><span class="mono">reasoning</span> &middot; 12 checks &middot; 8 violation &middot; 4 info</p>
 <p class="cat-blurb">Findings that only exist after inference, plus OWL2 profile membership and whatever a real DL reasoner adds beyond the always-on rule-based closure.</p>
 </div>
 <article class="check sev-violation" id="REA-001">
@@ -1131,6 +1133,30 @@ them.</p>
 <p class="fix"><span class="fix-label">Fix</span>Pair this suite with a real OWL2 DL reasoner (see docs/REASONING.md) to identify exactly which class is unsatisfiable and why; owlrl's rule-based closure can detect that something is wrong but not always explain the minimal contradicting axiom set.</p>
 <div class="check-foot"><span class="badge badge-sparql">SPARQL</span></div>
 <p class="src">sparql/reasoning/REA-004.rq</p>
+</article>
+<article class="check sev-violation" id="REA-005">
+<header class="check-head">
+<span class="cid">REA-005</span>
+<h4>Individual both owl:sameAs and owl:differentFrom the same node</h4>
+<span class="pill pill-violation">Violation</span>
+</header>
+<p class="metric">logical consistency</p>
+<p class="desc">After closure, one individual is asserted (or inferred) to be both owl:sameAs and owl:differentFrom the same other individual. The two are direct contradictions: sameAs says the IRIs denote one thing, differentFrom says they denote two, and no model satisfies both. Usually an alignment merged from two sources that disagreed, and it stays invisible until something reasons over the identity links rather than reading them.</p>
+<p class="fix"><span class="fix-label">Fix</span>Decide which is correct and remove the other. If the pair came from an automated alignment, the differentFrom is usually the assertion to trust and the sameAs the one to withdraw.</p>
+<div class="check-foot"><span class="badge badge-native">VS Code extension</span></div>
+<p class="src">no query file &mdash; emitted directly as a ResultRow</p>
+</article>
+<article class="check sev-violation" id="REA-006">
+<header class="check-head">
+<span class="cid">REA-006</span>
+<h4>Reasoner-derived contradiction (unclassified)</h4>
+<span class="pill pill-violation">Violation</span>
+</header>
+<p class="metric">logical consistency</p>
+<p class="desc">The reasoning ruleset derived a contradiction it labelled with a reason this suite does not yet render specifically. Reported rather than dropped: an unrecognised reason is still a contradiction the reasoner found, and silently discarding it would be the worst of the available answers. Firing at all means the ruleset has grown a case its reader has not -- the fix is to add it, not to widen this.</p>
+<p class="fix"><span class="fix-label">Fix</span>Read the message for the raw reason and the nodes involved. If this recurs, the reason needs adding to the reader in checks/reasoningRunner.ts so it reports under a specific id.</p>
+<div class="check-foot"><span class="badge badge-native">VS Code extension</span></div>
+<p class="src">no query file &mdash; emitted directly as a ResultRow</p>
 </article>
 <article class="check sev-info" id="REA-010">
 <header class="check-head">
@@ -1242,8 +1268,8 @@ them.</p>
 <span class="pill pill-violation">Violation</span>
 </header>
 <p class="metric">ontology conformance</p>
-<p class="desc">A subject uses a property whose type (nor any ancestor) matches any of the property's declared rdfs:domain classes, in a real data graph or a CONSTRUCT-query sketch.</p>
-<p class="fix"><span class="fix-label">Fix</span>Fix the subject's asserted type in the data/query, or add/relax the property's rdfs:domain in the ontology.</p>
+<p class="desc">A subject uses a property whose type (nor any ancestor) matches any of the property's declared domain classes -- rdfs:domain, or gist-style domainIncludes annotations, whichever the property uses -- in a real data graph or a CONSTRUCT-query sketch.</p>
+<p class="fix"><span class="fix-label">Fix</span>Fix the subject's asserted type in the data/query, or add/relax the property's declared domain (rdfs:domain or domainIncludes) in the ontology.</p>
 <div class="check-foot"><span class="badge badge-native">Python</span></div>
 <p class="src">no query file &mdash; emitted directly as a ResultRow</p>
 </article>
@@ -1254,8 +1280,8 @@ them.</p>
 <span class="pill pill-violation">Violation</span>
 </header>
 <p class="metric">ontology conformance</p>
-<p class="desc">A property's value (literal datatype, or resource type) doesn't match any of the property's declared rdfs:range classes/datatypes, in a real data graph or a CONSTRUCT-query sketch.</p>
-<p class="fix"><span class="fix-label">Fix</span>Fix the value's type/datatype in the data/query, or add/relax the property's rdfs:range in the ontology.</p>
+<p class="desc">A property's value (literal datatype, or resource type) doesn't match any of the property's declared range classes/datatypes -- rdfs:range, or gist-style rangeIncludes annotations, whichever the property uses -- in a real data graph or a CONSTRUCT-query sketch.</p>
+<p class="fix"><span class="fix-label">Fix</span>Fix the value's type/datatype in the data/query, or add/relax the property's declared range (rdfs:range or rangeIncludes) in the ontology.</p>
 <div class="check-foot"><span class="badge badge-native">Python</span></div>
 <p class="src">no query file &mdash; emitted directly as a ResultRow</p>
 </article>
@@ -1269,6 +1295,25 @@ them.</p>
 <p class="desc">A class the ontology declares is never used as an rdf:type in the graph under assessment. For the 'sketch' stage this commonly just means no CONSTRUCT query in the folder happens to populate that class; for a real, complete data export it may indicate a genuinely unused part of the model. Informational only.</p>
 <p class="fix"><span class="fix-label">Fix</span>Expected for a partial batch/sketch; investigate only if this class should always be populated by a complete export.</p>
 <div class="check-foot"><span class="badge badge-native">Python</span></div>
+<p class="src">no query file &mdash; emitted directly as a ResultRow</p>
+</article>
+</section>
+<section class="cat" id="cat-vocabulary">
+<div class="cat-head">
+<h3>Vocabulary integrity</h3>
+<p class="cat-meta"><span class="mono">vocabulary</span> &middot; 1 checks &middot; 1 warning</p>
+<p class="cat-blurb">A closed-world reading of the axioms: an IRI an axiom points at that nothing anywhere declares. SHACL cannot express this -- open-world semantics never contradict an undeclared term merely existing -- so it has no shape and no query, only an implementation.</p>
+</div>
+<article class="check sev-warning" id="VOC-001">
+<header class="check-head">
+<span class="cid">VOC-001</span>
+<h4>Undeclared term referenced by an axiom</h4>
+<span class="pill pill-warning">Warning</span>
+</header>
+<p class="metric">referential integrity of term references</p>
+<p class="desc">A term-referencing axiom points at an IRI that nothing declares. SHACL's open-world semantics never flag this: nothing *contradicts* an undeclared class existing, it is simply never asserted to. Covers the object position of rdfs:subClassOf/subPropertyOf/domain/range, owl:equivalentClass/disjointWith/inverseOf/onProperty/onClass/someValuesFrom/allValuesFrom and sh:targetClass/class/path. Deliberately NOT the rdf:type object or the predicate position, which are STR-001 and STR-002 -- reporting those here produced two findings with different ids for one defect. Scoped to namespaces this graph already declares at least one term in, so an external vocabulary that was never imported is left alone rather than flooded.</p>
+<p class="fix"><span class="fix-label">Fix</span>Check the spelling against the declaring ontology, or add the missing owl:imports if the term is meant to come from elsewhere.</p>
+<div class="check-foot"><span class="badge badge-native">VS Code extension</span></div>
 <p class="src">no query file &mdash; emitted directly as a ResultRow</p>
 </article>
 </section>
@@ -1346,9 +1391,10 @@ a graph pattern is a SPARQL check.</p>
 <h4>Pick an id and category</h4>
 <p>Ids follow <code>&lt;PREFIX&gt;-&lt;NNN&gt;</code>. In use today: <code>STR</code> structural,
 <code>LOG</code> logical, <code>QUA</code> quality, <code>EFF</code> efficiency, <code>STY</code>
-style, <code>DAT</code> data, <code>REA</code> reasoning, <code>CNF</code> conformance. A new
-category is fine &mdash; add it to the registry and to <code>CATEGORY_TITLES</code> in
-<code>docs/generate_checks_md.py</code>.</p>
+style, <code>DAT</code> data, <code>REA</code> reasoning, <code>CNF</code> conformance,
+<code>VOC</code> vocabulary, <code>TQL</code> tarql. A new category is fine &mdash; add it to the
+registry and to <code>CATEGORIES</code> in <code>docs/generate_check_registry.py</code>, which is
+this page's generator.</p>
 </li>
 <li>
 <h4>Add the registry entry</h4>

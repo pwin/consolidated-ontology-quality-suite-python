@@ -103,11 +103,13 @@ def run_registry_suite_on_graph(
       originally designed, so a check that only fires from one engine and
       not the other is a visible signal that the two formulations have
       drifted apart (see docs/EXTENDING.md).
-    - ``"sparql"`` -- portable SPARQL only. Every check this suite has is
-      implemented in SPARQL (`sparql/**/*.rq`); only a subset (18 of 50, at
-      last count) *also* has a SHACL twin, and there is currently no check
-      implemented in SHACL alone. Running SPARQL-only therefore finds the
-      exact same set of real findings, just without the cross-validation
+    - ``"sparql"`` -- portable SPARQL only. Every check with a SHACL shape
+      also has a portable SPARQL twin, and there is no check implemented in
+      SHACL alone -- which is the property that makes this a pure speed
+      choice, and the one `tests/test_check_coverage.py` guards rather than
+      leaving to this sentence. 21 of the 59 registry entries carry both
+      formulations at the time of writing. Running SPARQL-only therefore
+      finds the exact same set of real findings, just without the cross-validation
       signal -- and roughly 8x faster: pyshacl spends the overwhelming
       majority of a run's wall-clock time on its own Python-level shape
       traversal and constraint dispatch, on top of the same SPARQL
