@@ -1,6 +1,6 @@
 [project]
 name = "ontology-quality-suite"
-version = "0.12.0"
+version = "0.13.0"
 description = "Ontology Quality Suite -- assess OWL2 DL/RL/QL ontologies, TARQL/oxi-gen CONSTRUCT-query sketches, and the RDF data graphs they triplify -- structural, logical, documentation, efficiency, style, data quality, OWL2 profile membership, and reasoner-based consistency -- plus ontology-version and TARQL/ontology consistency checking with suggested repair diffs, locally or against a live Fuseki triplestore."
 readme = "README.md"
 license = "MIT OR Apache-2.0"
