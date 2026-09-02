@@ -90,10 +90,10 @@ if a pre-0.1.5 wheel ever got reinstalled).
 ``shacl`` is on PyPI as of 0.1.4 (0.1.5 for the fix above) -- install with
 ``uv sync --extra native-shacl`` (an opt-in extra, same convention as this
 package's own ``reasoner`` extra; see ``pyproject.toml``, pinned
-``shacl>=0.1.10``). Not a hard dependency of this package proper -- still
+``shacl>=0.1.11``). Not a hard dependency of this package proper -- still
 imported lazily here (same convention as ``shacl_runner.py``'s own
 pyshacl import), so ``--engine shacl``/``sparql``
-and everything else works fine without it. Requires ``shacl>=0.1.10``
+and everything else works fine without it. Requires ``shacl>=0.1.11``
 (pinned in ``pyproject.toml``'s ``native-shacl`` extra, kept current with
 upstream rather than pinned at the 0.1.5 floor that would technically
 still work): 0.1.3/0.1.4 had the two blank-node focus-node bugs documented
@@ -107,6 +107,13 @@ this replaced). 0.1.6-0.1.10 are feature/perf/robustness additions
 descent moving off the Rust call stack) with no behavior change to
 anything this suite's own checks exercise -- re-verified at each, not
 assumed from the changelog.
+
+0.1.11 is the floor because `run_shacl_native_rows` reads three fields
+added there -- ``root_shape``, ``value_plain`` and a rendered ``path``.
+Each replaced a workaround: resolving a nested shape's identity by matching
+its ``sh:message`` text, stripping literal syntax by hand, and treating a
+blank-node path label as if it meant something outside the process that
+minted it.
 
 0.1.10 is worth a note because it looks more relevant than it is. Before
 it, the engine's shape-recursion cap was effectively a cap on the *data*:
@@ -273,21 +280,22 @@ def run_shacl_native(data_graph: Graph, shapes_graph: Graph, *, inference: str =
 
 
 def _unwrap(term: Optional[str]) -> Optional[str]:
-    """One N-Triples-ish term string from the structured API as the plain
-    string the rest of this suite uses. IRIs arrive wrapped in angle
-    brackets, blank nodes as ``_:label``, literals quoted."""
+    """One N-Triples term string from the structured API as the plain string
+    the rest of this suite uses: IRIs arrive wrapped in angle brackets, blank
+    nodes as ``_:label``.
+
+    Literals are not handled here and do not need to be. The only literal a
+    result carries is its value, and ``Result.value_plain`` (shacl 0.1.11)
+    already gives that with its syntax removed -- which is what the graph
+    route yields once rdflib has parsed it. Before that field existed this
+    function had to strip the quoting and datatype itself, and getting it
+    wrong was invisible: the finding still fired, it just failed to merge
+    with its SPARQL twin and appeared twice.
+    """
     if term is None:
         return None
     if term.startswith("<") and term.endswith(">"):
         return term[1:-1]
-    if term.startswith('"'):
-        # A literal arrives fully serialised -- '"12x"^^<...#integer>' or
-        # '"label"@en' -- where the graph route yields the lexical form
-        # alone. Take the lexical form, so the two routes agree and so the
-        # dedup key matches the SPARQL twin's.
-        closing = term.rfind('"')
-        if closing > 0:
-            return term[1:closing]
     return term
 
 
@@ -335,37 +343,49 @@ def run_shacl_native_rows(
     shapes = _native_shacl.Shapes.from_turtle(shapes_graph.serialize(format="turtle"))  # type: ignore[attr-defined]
     report = shapes.validate_turtle(data_graph.serialize(format="turtle"), inference=inference)
 
-    message_index = _message_index(shapes_graph)
     rows: List[ResultRow] = []
     for result in report.results:
-        shape_term = _unwrap(result.source_shape)
-        shape_node: Optional[Node] = None
-        if shape_term is not None and not shape_term.startswith("_:"):
-            shape_node = URIRef(shape_term)
-        elif result.message:
-            shape_node = message_index.get(str(result.message))
+        # `root_shape` (shacl 0.1.11) is the nearest enclosing shape with an
+        # IRI. Before it existed this had to be recovered by indexing the
+        # shapes graph on sh:message and matching the result's message text --
+        # workable, but it tied check-id resolution to prose that a shape
+        # author is free to change.
+        root = _unwrap(result.root_shape)
+        shape_node: Optional[Node] = URIRef(root) if root and not root.startswith("_:") else None
 
         # The path is always recovered from the resolved shape's own sh:path
         # rather than taken from the result, and rendered by the same
         # _path_expression the graph route uses. Both engines report a path in
         # their own notation -- pyshacl as RDF, the native engine as SPARQL
-        # property-path syntax since shacl 0.1.11 -- and the two do not agree
-        # on how to spell a compound path. Reading it from the shapes graph
-        # makes the dedup key depend on the shape rather than on which engine
-        # produced the finding, which is the only way a row from one merges
-        # with the same row from the other.
+        # property-path syntax since 0.1.11 -- and the two do not agree on how
+        # to spell a compound path. Reading it from the shapes graph makes the
+        # dedup key depend on the shape rather than on which engine produced
+        # the finding, which is the only way a row from one merges with the
+        # same row from the other.
+        # `sh:path` sits on the nested property shape, not on the node shape
+        # `root_shape` names, so it usually cannot be looked up from here --
+        # and the engine's own rendering is used instead. The two notations
+        # differ in one respect only: the engine brackets its IRIs
+        # (`(<...#subClassOf>)+`) where `merge._path_expression` does not
+        # (`(...#subClassOf)+`). They have to agree, because `path` is part of
+        # the key that merges a SHACL row with its SPARQL twin, and a row that
+        # disagrees on the path survives twice under `--engine both`.
         declared = shapes_graph.value(shape_node, SH.path) if shape_node is not None else None
         if declared is not None:
             path = _path_expression(shapes_graph, declared)
         else:
             path = _unwrap(result.path)
+            if path is not None:
+                path = path.replace("<", "").replace(">", "")
 
         scc = URIRef(result.component_iri) if result.component_iri else None
         check_id = registry.resolve_check_id(scc, shape_node, shapes_graph)
         check = registry.get(check_id) if check_id else None
 
         focus = _unwrap(result.focus_node)
-        value = _unwrap(result.value)
+        # `value_plain` (shacl 0.1.11) is the term with its syntax removed,
+        # which is what the graph route yields after rdflib has parsed it.
+        value = result.value_plain
         # The same normalisation the graph route applies -- see
         # merge._extract_rows for why value defaults to the focus node.
         if value is None and focus is not None:

@@ -267,3 +267,7 @@ def test_structured_route_renders_property_paths_not_engine_labels(shapes, regis
         assert row.path is not None
         assert not row.path.startswith("_:"), f"engine-local path label leaked: {row.path}"
         assert "subClassOf" in row.path
+        # Normalised to merge._path_expression's notation, which does not
+        # bracket its IRIs -- the engine's own rendering does, and the two
+        # have to agree or the row will not merge with its SPARQL twin.
+        assert "<" not in row.path and ">" not in row.path
