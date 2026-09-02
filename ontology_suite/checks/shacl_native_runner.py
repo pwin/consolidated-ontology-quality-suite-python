@@ -90,10 +90,10 @@ if a pre-0.1.5 wheel ever got reinstalled).
 ``shacl`` is on PyPI as of 0.1.4 (0.1.5 for the fix above) -- install with
 ``uv sync --extra native-shacl`` (an opt-in extra, same convention as this
 package's own ``reasoner`` extra; see ``pyproject.toml``, pinned
-``shacl>=0.1.11``). Not a hard dependency of this package proper -- still
+``shacl>=0.1.12``). Not a hard dependency of this package proper -- still
 imported lazily here (same convention as ``shacl_runner.py``'s own
 pyshacl import), so ``--engine shacl``/``sparql``
-and everything else works fine without it. Requires ``shacl>=0.1.11``
+and everything else works fine without it. Requires ``shacl>=0.1.12``
 (pinned in ``pyproject.toml``'s ``native-shacl`` extra, kept current with
 upstream rather than pinned at the 0.1.5 floor that would technically
 still work): 0.1.3/0.1.4 had the two blank-node focus-node bugs documented
@@ -108,8 +108,11 @@ descent moving off the Rust call stack) with no behavior change to
 anything this suite's own checks exercise -- re-verified at each, not
 assumed from the changelog.
 
-0.1.11 is the floor because `run_shacl_native_rows` reads three fields
-added there -- ``root_shape``, ``value_plain`` and a rendered ``path``.
+0.1.12 is the floor because `run_shacl_native_rows` reads three fields
+added in 0.1.11 -- ``root_shape``, ``value_plain`` and a rendered ``path``.
+The floor names 0.1.12 rather than 0.1.11 because 0.1.11 was tagged but
+never published: the releases on PyPI go 0.1.10, 0.1.12, 0.2.0. A floor
+should name a version somebody can actually install.
 Each replaced a workaround: resolving a nested shape's identity by matching
 its ``sh:message`` text, stripping literal syntax by hand, and treating a
 blank-node path label as if it meant something outside the process that

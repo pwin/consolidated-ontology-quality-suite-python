@@ -38,7 +38,7 @@ reasoner = [
     "owlready2>=0.47",
 ]
 native-shacl = [
-    "shacl>=0.1.11",
+    "shacl>=0.1.12",
 ]
 
 [dependency-groups]
