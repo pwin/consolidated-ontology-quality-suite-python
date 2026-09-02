@@ -24,10 +24,10 @@ Three findings, in descending order of how sure they are:
 expressions across files. Compared on a **skeleton**: the expression with
 every ``?var`` replaced by ``?``. That distinction matters, and it is what
 keeps this check honest. Two files minting ``?nodeid_IRI`` as
-``CONCAT("srnd:_Node_", ?a)`` and ``CONCAT("srnd:_Node_", ?b)`` are almost
+``CONCAT("exd:_Node_", ?a)`` and ``CONCAT("exd:_Node_", ?b)`` are almost
 certainly fine -- they read the same column under two names. Two files minting
-it as ``CONCAT("srnd:_Node_", ?a)`` and
-``CONCAT("srnd:_Node_", REPLACE(?a, ?special, ""))`` are not fine: those
+it as ``CONCAT("exd:_Node_", ?a)`` and
+``CONCAT("exd:_Node_", REPLACE(?a, ?special, ""))`` are not fine: those
 produce different IRIs for the same node whenever the value contains the
 replaced character. Skeleton comparison flags the second and ignores the
 first. Comparing raw expression text would report both and be ignored

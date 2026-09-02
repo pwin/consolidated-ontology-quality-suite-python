@@ -38,7 +38,7 @@ its declared domain, a value outside its range. Caught by `CNF-003`/`CNF-004`.
 Everything below runs from one command:
 
 ```bash
-ontology-quality-suite sketch --queries scripts/to_rdf --out-dir out/sketch
+ontology-quality-suite sketch --queries queries/ --out-dir out/sketch
 ```
 
 `--ontology` is optional. Without it you still get the whole `TQL-00x` half,
@@ -79,9 +79,11 @@ from differently-named columns. The gain is modest there because that folder's
 column naming is fairly consistent; it grows with the number of files reading
 the same concept under different column names.
 
-The 7 kept included a literal typo -- `_Magnitude_LaneSegementTexture_`
-against `_Magnitude_LaneSegmentTexture_` -- which had survived human review
-precisely because it reads correctly at a glance.
+One of the 7 was a genuine defect. Two files spelled the same IRI template
+differently by a single character buried in a long name, and reviewers had
+read past it more than once. That is exactly the case this check exists for:
+a difference small enough to be invisible, and large enough to mint two IRIs
+for one thing.
 
 **`TQL-002` and `TQL-003` are the same situation split by naming
 convention.** TARQL binds every CSV header as a variable of the same name, so
@@ -103,8 +105,8 @@ against the ontology's declarations by exactly the code the `data` stage uses
 on real triplified output.
 
 ```bash
-ontology-quality-suite sketch --queries scripts/to_rdf \
-  --ontology ontology/MergedOntologies.ttl --out-dir out/sketch
+ontology-quality-suite sketch --queries queries/ \
+  --ontology ontology/merged-ontology.ttl --out-dir out/sketch
 ```
 
 `CNF-001`/`CNF-002` are the cheapest useful signal in the whole suite: a
@@ -174,13 +176,18 @@ Worth knowing before trusting a clean result:
 ## Reading `bind-review.txt`
 
 ```
-1. Variables bound differently across files (7)
-   ?texture_IRI  -- 2 patterns across 2 files
-       tarql:expandPrefixedName(CONCAT("pnhd:_Magnitude_LaneSegementTexture_",?))
-           tracscondition_to_rdf.tq:185
-       tarql:expandPrefixedName(CONCAT("pnhd:_Magnitude_LaneSegmentTexture_",?))
-           tracscategories_to_rdf.tq:113
+1. Variables bound differently across files (1)
+------------------------------------------------------------
+   ?road_IRI  -- 2 patterns across 2 files
+       tarql:expandPrefixedName(CONCAT("exd:_Road_", ?))
+           roads_to_rdf.rq:17
+       tarql:expandPrefixedName(CONCAT("exd:_Road_", REPLACE(?, " ", "_")))
+           lanes_to_rdf.rq:17
 ```
+
+(That is the real output of `examples/tarql_drift/`, this repo's own two-query
+fixture -- `ontology-quality-suite sketch --queries examples/tarql_drift` will
+reproduce it.)
 
 Each variant carries its files and line numbers, and the two templates sit
 one above the other, so the judgement can be made without opening either
@@ -193,8 +200,8 @@ the check ran and found things to compare.
 ```bash
 # Fails the build on TQL-002 and CNF-003/CNF-004; TQL-001 and TQL-003 report
 # without blocking.
-ontology-quality-suite sketch --queries scripts/to_rdf \
-  --ontology ontology/MergedOntologies.ttl \
+ontology-quality-suite sketch --queries queries/ \
+  --ontology ontology/merged-ontology.ttl \
   --out-dir out/sketch --fail-on Violation
 ```
 

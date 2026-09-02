@@ -178,10 +178,10 @@ cd.patch_doc_data_with_diagrams(doc_data, generated, out_dir)  # adds doc_data[.
 ## Where this came from: reviewing `create_class_diagrams.py`
 
 This feature was built after being shown a similar script from another
-project (`oandt-sandbox`'s `create_class_diagrams.py`, owlready2 + a
-hand-rolled DOT generator, one PNG + one `.ttl` per class via a `DESCRIBE
-<class>` SPARQL query). It's a reasonable, working approach, and its
-blank-node/literal handling and per-class CBD-via-DESCRIBE idea are
+project (`create_class_diagrams.py`: owlready2 plus a hand-rolled DOT
+generator, one PNG and one `.ttl` per class via a `DESCRIBE <class>` SPARQL
+query). It's a reasonable, working approach, and its blank-node/literal
+handling and per-class CBD-via-DESCRIBE idea are
 directly reflected in `concise_bounded_description` above (rdflib's own
 `DESCRIBE` query answers exactly that algorithm, so `class_diagrams.py`
 computes it directly rather than round-tripping through SPARQL for it).
