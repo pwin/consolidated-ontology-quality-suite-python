@@ -345,10 +345,20 @@ def run_shacl_native_rows(
         elif result.message:
             shape_node = message_index.get(str(result.message))
 
-        path = _unwrap(result.path)
-        if path is not None and path.startswith("_:"):
-            declared = shapes_graph.value(shape_node, SH.path) if shape_node is not None else None
-            path = _path_expression(shapes_graph, declared) if declared is not None else None
+        # The path is always recovered from the resolved shape's own sh:path
+        # rather than taken from the result, and rendered by the same
+        # _path_expression the graph route uses. Both engines report a path in
+        # their own notation -- pyshacl as RDF, the native engine as SPARQL
+        # property-path syntax since shacl 0.1.11 -- and the two do not agree
+        # on how to spell a compound path. Reading it from the shapes graph
+        # makes the dedup key depend on the shape rather than on which engine
+        # produced the finding, which is the only way a row from one merges
+        # with the same row from the other.
+        declared = shapes_graph.value(shape_node, SH.path) if shape_node is not None else None
+        if declared is not None:
+            path = _path_expression(shapes_graph, declared)
+        else:
+            path = _unwrap(result.path)
 
         scc = URIRef(result.component_iri) if result.component_iri else None
         check_id = registry.resolve_check_id(scc, shape_node, shapes_graph)
