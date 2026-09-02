@@ -15,15 +15,17 @@ This differs from graph_quality.py and ontology_quality.py in three ways:
 
   3. With an ontology, this script also checks CONFORMANCE: classes/
      properties the data uses but the ontology never declared, classes the
-     ontology declares but the data never populates, and rdfs:domain/
-     rdfs:range violations (a property used on a subject/object whose type
-     isn't covered by what the ontology says that property's domain/range
-     should be).
+     ontology declares but the data never populates, and domain/range
+     violations (a property used on a subject/object whose type isn't
+     covered by what the ontology says that property's domain/range should
+     be, whether it says so with rdfs:domain/rdfs:range or with gist-style
+     domainIncludes/rangeIncludes).
 
 Scope/limitations, stated up front rather than silently:
-  - Only direct `rdfs:domain` / `rdfs:range` / `rdfs:subClassOf` triples are
-    consulted. OWL2 restriction-based constraints (owl:someValuesFrom etc.)
-    are not evaluated.
+  - Only direct `rdfs:domain` / `rdfs:range` / `rdfs:subClassOf` triples,
+    plus gist-style `domainIncludes` / `rangeIncludes` annotations (matched
+    by local name), are consulted. OWL2 restriction-based constraints
+    (owl:someValuesFrom etc.) are not evaluated.
   - RDFS formally treats multiple `rdfs:domain`/`rdfs:range` triples on one
     property as a CONJUNCTION (the subject must satisfy every one). This
     script instead treats them as alternatives (at least one must be
@@ -53,6 +55,7 @@ from ..sketch.graph_quality import (
     cross_namespace_groups,
     default_ignored_predicates,
     load_data_graph,
+    local_name,
     print_report as print_data_report,
 )
 from ..sketch.tarql_visualiser import (
@@ -183,6 +186,39 @@ def ontology_declarations(ontology_graph):
     for prop, cls in ontology_graph.subject_objects(RDFS.range):
         range_[prop].add(cls)
         declared_properties.add(prop)
+
+    # gist-style domainIncludes/rangeIncludes count as a declared domain/range
+    # here, which is what makes CNF-003/CNF-004 work at all on a gist-based
+    # ontology. Without this the two checks were not merely less sensitive,
+    # they were dead: gist deliberately prefers these soft annotations to
+    # rdfs:domain/rdfs:range for shared properties, so `domain` and `range`
+    # stayed empty for exactly the properties the data uses most, the
+    # `if domain_classes:` guard in check_conformance() skipped every one of
+    # them, and no domain or range violation could be reported however wrong
+    # the data was. Everything else in this suite had already learned to read
+    # them -- STR-003 in both formulations, ontology_evaluation.py's richness
+    # metrics -- and so had the VS Code extension's CNF-003.rq/CNF-004.rq;
+    # this was the one place left that had not.
+    #
+    # Matched by local name rather than a hardcoded gist namespace IRI, since
+    # gist has published under more than one over the years. The .rq twins
+    # spell the same test STRENDS(STR(?p), "domainIncludes"), that being what
+    # SPARQL can express portably; the two agree on every real vocabulary.
+    #
+    # These deliberately do NOT add to `declared_properties`, which the two
+    # loops above do. The asymmetry is the entailment: anything carrying an
+    # rdfs:domain *is* an rdf:Property under RDFS, whereas domainIncludes is
+    # rdfs:subPropertyOf skos:scopeNote -- an annotation that entails nothing
+    # whatever about its subject. A property known only by a scope note is
+    # still undeclared, and CNF-002 should go on saying so.
+    for predicate in set(ontology_graph.predicates()):
+        name = local_name(predicate)
+        if name == "domainIncludes":
+            for prop, cls in ontology_graph.subject_objects(predicate):
+                domain[prop].add(cls)
+        elif name == "rangeIncludes":
+            for prop, cls in ontology_graph.subject_objects(predicate):
+                range_[prop].add(cls)
 
     parents_of = defaultdict(set)
     for child, parent in ontology_graph.subject_objects(RDFS.subClassOf):
@@ -379,9 +415,11 @@ def conformance_to_rows(conformance, source_label):
                 check_id="CNF-003", category="conformance",
                 title="rdfs:domain violation",
                 severity="Violation", focus_node=str(s), path=str(prop), value=None,
-                message=f"{s} uses property {prop} but its type doesn't match any of the property's "
-                        f"declared rdfs:domain classes (in the {source_label} graph).",
-                remediation="Fix the subject's type, or add/relax the property's rdfs:domain.",
+                message=f"{s} uses property {prop} but its type doesn't match (or descend from) any "
+                        f"of the property's declared domain classes -- rdfs:domain, or gist-style "
+                        f"domainIncludes -- in the {source_label} graph.",
+                remediation="Fix the subject's type, or add/relax the property's declared domain "
+                            "(rdfs:domain or domainIncludes).",
                 sources=[source_label],
             ))
     for prop, objects in conformance["range_violations"].items():
@@ -391,8 +429,10 @@ def conformance_to_rows(conformance, source_label):
                 title="rdfs:range violation",
                 severity="Violation", focus_node=str(o), path=str(prop), value=None,
                 message=f"Value {o} of property {prop} doesn't match any of the property's declared "
-                        f"rdfs:range classes/datatypes (in the {source_label} graph).",
-                remediation="Fix the value's type/datatype, or add/relax the property's rdfs:range.",
+                        f"range classes/datatypes -- rdfs:range, or gist-style rangeIncludes -- in "
+                        f"the {source_label} graph.",
+                remediation="Fix the value's type/datatype, or add/relax the property's declared "
+                            "range (rdfs:range or rangeIncludes).",
                 sources=[source_label],
             ))
     for cls in sorted(conformance["unpopulated_classes"], key=str):
