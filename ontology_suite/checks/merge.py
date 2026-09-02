@@ -124,6 +124,52 @@ def _joined(values: List[str]) -> Optional[str]:
     return ", ".join(sorted(set(values)))
 
 
+def substitute_message_placeholders(
+    message: Optional[str],
+    focus: Optional[str],
+    path: Optional[str],
+    value: Optional[str],
+) -> str:
+    """Fill in a SHACL message's `{$this}` / `{$value}` / `{$path}`.
+
+    `sh:message` is a template: SHACL 1.0 section 6.2 substitutes the
+    constraint's own bindings into it, and the placeholder is invariably the
+    part that says *which* term the finding is about. An engine that returns
+    the text verbatim therefore produces a finding a reader cannot act on --
+    "{$this} is disjoint with one of its own transitive superclasses" names
+    no class at all.
+
+    Both engines needed this, to different degrees, and neither said so.
+    Measured over examples/ontology/domain.ttl + examples/property_axioms/
+    (84 SHACL rows): pyshacl left 2 unsubstituted, the native Rust engine
+    left **25**, across ten check ids. The native engine is the default when
+    it is installed, so the worse of the two was what most runs got. The
+    portable SPARQL twins build their messages with CONCAT and were never
+    affected, which is why `--engine sparql` reads correctly and is also why
+    this went unnoticed: the two formulations of one check disagreed about
+    the prose while agreeing about everything the dedup key looks at.
+
+    Only the three bindings a result actually carries are substituted. A
+    constraint parameter such as `{$maxCount}` is left as written rather than
+    replaced with "None": that value is genuinely not in the result, and a
+    visible placeholder at least says which term is missing instead of
+    asserting a wrong one. The same rule the VS Code extension settled on
+    when it found this from the other side.
+
+    Called at ResultRow construction, never earlier. `shacl_native_runner`
+    indexes the shapes graph on `sh:message` text to resolve blank source
+    shapes, so substituting before that ran would break check-id resolution.
+    """
+    if not message or "{" not in message:
+        return message or ""
+    for name, replacement in (("this", focus), ("value", value), ("path", path)):
+        if replacement is None:
+            continue
+        message = message.replace("{$" + name + "}", str(replacement))
+        message = message.replace("{?" + name + "}", str(replacement))
+    return message
+
+
 def _extract_rows(
     results_graph: Graph,
     registry: Registry,
@@ -170,7 +216,12 @@ def _extract_rows(
                 focus_node=str(focus) if focus is not None else "",
                 path=path,
                 value=value,
-                message=str(message) if message is not None else "",
+                message=substitute_message_placeholders(
+                    str(message) if message is not None else "",
+                    str(focus) if focus is not None else None,
+                    path,
+                    value,
+                ),
                 remediation=check.remediation if check else None,
                 sources=[source_label],
             )

@@ -185,6 +185,13 @@ disjoint with..."``, not filled in), which is exactly the literal already
 sitting on that same blank/named node in ``shapes_graph`` -- used as an
 alternate key back to *that exact node object*.
 
+That the message arrives unsubstituted is load-bearing here and a defect
+everywhere else: a reader gets a sentence naming no term. Both facts hold
+because the two happen at different moments -- the raw text is the index
+key, and ``merge.substitute_message_placeholders`` fills it in later, when
+the ``ResultRow`` is built and the check id is already resolved. Substituting
+any earlier would silently break the lookup above.
+
 (For a SHACL-SPARQL constraint -- ``sh:sparql [...]`` -- both pyshacl and
 the native engine report ``sh:sourceShape`` as the *enclosing named shape*
 already, e.g. ``oq:EFF-001``, matching SHACL-SPARQL's spec semantics; no
@@ -207,7 +214,7 @@ from rdflib import BNode, Graph, URIRef
 from rdflib.namespace import Namespace
 from rdflib.term import Node
 
-from .merge import ResultRow, _path_expression
+from .merge import ResultRow, _path_expression, substitute_message_placeholders
 from .registry import Registry
 
 try:
@@ -402,7 +409,17 @@ def run_shacl_native_rows(
             focus_node=focus or "",
             path=path,
             value=value,
-            message=str(result.message) if result.message else "",
+            # The engine returns `sh:message` verbatim, placeholders and all
+            # -- see merge.substitute_message_placeholders for what that costs
+            # a reader, and why this happens here rather than on the results
+            # graph (the message text is this module's index for resolving
+            # blank source shapes).
+            message=substitute_message_placeholders(
+                str(result.message) if result.message else "",
+                focus,
+                path,
+                value,
+            ),
             remediation=check.remediation if check else None,
             sources=["shacl"],
         ))
