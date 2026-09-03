@@ -473,7 +473,15 @@ def run_sketch_stage(
     exclude_imports: bool = False,
     allow_network: bool = False,
     verbose: bool = False,
+    registry: Optional[Registry] = None,
+    sparql_dir: str | Path = config.DEFAULT_SPARQL_DIR,
 ) -> StageResult:
+    # Both default so every existing caller keeps working: the registry is
+    # needed only to attach a check's title/severity/remediation to a
+    # query-source finding, and loading the default one is what the CLI
+    # would have passed anyway.
+    if registry is None:
+        registry = Registry.load(config.DEFAULT_REGISTRY_PATH)
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     sketch_path = out_dir / "sketch.ttl"
@@ -517,6 +525,32 @@ def run_sketch_stage(
     bind_report_path = out_dir / "bind-review.txt"
     _write_text(bind_report_path, bind_analysis.format_bind_report(bind_report))
 
+    # ...and the same facts as RDF, so a TARQL check can be a query file
+    # rather than Python. Adding one is now the two steps every other check
+    # takes -- a `.rq` in `resources/sparql/tarql/` and a registry entry --
+    # where before it meant editing bind_analysis.py. See
+    # bind_analysis.bind_report_to_graph for why the facts are published
+    # instead of more findings.
+    #
+    # These queries run against the facts graph and nothing else: the `tarql`
+    # subdirectory is held back from the general sweep
+    # (sparql_runner.SUBJECT_SPECIFIC_DIRS), because a check that runs
+    # against every graph and matches almost everywhere is indistinguishable
+    # from one that has quietly stopped working.
+    bind_facts = bind_analysis.bind_report_to_graph(bind_report)
+    bind_facts_path = out_dir / "bind-facts.ttl"
+    bind_facts.serialize(destination=str(bind_facts_path), format="turtle")
+    tarql_query_dir = Path(sparql_dir) / "tarql"
+    if tarql_query_dir.is_dir():
+        tarql_results, tarql_outcomes = run_sparql_checks(bind_facts, tarql_query_dir)
+        rows += build_unified_results(Graph(), tarql_results, registry)
+        for outcome in tarql_outcomes:
+            if not outcome.ok:
+                warnings.append(f"{outcome.check_id} failed to run against the BIND facts: {outcome.error}")
+        if verbose:
+            print(f"[verbose] {len(bind_facts)} BIND-fact triples; "
+                  f"{len(tarql_outcomes)} query-source check(s) run")
+
     return StageResult(
         name="sketch",
         rows=rows,
@@ -526,6 +560,7 @@ def run_sketch_stage(
             "used_queries": used_queries,
             "bind_report": bind_report,
             "bind_report_path": bind_report_path,
+            "bind_facts_path": bind_facts_path,
             "ignored_legend_triples": ignored_count,
             "graph_metrics": graph_metrics,
             "schema_metrics": schema_metrics,

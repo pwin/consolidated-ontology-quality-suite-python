@@ -1,0 +1,52 @@
+PREFIX sh:  <http://www.w3.org/ns/shacl#>
+PREFIX oq:  <https://semantechs.co.uk/ontology-quality/>
+PREFIX tq:  <https://semantechs.co.uk/ontology-quality/tarql/>
+
+# TQL-004: a constructed-IRI variable that never becomes an IRI.
+#
+# The worked example for writing a TARQL check as a query file rather than in
+# Python -- see sketch/bind_analysis.py::bind_report_to_graph.
+#
+# SPARQL's CONCAT returns a *string*. TARQL does not coerce it, so a triple
+# whose subject position holds a plain literal is not a triple and every row
+# using that variable is dropped. Silently, for every row, with no error --
+# the same failure as TQL-002 reached from the opposite direction. TQL-002
+# catches the variable that was never bound; this catches the one bound to
+# the wrong kind of thing, which looks more correct and is just as empty.
+#
+# The whole test is `tq:producesKind` not being "IRI", and that is the point
+# worth copying. An earlier draft asked whether the expression text contained
+# "IRI(" -- which reads `MYIRI(` as a conversion, misses a bare string
+# literal, and cannot tell the outermost call from a nested one. Deciding
+# that is a *parse*, so `bind_analysis.value_kind` does it once, from the
+# bracket matching the parser already had to do, and publishes the answer.
+# The query then asks a question instead of re-deriving a fact.
+#
+# `tq:producesKind` is absent, never guessed, when the query text does not
+# settle it -- a bare `BIND(?x AS ?y_IRI)` may be passing on an IRI from an
+# earlier BIND. So this check cannot fire on something the parser merely
+# failed to recognise, which is what lets it be a Violation.
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Violation ;
+    sh:focusNode ?bind ;
+    sh:resultPath tq:expression ;
+    sh:value ?expression ;
+    sh:sourceConstraintComponent oq:TQL-004 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  ?bind a tq:Bind ;
+        tq:target ?target ;
+        tq:expression ?expression ;
+        tq:producesKind ?kind ;
+        tq:source ?source ;
+        tq:line ?line .
+  FILTER(?kind != "IRI")
+  FILTER(STRENDS(?target, "_IRI") || STRENDS(?target, "_iri")
+         || STRENDS(?target, "_URI") || STRENDS(?target, "_uri"))
+  BIND(CONCAT("?", ?target, " is built as a string and never converted to an IRI (",
+              ?source, ":", STR(?line),
+              "). Every triple using it is dropped. Wrap it in tarql:expandPrefixedName() ",
+              "for a prefixed name, or IRI() for a full one.") AS ?msg)
+}

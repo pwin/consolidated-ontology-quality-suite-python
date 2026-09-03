@@ -109,6 +109,48 @@ includes that directory in its `sparql_dirs` list (it already includes
 `sparql/logical` and `sparql/reasoning` by default). No SPARQL/registry
 changes needed beyond the check itself.
 
+## 2b. A check over query *source* (`sparql/tarql/`)
+
+Fits anything about the TARQL/oxi-gen queries themselves rather than the
+graph they build: an IRI template that drifts between files, a `BIND` that
+does not follow a house convention, a `CONSTRUCT` variable that is not what
+it looks like.
+
+This used to be the standing example of something only Python could do, and
+the reasoning was sound but the conclusion too broad. Query source is not a
+graph -- `sketch.ttl` keeps each query's `CONSTRUCT` template and discards
+the `WHERE` clause, so every `BIND` is gone before it exists. That is a
+reason `TQL-001`..`TQL-003` are Python. It is not a reason a TARQL check
+*cannot* be a query, because the run now publishes the query source as its
+own graph: `bind-facts.ttl`, one node per `BIND` carrying its target,
+expression, skeleton, file and line, plus one per `CONSTRUCT` variable
+(`sketch/bind_analysis.py::bind_report_to_graph`).
+
+So the recipe is §1's, with two differences:
+
+- The `.rq` goes in **`sparql/tarql/`**, and is written against the `tq:`
+  vocabulary rather than against RDFS/OWL.
+- That directory is **held back from the ontology and data sweeps**
+  (`checks/sparql_runner.py::SUBJECT_SPECIFIC_DIRS`). A check that runs
+  against every graph and matches almost everywhere looks exactly like one
+  that has quietly stopped working, so these are run only against the graph
+  they are about.
+
+The line is *not* difficulty. `TQL-001`'s cross-file comparison is a nested
+aggregate with two `COUNT DISTINCT`s, and it is perfectly expressible as a
+query now that the skeleton it compares is a published fact -- it stays
+native because it predates the facts graph, not because SPARQL cannot do it.
+What SPARQL cannot do is *compute* the skeleton, which is a parse. The rule
+that follows: if a `FILTER` is recovering structure from the expression text,
+add a predicate to `bind_report_to_graph` instead.
+
+`sparql/tarql/TQL-004.rq` is the worked example of exactly that -- its first
+draft searched the text for `"IRI("`, which misreads `MYIRI(` and misses a
+bare string literal; it now reads a single `tq:producesIri` triple. **And
+`docs/TESTING_TARQL.md` is the full write-up** -- the vocabulary, the
+manifest fields, the rdflib SPARQL-parser traps, and how to run a check tree
+that lives in your own project rather than in this package.
+
 ## 3. A native Python check (when there's no single graph to pattern-match)
 
 Some things aren't a SPARQL pattern over one merged graph: OWL2 profile

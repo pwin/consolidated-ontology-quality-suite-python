@@ -1,0 +1,34 @@
+# Fixture for the checks written against the BIND facts graph
+# (sketch/bind_analysis.py::bind_report_to_graph) rather than in Python.
+#
+# Two suffix conventions, each with a correct case and a broken one, and the
+# pair is the point: a reader scanning this file has to look at the wrapping
+# call to tell them apart, which is why the check is worth having.
+prefix ex:    <https://example.org/catalogue/>
+prefix exd:   <https://example.org/catalogue/data/>
+prefix xsd:   <http://www.w3.org/2001/XMLSchema#>
+prefix tarql: <http://tarql.github.io/tarql#>
+
+CONSTRUCT {
+  ?item_IRI a ex:Item ;
+    ex:title ?title ;
+    ex:heldBy ?holder_IRI ;
+    ex:published ?published_DT ;
+    ex:copies ?copies_DT .
+}
+WHERE {
+  # Correct: the string is converted before it is used as a subject.
+  BIND(tarql:expandPrefixedName(CONCAT("exd:_Item_", ?itemid)) AS ?item_IRI)
+
+  # SEEDS: TQL-004 -- CONCAT returns a string, and nothing converts it. Every
+  # ex:heldBy triple is silently dropped, for every row.
+  BIND(CONCAT("exd:_Holder_", ?holderid) AS ?holder_IRI)
+
+  # Correct: STRDT gives the value the datatype the _DT suffix advertises.
+  BIND(STRDT(?publishedon, xsd:date) AS ?published_DT)
+
+  # SEEDS: TQL-005 -- STR() produces a plain string, so this arrives as an
+  # untyped literal however the variable is named. Nothing errors; the data
+  # is simply not the datatype anyone reading the query would expect.
+  BIND(STR(?copycount) AS ?copies_DT)
+}

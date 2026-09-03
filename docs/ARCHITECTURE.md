@@ -321,7 +321,19 @@ that depend on OWL2-RL-specific rules).
    text rather than the sketch graph, and has to: `tarql_visualiser`
    keeps only each query's prefixes and its `CONSTRUCT` template, so the
    `WHERE` clause and every `BIND` expression in it are gone before the
-   sketch graph exists. See `docs/TESTING_TARQL.md`.
+   sketch graph exists.
+
+   What it parses is then published as `bind-facts.ttl` -- a node per
+   `BIND` carrying target, expression, skeleton, file and line, and one per
+   `CONSTRUCT` variable -- and the `.rq` files under `sparql/tarql/` are run
+   against *that* graph. So a query-source check is a query file and a
+   registry entry like any other, including one a project keeps outside this
+   package (`sketch --sparql`). Those queries are held back from the ontology
+   and data sweeps (`sparql_runner.SUBJECT_SPECIFIC_DIRS`): a check that runs
+   against every graph and matches almost everywhere is indistinguishable
+   from one that has quietly stopped working. `TQL-001`..`TQL-003` predate
+   the facts graph and remain native, because skeletonisation is a parse and
+   SPARQL cannot do it. See `docs/TESTING_TARQL.md`.
 4. **`triplify`** -- `triplify/oxigen.py` shells out to a built `oxi-gen`
    binary per CSV/query pair (paired by `triplify/discovery.py`'s naming
    convention) to produce real Turtle data.

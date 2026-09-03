@@ -92,6 +92,12 @@ NOT_PRODUCED_BY_THE_REGISTRY_SUITE = {
     # sketch graph exists and no graph pattern can reach them. Exercised by
     # tests/test_bind_analysis.py.
     "TQL-001", "TQL-002", "TQL-003",
+    # sparql/tarql/*.rq -- query files like any other, but over the
+    # BIND facts graph (sketch/bind_analysis.py::bind_report_to_graph), which
+    # this sweep does not build. Held back from the general sweep for the
+    # same reason (sparql_runner.SUBJECT_SPECIFIC_DIRS). Exercised by
+    # tests/test_bind_facts_graph.py against examples/tarql_facts/.
+    "TQL-004", "TQL-005",
     # Declared in the shared registry, implemented only in the VS Code
     # extension (consolidated_ontology_suite_webapp/src/checks/): VOC-001 is
     # a closed-world scan of the axiom positions, REA-005/REA-006 are

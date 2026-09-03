@@ -426,8 +426,8 @@ a:focus-visible, summary:focus-visible {
   asserts, which of them are written in SPARQL and which in SHACL &mdash; and how to add your own
   to the panel without forking anything.</p>
   <div class="stats">
-    <div class="stat"><b>59</b><span>checks in the registry</span></div>
-    <div class="stat"><b>42</b><span>SPARQL formulations</span></div>
+    <div class="stat"><b>61</b><span>checks in the registry</span></div>
+    <div class="stat"><b>44</b><span>SPARQL formulations</span></div>
     <div class="stat"><b>21</b><span>with a SHACL twin</span></div>
     <div class="stat"><b>14</b><span>native Python checks</span></div>
     <div class="stat"><b>3</b><span>extension-only</span></div>
@@ -453,7 +453,7 @@ a:focus-visible, summary:focus-visible {
 <li><a href="#cat-reasoning">Reasoning and profiles</a> <span class="toc-n">12</span></li>
 <li><a href="#cat-conformance">Conformance against a separate ontology</a> <span class="toc-n">5</span></li>
 <li><a href="#cat-vocabulary">Vocabulary integrity</a> <span class="toc-n">1</span></li>
-<li><a href="#cat-tarql">TARQL query consistency</a> <span class="toc-n">3</span></li>
+<li><a href="#cat-tarql">TARQL query consistency</a> <span class="toc-n">5</span></li>
   </ul>
   <h2>Extending</h2>
   <ul>
@@ -482,7 +482,7 @@ kinds:</p>
 <table>
 <thead><tr><th>Kind</th><th>Lives in</th><th>Count</th><th>Use when</th></tr></thead>
 <tbody>
-<tr><td><strong>Portable SPARQL</strong></td><td><code>sparql/&lt;category&gt;/&lt;id&gt;.rq</code></td><td>42</td>
+<tr><td><strong>Portable SPARQL</strong></td><td><code>sparql/&lt;category&gt;/&lt;id&gt;.rq</code></td><td>44</td>
 <td>The condition is a graph pattern over one merged graph. This is the default and covers most checks.</td></tr>
 <tr><td><strong>SHACL shape</strong></td><td><code>shapes/&lt;category&gt;.ttl</code></td><td>21</td>
 <td>Always paired with a SPARQL twin, never alone &mdash; the pair exists to cross-validate.</td></tr>
@@ -579,7 +579,7 @@ iterating.</p>
 
 <section class="band">
 <h2>The catalogue</h2>
-<p class="lede">All 59 checks, grouped by category. Severity is the registry default and can be
+<p class="lede">All 61 checks, grouped by category. Severity is the registry default and can be
 overridden per project; the badges say which formulations exist for each check and where to find
 them.</p>
 <section class="cat" id="cat-structural">
@@ -1320,8 +1320,8 @@ them.</p>
 <section class="cat" id="cat-tarql">
 <div class="cat-head">
 <h3>TARQL query consistency</h3>
-<p class="cat-meta"><span class="mono">tarql</span> &middot; 3 checks &middot; 1 warning &middot; 1 violation &middot; 1 info</p>
-<p class="cat-blurb">The only group that reads query <em>source</em> rather than a graph. A folder of TARQL queries is a program, and like any program it drifts: the same conceptual IRI ends up minted two ways in two files, and nothing about either query is invalid. These findings come from the query text, so no SPARQL or SHACL formulation of them is possible.</p>
+<p class="cat-meta"><span class="mono">tarql</span> &middot; 5 checks &middot; 2 warning &middot; 2 violation &middot; 1 info</p>
+<p class="cat-blurb">The only group that reads query <em>source</em> rather than a graph. A folder of TARQL queries is a program, and like any program it drifts: the same conceptual IRI ends up minted two ways in two files, and nothing about either query is invalid. The sketch graph cannot see any of that &mdash; it keeps each query's CONSTRUCT template and discards the WHERE clause &mdash; so the query source is published as its own facts graph instead (<code>bind_report_to_graph</code>: a node per BIND, with its target, expression, skeleton, file and line). Checks here are ordinary <code>.rq</code> files over <em>that</em> graph, added the same way as any other; the three oldest predate it and are still native Python.</p>
 </div>
 <article class="check sev-warning" id="TQL-001">
 <header class="check-head">
@@ -1358,6 +1358,30 @@ them.</p>
 <p class="fix"><span class="fix-label">Fix</span>Check the variable against the CSV header. If there is no such column it is a typo, and the triple is silently dropped for every row.</p>
 <div class="check-foot"><span class="badge badge-native">Python</span></div>
 <p class="src">no query file &mdash; emitted directly as a ResultRow</p>
+</article>
+<article class="check sev-violation" id="TQL-004">
+<header class="check-head">
+<span class="cid">TQL-004</span>
+<h4>Constructed IRI variable never converted from a string</h4>
+<span class="pill pill-violation">Violation</span>
+</header>
+<p class="metric">constructed IRI well-formedness</p>
+<p class="desc">A ?x_IRI variable is bound to a CONCAT expression and nothing turns the result into an IRI. SPARQL's CONCAT returns a string and TARQL does not coerce it, so a triple using that variable in subject position is not a triple and is dropped -- for every input row, with no error. The same silent loss as TQL-002, reached from the opposite direction: TQL-002 catches the variable that was never bound, this one catches the variable bound to the wrong kind of thing, which looks more correct and is just as empty. Scoped to CONCAT expressions; a bare passthrough is left alone, since the value may already be an IRI from an earlier BIND.</p>
+<p class="fix"><span class="fix-label">Fix</span>Wrap the expression in tarql:expandPrefixedName() for a prefixed name, or IRI()/URI() for a full IRI.</p>
+<div class="check-foot"><span class="badge badge-sparql">SPARQL</span></div>
+<p class="src">sparql/tarql/TQL-004.rq</p>
+</article>
+<article class="check sev-warning" id="TQL-005">
+<header class="check-head">
+<span class="cid">TQL-005</span>
+<h4>Datatype-suffixed variable never given a datatype</h4>
+<span class="pill pill-warning">Warning</span>
+</header>
+<p class="metric">constructed literal well-formedness</p>
+<p class="desc">A ?x_DT variable -- the convention for a value given an explicit datatype with STRDT() -- is bound to an expression producing something else, usually a plain string from STR() or CONCAT(). This fails more quietly than TQL-004: the triple loads and queries perfectly well, carrying an untyped string where a date or a number was intended, and surfaces later as a range violation, a comparison in which "10" sorts before "9", or a date nothing can filter on. Reported only where the expression's value kind is positively recognised; a bare passthrough may have been typed by an earlier BIND.</p>
+<p class="fix"><span class="fix-label">Fix</span>Wrap the expression in STRDT(..., xsd:&lt;type&gt;), or rename the variable if it is not meant to carry a datatype.</p>
+<div class="check-foot"><span class="badge badge-sparql">SPARQL</span></div>
+<p class="src">sparql/tarql/TQL-005.rq</p>
 </article>
 </section>
 </section>

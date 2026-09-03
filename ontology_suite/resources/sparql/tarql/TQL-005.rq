@@ -1,0 +1,52 @@
+PREFIX sh:  <http://www.w3.org/ns/shacl#>
+PREFIX oq:  <https://semantechs.co.uk/ontology-quality/>
+PREFIX tq:  <https://semantechs.co.uk/ontology-quality/tarql/>
+
+# TQL-005: a datatype-suffixed variable that is not given a datatype.
+#
+# The sibling of TQL-004, and the reason the fact it reads is a *kind* rather
+# than a boolean. A TARQL folder marks a constructed variable by its suffix:
+# `?x_IRI` for a minted IRI, `?x_DT` for a value given an explicit datatype
+# with STRDT(). Both conventions make a promise about the term the BIND
+# produces, and both can be broken silently.
+#
+# This one fails more quietly than TQL-004. An unconverted `?x_IRI` drops the
+# triple outright; an unconverted `?x_DT` produces a triple that loads and
+# queries perfectly well, carrying a plain string where a date or an integer
+# was intended. Nothing errors. It surfaces later as a range violation
+# (CNF-004), a comparison that comes out wrong because "10" sorts before "9",
+# or a date nobody can filter on.
+#
+# The whole test is `tq:producesKind != "TypedLiteral"`. STRDT was originally
+# classed with the string functions in bind_analysis.VALUE_KIND_BY_CALL --
+# which answered TQL-004's question correctly by accident, since a typed
+# literal is not an IRI either, and made this check unwritable. Publishing
+# what the expression *produces* rather than a yes/no for one question is
+# what makes both checks a single triple pattern.
+#
+# Absent, never guessed: a bare `BIND(?x AS ?y_DT)` may be passing on a value
+# that was typed earlier, so nothing is reported unless the parser positively
+# recognised a different kind.
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Warning ;
+    sh:focusNode ?bind ;
+    sh:resultPath tq:expression ;
+    sh:value ?expression ;
+    sh:sourceConstraintComponent oq:TQL-005 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  ?bind a tq:Bind ;
+        tq:target ?target ;
+        tq:expression ?expression ;
+        tq:producesKind ?kind ;
+        tq:source ?source ;
+        tq:line ?line .
+  FILTER(?kind != "TypedLiteral")
+  FILTER(STRENDS(?target, "_DT") || STRENDS(?target, "_dt"))
+  BIND(CONCAT("?", ?target, " is named as a typed value but produces a ", ?kind,
+              " (", ?source, ":", STR(?line),
+              "). The triple will load and carry an untyped string. Wrap the ",
+              "expression in STRDT(..., xsd:<type>).") AS ?msg)
+}

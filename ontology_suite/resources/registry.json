@@ -649,6 +649,28 @@
       "remediation": "Check the variable against the CSV header. If there is no such column it is a typo, and the triple is silently dropped for every row.",
       "cucumber_feature": "TARQL Query Consistency",
       "cucumber_scenario": "Every unbound CONSTRUCT variable corresponds to a real CSV column"
+    },
+    {
+      "id": "TQL-004",
+      "category": "tarql",
+      "metric": "constructed IRI well-formedness",
+      "default_severity": "Violation",
+      "title": "Constructed IRI variable never converted from a string",
+      "description": "A ?x_IRI variable is bound to a CONCAT expression and nothing turns the result into an IRI. SPARQL's CONCAT returns a string and TARQL does not coerce it, so a triple using that variable in subject position is not a triple and is dropped -- for every input row, with no error. The same silent loss as TQL-002, reached from the opposite direction: TQL-002 catches the variable that was never bound, this one catches the variable bound to the wrong kind of thing, which looks more correct and is just as empty. Scoped to CONCAT expressions; a bare passthrough is left alone, since the value may already be an IRI from an earlier BIND.",
+      "remediation": "Wrap the expression in tarql:expandPrefixedName() for a prefixed name, or IRI()/URI() for a full IRI.",
+      "cucumber_feature": "TARQL Query Consistency",
+      "cucumber_scenario": "Every constructed IRI variable is bound to an IRI, not a string"
+    },
+    {
+      "id": "TQL-005",
+      "category": "tarql",
+      "metric": "constructed literal well-formedness",
+      "default_severity": "Warning",
+      "title": "Datatype-suffixed variable never given a datatype",
+      "description": "A ?x_DT variable -- the convention for a value given an explicit datatype with STRDT() -- is bound to an expression producing something else, usually a plain string from STR() or CONCAT(). This fails more quietly than TQL-004: the triple loads and queries perfectly well, carrying an untyped string where a date or a number was intended, and surfaces later as a range violation, a comparison in which \"10\" sorts before \"9\", or a date nothing can filter on. Reported only where the expression's value kind is positively recognised; a bare passthrough may have been typed by an earlier BIND.",
+      "remediation": "Wrap the expression in STRDT(..., xsd:<type>), or rename the variable if it is not meant to carry a datatype.",
+      "cucumber_feature": "TARQL Query Consistency",
+      "cucumber_scenario": "Every datatype-suffixed variable is bound to a typed literal"
     }
   ]
 }

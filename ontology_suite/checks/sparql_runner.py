@@ -24,9 +24,31 @@ class SparqlCheckOutcome:
     result_count: int
 
 
-def discover_queries(sparql_dir: str | Path) -> List[Path]:
+# Checks that read a graph nobody else builds, and so must not be run against
+# an ontology or a data graph. `sparql/tarql/` holds queries over the BIND
+# facts graph (sketch/bind_analysis.py::bind_report_to_graph) -- a vocabulary
+# an ontology never contains, so running them elsewhere costs a parse and
+# matches nothing. Excluded by name rather than left to match nothing anyway,
+# because "runs everywhere and is silent almost everywhere" is how a check
+# that has quietly stopped working looks.
+SUBJECT_SPECIFIC_DIRS = ("tarql",)
+
+
+def discover_queries(sparql_dir: str | Path, include_subject_specific: bool = False) -> List[Path]:
+    """Every `.rq` under `sparql_dir`, minus the subject-specific ones.
+
+    `include_subject_specific=True` is for a caller that has built the graph
+    those queries expect and wants them and nothing else -- pass that
+    subdirectory directly instead, which is what the sketch stage does.
+    """
     sparql_dir = Path(sparql_dir)
-    return sorted(sparql_dir.rglob("*.rq"))
+    found = sorted(sparql_dir.rglob("*.rq"))
+    if include_subject_specific:
+        return found
+    return [
+        p for p in found
+        if not set(p.relative_to(sparql_dir).parts[:-1]) & set(SUBJECT_SPECIFIC_DIRS)
+    ]
 
 
 def run_sparql_checks(graph: Graph, sparql_dir: str | Path) -> tuple[Graph, List[SparqlCheckOutcome]]:

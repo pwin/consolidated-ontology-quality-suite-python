@@ -194,6 +194,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     _add_import_args(skt)
     skt.add_argument("--file-pattern", default=tarql_visualiser.DEFAULT_QUERY_GLOBS)
     skt.add_argument("--registry", default=str(config.DEFAULT_REGISTRY_PATH))
+    skt.add_argument(
+        "--sparql", default=str(config.DEFAULT_SPARQL_DIR),
+        help="query tree holding the check files; its `tarql/` subdirectory is run against the "
+             "BIND facts graph built from --queries. Point it at your own tree to add "
+             "project-specific query-source checks -- see docs/TESTING_TARQL.md",
+    )
     skt.add_argument("--out-dir", default="out/sketch")
     skt.add_argument("--fail-on", default="never", choices=["Violation", "Warning", "Info", "never"])
     _add_verbose_arg(skt)
@@ -397,11 +403,12 @@ def cmd_sketch(args) -> int:
     stage = pipeline.run_sketch_stage(
         args.queries, out_dir, ontology_path=args.ontology, query_pattern=args.file_pattern,
         import_dir=args.import_dir, exclude_imports=args.exclude_imports, allow_network=args.allow_network,
-        verbose=args.verbose,
+        verbose=args.verbose, registry=registry, sparql_dir=args.sparql,
     )
     artifacts = [
         ("sketch.ttl", stage.artifacts["sketch_path"]),
         ("bind-review.txt", stage.artifacts["bind_report_path"]),
+        ("bind-facts.ttl", stage.artifacts["bind_facts_path"]),
     ]
     _write_reports(stage.rows, registry, out_dir, "TARQL/oxi-gen Sketch Report", artifacts)
     counts = _print_summary(stage.rows, out_dir, stage.warnings)
@@ -660,7 +667,7 @@ def cmd_run(args) -> int:
         stage = pipeline.run_sketch_stage(
             args.queries, out_dir / "sketch", ontology_path=args.ontology, query_pattern=args.query_pattern,
             import_dir=args.import_dir, exclude_imports=args.exclude_imports, allow_network=args.allow_network,
-            verbose=args.verbose,
+            verbose=args.verbose, registry=registry, sparql_dir=args.sparql,
         )
         rows += stage.rows
         warnings += stage.warnings

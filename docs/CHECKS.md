@@ -1,6 +1,6 @@
 # Check catalogue
 
-Generated from `registry.json` by `docs/generate_checks_md.py` -- 59 checks across 10 categories. Do not hand-edit; re-run the generator instead.
+Generated from `registry.json` by `docs/generate_checks_md.py` -- 61 checks across 10 categories. Do not hand-edit; re-run the generator instead.
 
 `registry.json` is shared data: the same file ships in the VS Code extension, which loads it at runtime and can be pointed at a checkout of this repo instead. So it declares every check *any* implementation produces, and the 3 the CLI cannot run are marked below.
 
@@ -487,6 +487,22 @@ Generated from `registry.json` by `docs/generate_checks_md.py` -- 59 checks acro
 - **Description:** A variable appears in a CONSTRUCT template but is not bound by a BIND and does not appear in the WHERE clause. This is ordinarily correct rather than a defect: TARQL binds each CSV header as a variable of the same name, so most such variables are simply columns. It is reported at Info because the only way to tell a column from a typo is to read the CSV header, which is a reviewer's judgement rather than something the query text can settle.
 - **Remediation:** Check the variable against the CSV header. If there is no such column it is a typo, and the triple is silently dropped for every row.
 - **Cucumber:** TARQL Query Consistency / Every unbound CONSTRUCT variable corresponds to a real CSV column
+
+### `TQL-004` -- Constructed IRI variable never converted from a string
+
+- **Default severity:** Violation
+- **Metric:** constructed IRI well-formedness
+- **Description:** A ?x_IRI variable is bound to a CONCAT expression and nothing turns the result into an IRI. SPARQL's CONCAT returns a string and TARQL does not coerce it, so a triple using that variable in subject position is not a triple and is dropped -- for every input row, with no error. The same silent loss as TQL-002, reached from the opposite direction: TQL-002 catches the variable that was never bound, this one catches the variable bound to the wrong kind of thing, which looks more correct and is just as empty. Scoped to CONCAT expressions; a bare passthrough is left alone, since the value may already be an IRI from an earlier BIND.
+- **Remediation:** Wrap the expression in tarql:expandPrefixedName() for a prefixed name, or IRI()/URI() for a full IRI.
+- **Cucumber:** TARQL Query Consistency / Every constructed IRI variable is bound to an IRI, not a string
+
+### `TQL-005` -- Datatype-suffixed variable never given a datatype
+
+- **Default severity:** Warning
+- **Metric:** constructed literal well-formedness
+- **Description:** A ?x_DT variable -- the convention for a value given an explicit datatype with STRDT() -- is bound to an expression producing something else, usually a plain string from STR() or CONCAT(). This fails more quietly than TQL-004: the triple loads and queries perfectly well, carrying an untyped string where a date or a number was intended, and surfaces later as a range violation, a comparison in which "10" sorts before "9", or a date nothing can filter on. Reported only where the expression's value kind is positively recognised; a bare passthrough may have been typed by an earlier BIND.
+- **Remediation:** Wrap the expression in STRDT(..., xsd:<type>), or rename the variable if it is not meant to carry a datatype.
+- **Cucumber:** TARQL Query Consistency / Every datatype-suffixed variable is bound to a typed literal
 
 ## Vocabulary integrity (closed-world axiom references) (`vocabulary`)
 

@@ -74,8 +74,12 @@ CATEGORIES = [
     ("tarql", "TARQL query consistency",
      "The only group that reads query <em>source</em> rather than a graph. A folder of TARQL "
      "queries is a program, and like any program it drifts: the same conceptual IRI ends up minted "
-     "two ways in two files, and nothing about either query is invalid. These findings come from "
-     "the query text, so no SPARQL or SHACL formulation of them is possible."),
+     "two ways in two files, and nothing about either query is invalid. The sketch graph cannot "
+     "see any of that &mdash; it keeps each query's CONSTRUCT template and discards the WHERE "
+     "clause &mdash; so the query source is published as its own facts graph instead "
+     "(<code>bind_report_to_graph</code>: a node per BIND, with its target, expression, skeleton, "
+     "file and line). Checks here are ordinary <code>.rq</code> files over <em>that</em> graph, "
+     "added the same way as any other; the three oldest predate it and are still native Python."),
 ]
 
 CLOSURE_SAFE = {"LOG-001", "LOG-002", "LOG-004", "LOG-005"}

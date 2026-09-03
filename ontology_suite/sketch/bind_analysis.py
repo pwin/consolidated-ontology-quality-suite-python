@@ -1,13 +1,22 @@
 """Cross-file review of the ``BIND`` statements in a folder of TARQL/oxi-gen
 CONSTRUCT queries.
 
-This is a *native* check in the sense of ``docs/EXTENDING.md`` -- there is no
+These are *native* checks in the sense of ``docs/EXTENDING.md``: there is no
 graph to pattern-match. ``tarql_visualiser.parse_query`` deliberately keeps
 only a query's prefixes and its ``CONSTRUCT`` template, turning each variable
 into a placeholder IRI; the ``WHERE`` clause, and with it every ``BIND``
 expression and the identity of every variable, is discarded before the sketch
-graph exists. So no SPARQL or SHACL formulation over the sketch can see any of
-what this module looks at. It reads the query text instead.
+graph exists. So no SPARQL or SHACL formulation over the *sketch* can see any
+of what this module looks at. It reads the query text instead.
+
+That is a reason to write these three in Python, and it was mistaken for a
+reason no TARQL check could ever be a query. ``bind_report_to_graph`` below
+publishes what this module parses -- a node per ``BIND`` carrying its target,
+expression, skeleton, file and line -- so a check over the query source is an
+ordinary ``.rq`` in ``resources/sparql/tarql/``, added with a registry entry
+and no code, exactly like ``STR-002``. Skeletonisation stays here because it
+is a parse and SPARQL cannot do it; asking whether two files disagree about a
+skeleton is then a ``GROUP BY``. Python parses, SPARQL asks.
 
 What it is for
 --------------
@@ -60,10 +69,23 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Dict, Iterable, List, Sequence, Set, Tuple
+from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
+
+import os
+from urllib.parse import quote
+
+from rdflib import Graph, Literal, Namespace, URIRef
+from rdflib.namespace import RDF, XSD
 
 from .. import io_utils
 from ..checks.merge import ResultRow
+
+# The vocabulary the BIND facts are published in, and the namespace their
+# nodes are minted under. `tq:` is the schema, `tqd:` the data -- the same
+# split every ontology in this suite's own examples keeps, and the reason
+# a finding's focus node reads as a place in a file rather than a hash.
+TQ = Namespace("https://semantechs.co.uk/ontology-quality/tarql/")
+TQD = Namespace("https://semantechs.co.uk/ontology-quality/tarql/data/")
 
 # The naming convention that says "this variable is constructed, not read from
 # a column". Configurable because it is a convention, not a rule -- but it is
@@ -199,6 +221,104 @@ def skeleton(expression: str) -> str:
     return " ".join(VARIABLE.sub("?", expression).split())
 
 
+# Matches a call at the head of an expression, prefixed or not, so
+# `tarql:expandPrefixedName(` and `CONCAT(` are both recognised.
+CALL_HEAD = re.compile(r"^([A-Za-z_][A-Za-z0-9_.-]*(?::[A-Za-z_][A-Za-z0-9_.-]*)?)\s*\(")
+
+# What kind of RDF term an expression yields, keyed on the outermost call's
+# local name so a prefixed call is recognised whatever prefix the query bound.
+#
+# The kinds are the ones a naming convention can be checked against. A TARQL
+# folder marks a constructed variable by its suffix -- `?x_IRI` for a minted
+# IRI, and some projects `?x_DT` for a value given a datatype -- and the
+# check that convention needs is "does this expression actually produce that
+# kind of term". `STRDT` was originally filed with the string functions here,
+# which answered the `_IRI` question correctly by accident and made the `_DT`
+# question unaskable: it does not produce a string, it produces a typed
+# literal, and that distinction is the whole point of the convention.
+#
+# Deliberately not exhaustive. An unrecognised function means "cannot tell",
+# published as the *absence* of a fact rather than as a guess, so a check
+# reading this can never fire on something the parser did not actually
+# recognise.
+VALUE_KIND_BY_CALL = {
+    # -> an IRI
+    "iri": "IRI", "uri": "IRI", "expandprefixedname": "IRI",
+    # -> a literal carrying an explicit datatype
+    "strdt": "TypedLiteral",
+    # -> a literal carrying a language tag
+    "strlang": "LangLiteral",
+    # -> a plain (xsd:string) literal
+    "concat": "String", "str": "String", "substr": "String",
+    "replace": "String", "ucase": "String", "lcase": "String",
+    "strafter": "String", "strbefore": "String", "encode_for_uri": "String",
+}
+
+
+def outermost_call(expression: str) -> Optional[str]:
+    """The function whose result *is* the expression, or None.
+
+    None for a bare variable, a bare literal, or anything that is not a
+    single wrapping call -- `f(a) + g(b)` has no outermost call in the sense
+    that matters here, and saying so is better than picking one.
+    """
+    text = expression.strip()
+    head = CALL_HEAD.match(text)
+    if head is None:
+        return None
+    close = _matching(text, head.end() - 1, "(", ")")
+    if close != len(text) - 1:
+        return None                       # the call ends before the expression does
+    return head.group(1)
+
+
+def value_kind(expression: str) -> Optional[str]:
+    """What kind of RDF term the expression yields -- ``"IRI"``,
+    ``"TypedLiteral"``, ``"LangLiteral"``, ``"String"`` -- or None for
+    "cannot tell from the query text".
+
+    This is the fact the suffix conventions are really about, and computing
+    it here rather than in the check is the point. SPARQL can only ask
+    whether the expression *text* contains ``"IRI("`` -- a heuristic that
+    misreads ``MYIRI(``, misses a bare string literal, and cannot tell the
+    outermost call from a nested one. The parser already knows, because
+    ``_matching`` had to bracket-match to find the expression at all.
+
+    That is the division this module and ``resources/sparql/tarql/`` keep to:
+    anything needing the *structure* of the query text is computed here and
+    published as a fact; anything relating facts to each other is a query.
+    The rule is not difficulty -- ``TQL-001``'s cross-file skeleton
+    comparison is a nested aggregate and would be a perfectly good query --
+    it is whether a ``FILTER`` would be re-deriving what the parse knew.
+
+    None is returned generously. A bare variable may already hold an IRI
+    from an earlier ``BIND``; an unrecognised function may do anything. A
+    check reading this fact therefore never fires on an expression this
+    module merely failed to understand, which is what lets such a check
+    carry Violation severity.
+    """
+    text = expression.strip()
+    call = outermost_call(text)
+    if call is not None:
+        return VALUE_KIND_BY_CALL.get(call.rsplit(":", 1)[-1].lower())
+    if text[:1] in ('"', "'"):
+        # A bare literal. `"x"^^xsd:date` and `"x"@en` carry their own kind;
+        # anything else is a plain string.
+        if "^^" in text:
+            return "TypedLiteral"
+        if re.search(r'"@[A-Za-z]', text) or re.search(r"'@[A-Za-z]", text):
+            return "LangLiteral"
+        return "String"
+    return None                           # a bare variable: it may be anything
+
+
+def produces_iri(expression: str) -> Optional[bool]:
+    """``value_kind`` narrowed to the question ``TQL-004`` asks. None where
+    the kind is unknown, so "not an IRI" is never inferred from silence."""
+    kind = value_kind(expression)
+    return None if kind is None else kind == "IRI"
+
+
 @dataclass(frozen=True)
 class BindStatement:
     source: str
@@ -209,6 +329,18 @@ class BindStatement:
     @property
     def skeleton(self) -> str:
         return skeleton(self.expression)
+
+    @property
+    def outermost_call(self) -> Optional[str]:
+        return outermost_call(self.expression)
+
+    @property
+    def value_kind(self) -> Optional[str]:
+        return value_kind(self.expression)
+
+    @property
+    def produces_iri(self) -> Optional[bool]:
+        return produces_iri(self.expression)
 
 
 @dataclass
@@ -348,6 +480,97 @@ def analyse(
                 looks_constructed=variable.endswith(suffixes),
             ))
     return report
+
+
+def bind_report_to_graph(
+    report: BindReport,
+    constructed_suffixes: Iterable[str] = DEFAULT_CONSTRUCTED_SUFFIXES,
+) -> Graph:
+    """``BindReport`` as RDF, so a TARQL check can be a query file.
+
+    This exists to close a gap in how the suite is extended. A new SPARQL or
+    SHACL check is a file plus a registry entry and no code at all, because
+    the thing being checked is a graph and the runner needs to understand
+    nothing about it. A new TARQL check needed Python, because the thing
+    being checked -- the text of a `BIND` expression -- never became a graph:
+    `tarql_visualiser` keeps each query's CONSTRUCT template and discards the
+    WHERE clause before `sketch.ttl` exists.
+
+    So publish the facts instead of the findings. Every `BIND` becomes a node
+    carrying its target, its expression, its skeleton, its file and its line;
+    every CONSTRUCT variable becomes a node saying whether it was bound and
+    whether its name follows the constructed-IRI convention. A check over
+    those is an ordinary `.rq` file in `resources/sparql/tarql/`, added
+    exactly the way `STR-002` is added.
+
+    The division of labour is the honest one rather than a compromise:
+    skeletonisation is a parse and stays in Python, because SPARQL cannot do
+    it. Once the skeleton is a literal in the graph, asking whether two files
+    disagree about one is a `GROUP BY`. Python parses; SPARQL asks.
+
+    Node IRIs are derived from the file's basename plus the line, so they are
+    stable across runs and legible in a report -- a finding's focus node
+    reads as the place to open, which is what a query-source finding has
+    instead of a subject IRI. Two files with the same basename in different
+    directories would collide; the path is on the query node so the
+    distinction is not lost, and a folder holding two `road_to_rdf.rq` is its
+    own problem.
+    """
+    suffixes = tuple(constructed_suffixes)
+    graph = Graph(bind_namespaces="none")
+    graph.bind("tq", TQ)
+    graph.bind("tqd", TQD)
+    graph.bind("xsd", XSD)
+
+    for query in report.queries:
+        name = os.path.basename(query.source)
+        query_node = URIRef(TQD + quote(name, safe=""))
+        graph.add((query_node, RDF.type, TQ.Query))
+        graph.add((query_node, TQ.source, Literal(name)))
+        graph.add((query_node, TQ.path, Literal(query.source)))
+
+        for bind in query.binds:
+            bind_node = URIRef(f"{query_node}/bind/{bind.line}")
+            graph.add((bind_node, RDF.type, TQ.Bind))
+            graph.add((bind_node, TQ.inQuery, query_node))
+            graph.add((bind_node, TQ.target, Literal(bind.target)))
+            graph.add((bind_node, TQ.expression, Literal(bind.expression)))
+            graph.add((bind_node, TQ.skeleton, Literal(bind.skeleton)))
+            graph.add((bind_node, TQ.line, Literal(bind.line, datatype=XSD.integer)))
+            graph.add((bind_node, TQ.source, Literal(name)))
+
+            # The two facts that need the parse rather than the text. A check
+            # asking "does this build an IRI" would otherwise have to search
+            # the expression for "IRI(", which misreads `MYIRI(`, misses a
+            # bare string literal entirely, and cannot tell the outermost
+            # call from a nested one. `_matching` already bracket-matched to
+            # find the expression; throwing that away and regexing the result
+            # is the mistake this whole graph exists to avoid.
+            call = bind.outermost_call
+            if call is not None:
+                graph.add((bind_node, TQ.outermostCall, Literal(call)))
+            kind = bind.value_kind
+            if kind is not None:
+                # Absent, never guessed, when the text does not settle it --
+                # a bare variable may already hold an IRI from an earlier
+                # BIND. A check reading this fact therefore cannot fire on
+                # something the parser merely failed to recognise, which is
+                # what lets one carry Violation severity.
+                graph.add((bind_node, TQ.producesKind, Literal(kind)))
+
+        # Both the bound and the unbound are published. A check about what a
+        # query *does* bind is as reasonable as one about what it misses, and
+        # emitting only the gaps would make the first kind unwritable.
+        for variable in sorted(query.construct_vars):
+            var_node = URIRef(f"{query_node}/var/{quote(variable, safe='')}")
+            graph.add((var_node, RDF.type, TQ.ConstructVariable))
+            graph.add((var_node, TQ.inQuery, query_node))
+            graph.add((var_node, TQ.variable, Literal(variable)))
+            graph.add((var_node, TQ.source, Literal(name)))
+            graph.add((var_node, TQ.bound, Literal(variable in query.bound)))
+            graph.add((var_node, TQ.constructed, Literal(variable.endswith(suffixes))))
+
+    return graph
 
 
 def bind_report_to_rows(report: BindReport) -> List[ResultRow]:
