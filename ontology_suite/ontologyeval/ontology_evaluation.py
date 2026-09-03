@@ -172,7 +172,11 @@ def resolve_imports(main_path, import_dir=None, allow_network=False, glob_patter
     imports) reference, preferring a local file in `import_dir` (searched
     recursively) and falling back to an HTTP fetch only if `allow_network`.
 
-    Returns (merged_graph, report) where report = {"resolved": [...], "unresolved": [...]}.
+    Returns (merged_graph, report). The report carries what was resolved and
+    what was not, plus what was searched: ``search_dir`` and
+    ``search_dir_missing`` exist so a caller can tell "the imports are not in
+    this directory" from "this directory is not there", which look identical
+    from the unresolved list alone.
     """
     main_graph = _parse_file(main_path)
     merged = rdflib.Graph(bind_namespaces="none")
@@ -182,6 +186,16 @@ def resolve_imports(main_path, import_dir=None, allow_network=False, glob_patter
         merged.add(triple)
 
     search_dir = import_dir or os.path.dirname(os.path.abspath(main_path)) or "."
+    # A `--import-dir` that does not exist is the single easiest way to get a
+    # run that looks like an import-resolution failure and is not one. glob
+    # returns nothing for a missing directory rather than raising, so every
+    # import came back unresolved and the only message named the imports --
+    # never the directory. Reported twice from real use, both times a
+    # mistyped path (a wrong drive letter, then a singular/plural slip)
+    # sitting beside two correct ones on the same command line. The
+    # directory is the thing the user can check, so the report has to name
+    # it.
+    search_dir_missing = bool(import_dir) and not os.path.isdir(search_dir)
     candidate_files = sorted(
         {
             p
@@ -271,6 +285,10 @@ def resolve_imports(main_path, import_dir=None, allow_network=False, glob_patter
         "network_allowed": allow_network,
         "unparsable": [{"source": k, "error": v} for k, v in sorted(unparsable.items())],
         "ambiguous": ambiguous,
+        "search_dir": search_dir,
+        "search_dir_missing": search_dir_missing,
+        "search_dir_explicit": bool(import_dir),
+        "candidate_count": len(candidate_files),
     }
 
 
@@ -285,6 +303,8 @@ def load_without_imports(main_path):
     return graph, {
         "resolved": [], "unresolved": [], "excluded": excluded,
         "network_allowed": False, "unparsable": [], "ambiguous": [],
+        "search_dir": None, "search_dir_missing": False,
+        "search_dir_explicit": False, "candidate_count": 0,
     }
 
 

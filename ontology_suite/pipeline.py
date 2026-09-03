@@ -221,6 +221,23 @@ def import_warnings(ontology_path: str | Path, report: dict) -> List[str]:
     into ``StageResult.warnings`` so the run summary shows them by default.
     """
     warnings: List[str] = []
+    # Named before the unresolved list, because it explains it. A
+    # `--import-dir` that does not exist resolves nothing and reads exactly
+    # like an ontology whose imports are genuinely missing -- the unresolved
+    # list is identical either way. Reported twice from real use, both a
+    # mistyped path given alongside two correct ones, and both times the
+    # output pointed at the imports rather than at the directory that was
+    # never opened.
+    if report.get("search_dir_explicit") and report.get("search_dir_missing"):
+        warnings.append(
+            f"--import-dir {report['search_dir']} does not exist -- no local file was searched, so "
+            "every owl:imports below is unresolved for that reason alone. Check the path."
+        )
+    elif report.get("search_dir_explicit") and report.get("candidate_count") == 0 and report["unresolved"]:
+        warnings.append(
+            f"--import-dir {report['search_dir']} exists but holds no ontology files matching "
+            f"{ontology_evaluation.DEFAULT_IMPORT_GLOBS} -- nothing local was available to resolve against."
+        )
     if report["unresolved"]:
         warnings.append(
             f"{ontology_path}: {len(report['unresolved'])} owl:imports UNRESOLVED "
