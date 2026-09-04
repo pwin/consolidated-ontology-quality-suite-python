@@ -32,6 +32,12 @@ stops being read.
 Skipped when the sibling checkout is absent, which is the common case in CI
 and on a machine that only has one of the two. That makes this a test for
 whoever edits both -- which is precisely who breaks it.
+
+All of that is about shared *data*. Where the two repos share an *algorithm*
+-- hand-written twice, once per language -- a file comparison is blind to it,
+and `test_strip_comments_parity.py` is the pattern for that case: one fixture
+of inputs and expected outputs, carried by both repos, run against each side's
+own port.
 """
 import os
 from pathlib import Path

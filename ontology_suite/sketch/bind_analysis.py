@@ -108,6 +108,12 @@ def strip_comments(text: str) -> str:
     queries build IRIs out of exactly such literals) would truncate the
     expression. This scanner tracks IRI brackets and both quote styles, and
     only treats ``#`` as a comment outside them.
+
+    The VS Code extension carries a hand-written port of this
+    (``src/triplify/bindAnalysis.ts``), and both back a user-visible edit --
+    ``--apply-repairs`` here, rename there. ``tests/test_strip_comments_parity``
+    runs both against one shared fixture; change the behaviour and the fixture
+    changes with it, in both repos.
     """
     out = []
     i, n = 0, len(text)

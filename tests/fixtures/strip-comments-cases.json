@@ -1,0 +1,101 @@
+{
+  "description": "Shared behavioural fixture for the comment masker that both suites carry: `strip_comments` in ontology_suite/sketch/bind_analysis.py, and `stripComments` in src/triplify/bindAnalysis.ts. Both must return exactly `expected` for each `input`, and `expected` is always the same length as `input` -- comments are blanked to spaces rather than removed, so every offset reported afterwards still indexes the real document. Kept identical in both repos; test_strip_comments_parity.py and stripCommentsParity.test.ts run their own port against their own copy, and compare the copies when both checkouts are present. The cases are maintained by hand, not generated from either implementation: a generated fixture only ever restates what the code already does, and would have agreed with both ports on the day they were both wrong.",
+  "cases": [
+    {
+      "name": "a trailing comment is blanked",
+      "why": "The defect both ports shipped: a line-oriented scan that only skipped a line *starting* with `#` left this comment fully in scope, so the rename rewrote the note explaining the rename.",
+      "input": "ex:Dog a owl:Class .  # was ex:Dgo",
+      "expected": "ex:Dog a owl:Class .              "
+    },
+    {
+      "name": "a whole-line comment is blanked",
+      "why": "The case the old line-oriented scan did get right.",
+      "input": "# whole line\n:b a :C .",
+      "expected": "            \n:b a :C ."
+    },
+    {
+      "name": "a fragment IRI keeps its local name",
+      "why": "`#` is the fragment separator in almost every RDF namespace. A naive `#`-to-end-of-line strip truncates the term and every CURIE after it.",
+      "input": "<http://example.org/ns#Term> a owl:Class .",
+      "expected": "<http://example.org/ns#Term> a owl:Class ."
+    },
+    {
+      "name": "a comment after a fragment IRI is still blanked",
+      "why": "The IRI must close the exemption, not extend it to the rest of the line.",
+      "input": ":a :p <http://x#y> . # x",
+      "expected": ":a :p <http://x#y> .    "
+    },
+    {
+      "name": "a hash inside a double-quoted literal is not a comment",
+      "why": "A term named in an sh:message is text, not a remark.",
+      "input": "sh:message \"ex:Dog # not a comment\" .",
+      "expected": "sh:message \"ex:Dog # not a comment\" ."
+    },
+    {
+      "name": "a hash inside a single-quoted literal is not a comment",
+      "why": "Both quote styles are legal in Turtle and SPARQL.",
+      "input": ":a :p 'single # quoted' .",
+      "expected": ":a :p 'single # quoted' ."
+    },
+    {
+      "name": "a line of a triple-quoted literal may begin with a hash",
+      "why": "The reason this reads the text straight through rather than line by line: a multi-line literal's quoting state does not survive a split.",
+      "input": ":a rdfs:comment \"\"\"line one\n# still literal\nline three\"\"\" .",
+      "expected": ":a rdfs:comment \"\"\"line one\n# still literal\nline three\"\"\" ."
+    },
+    {
+      "name": "an escaped quote does not end the literal",
+      "why": "Ending the literal early would put the rest of the line back in scope and blank a real term as though it were a remark.",
+      "input": ":a :p \"esc \\\" then # still literal\" . # real",
+      "expected": ":a :p \"esc \\\" then # still literal\" .       "
+    },
+    {
+      "name": "a TARQL IRI template survives with its comment blanked",
+      "why": "The shape both ports exist to handle: a CURIE built inside a literal is a real term reference, and the remark beside it is not.",
+      "input": "BIND(CONCAT(\"exd:_A_\", ?id) AS ?a)  # trailing",
+      "expected": "BIND(CONCAT(\"exd:_A_\", ?id) AS ?a)            "
+    },
+    {
+      "name": "text with no comment is returned unchanged",
+      "why": "The identity case. A masker that alters uncommented text is worse than no masker.",
+      "input": "no comment at all",
+      "expected": "no comment at all"
+    },
+    {
+      "name": "an unclosed literal swallows the rest of the input",
+      "why": "Malformed input must not crash and must not be quietly repaired. Both ports read the rest of the text as literal, so nothing is blanked and a `#` that was probably meant as a comment stays in scope. That is a guess either way; what matters is that the two ports guess alike, since a file this broken should be failing its parser, not its masker.",
+      "input": ":a :p \"unclosed # literal",
+      "expected": ":a :p \"unclosed # literal"
+    },
+    {
+      "name": "a bare less-than is not an IRI",
+      "why": "`<` only opens an IRI when a well-formed one follows, so the `#` here is an ordinary comment.",
+      "input": ":a :p <not an iri # comment",
+      "expected": ":a :p <not an iri          "
+    },
+    {
+      "name": "a comment at end of input needs no newline",
+      "why": "The end-of-text branch: the search for the line ending finds none, and the comment runs to the end of the text.",
+      "input": ":a a :C . # last",
+      "expected": ":a a :C .       "
+    },
+    {
+      "name": "a CRLF line ending keeps every later offset true",
+      "why": "The CR sits between the comment and the LF, so it is inside the blanked span and both ports space it over. That costs nothing -- the newline stays where it was and the length is unchanged, which is all a mask owes its caller -- but it is worth pinning, because a port that stopped one character earlier would shift every offset after it.",
+      "input": ":a a :C . # x\r\n:b a :C .\r\n",
+      "expected": ":a a :C .     \n:b a :C .\r\n"
+    },
+    {
+      "name": "empty input",
+      "why": "The degenerate case, pinned because both ports index into the text.",
+      "input": "",
+      "expected": ""
+    },
+    {
+      "name": "a hash immediately after an IRI closes",
+      "why": "No space between `>` and `#`: the exemption ends at the bracket.",
+      "input": ":a :p <http://x#y>#note",
+      "expected": ":a :p <http://x#y>     "
+    }
+  ]
+}
