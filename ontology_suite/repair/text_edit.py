@@ -73,12 +73,48 @@ def render_term(iri: str, prefixes: Dict[str, str]) -> str:
     return f"{prefix}:{local}" if prefix else f"<{iri}>"
 
 
+def _sub_outside_comments(text: str, pattern: re.Pattern, replacement: str) -> str:
+    """`pattern.sub` restricted to the parts of `text` that are not comments.
+
+    A rename is a code edit; a comment is prose *about* code. Substituting
+    into both turned a true remark into a false one: a comment reading
+    *"every row is typed `acme:Engineer`, which v2.0.0 renames to
+    `acme:SoftwareEngineer`"* became *"every row is typed
+    `acme:SoftwareEngineer`, which v2.0.0 renames to
+    `acme:SoftwareEngineer`"* -- harmless to the query, nonsense to the next
+    reader, and worse than leaving it alone.
+
+    String literals are deliberately still rewritten. In a TARQL query an IRI
+    template is built out of literals -- `CONCAT("acme:_Engineer_", ?id)` --
+    so a term rename usually *must* reach inside them. That is a judgement
+    about this domain, not a general rule, and it is why this is not simply
+    "substitute outside comments and strings".
+
+    `strip_comments` blanks comments to spaces while preserving every other
+    offset, so a match found in the mask has the same position in the
+    original, and the original's text can be spliced around it.
+    """
+    from ..sketch.bind_analysis import strip_comments   # local: keeps this module's imports light
+
+    masked = strip_comments(text)
+    out, last = [], 0
+    for match in pattern.finditer(masked):
+        out.append(text[last:match.start()])
+        out.append(replacement)
+        last = match.end()
+    out.append(text[last:])
+    return "".join(out)
+
+
 def replace_term(text: str, old_iri: str, new_iri: str, prefixes: Dict[str, str]) -> str:
     """Replaces every occurrence of `old_iri` in `text` -- whether written
     as `<old_iri>` or as a `prefix:localName` CURIE under any of `prefixes`
     that happens to bind `old_iri`'s namespace -- with the best available
     rendering of `new_iri` (a CURIE if `prefixes` already binds its
-    namespace, otherwise a bracketed IRI)."""
+    namespace, otherwise a bracketed IRI).
+
+    Comments are left alone; see `_sub_outside_comments` for why, and for why
+    string literals are not."""
     new_term = render_term(new_iri, prefixes)
     namespace, local = split_iri(old_iri)
 
@@ -88,5 +124,5 @@ def replace_term(text: str, old_iri: str, new_iri: str, prefixes: Dict[str, str]
             patterns.append(re.compile(r"(?<![:\w])" + re.escape(name) + r":" + re.escape(local) + r"\b"))
 
     for pattern in patterns:
-        text = pattern.sub(new_term, text)
+        text = _sub_outside_comments(text, pattern, new_term)
     return text

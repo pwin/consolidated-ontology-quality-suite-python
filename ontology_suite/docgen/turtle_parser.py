@@ -171,12 +171,30 @@ def _to_prefixes(graph):
 # Public entry point
 # ---------------------------------------------------------------------------
 
-def parse_turtle(text):
-    """Parse Turtle text, returning (triples, prefixes) where triples is
+def parse_turtle(text, source=None):
+    """Parse RDF text, returning (triples, prefixes) where triples is
     a list of (subject, predicate, object) tuples using the IRI/BNode/
     Literal/Collection term types above, and prefixes is a
-    {prefix: IRI} dict of exactly the @prefix declarations present in
-    the source text."""
+    {prefix: IRI} dict of exactly the prefix declarations present in
+    the source text.
+
+    Named for Turtle because that is what `--ontology` is, and Turtle stays
+    the assumption when nothing says otherwise. `source` is the path the text
+    came from, when there is one: `--ref` takes whatever serialisation the
+    upstream vocabulary publishes, and FOAF publishes RDF/XML. Handing that
+    to the Turtle parser crashed on the XML comment header -- a real report,
+    and an unhelpful one, since the error named a Turtle syntax problem in a
+    file containing no Turtle.
+
+    `io_utils.resolve_format` decides: the extension's guess, overridden when
+    the content plainly disagrees. Bytes are evidence, an extension is only a
+    claim -- and `.owl` files written in Turtle are common enough that the
+    override earns its keep in both directions.
+    """
     graph = _RDFLibGraph(bind_namespaces="none")
-    graph.parse(data=text, format="turtle")
+    if source is None:
+        graph.parse(data=text, format="turtle")
+    else:
+        from .. import io_utils
+        graph.parse(data=text, format=io_utils.resolve_format(source, text.encode("utf-8")))
     return _to_triples(graph), _to_prefixes(graph)

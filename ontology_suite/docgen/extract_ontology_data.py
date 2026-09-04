@@ -115,6 +115,39 @@ STRUCTURAL_PREFIXES = {"rdf", "rdfs", "owl", "xsd", "xml"}
 
 LABEL_PREDICATES = [IRI(SKOS + "prefLabel"), RDFS_LABEL, IRI(DC + "title"), IRI(DCTERMS + "title")]
 DEFINITION_PREDICATES = [IRI(SKOS + "definition"), RDFS_COMMENT, IRI(DC + "description"), IRI(DCTERMS + "description")]
+
+# The language a generated document is written in. Not configurable yet; naming
+# it means the choice is made once and visibly, rather than by whichever
+# literal a parser happened to yield first.
+DOC_LANGUAGE = "en"
+
+
+def preferred_literal(values, language=DOC_LANGUAGE):
+    """The best of several annotation values for one predicate.
+
+    Taking `values[0]` is fine while every annotation is in one language,
+    which was true of every fixture here and of most ontologies under test.
+    It stops being fine the moment `--ref` points at a published vocabulary:
+    W3C's `org.ttl` carries `rdfs:comment` in English, French, Italian and
+    Spanish, and five identical runs of one docgen command produced the
+    definition in three different languages. The order `graph.objects`
+    returns depends on Python's per-process string hashing, so this was not
+    merely a wrong choice -- it was a different wrong choice each run, in a
+    document meant to be diffable.
+
+    Preference: the wanted language, then an untagged literal (what a
+    single-language ontology writes), then the first in sorted order -- so a
+    vocabulary offering nothing in `language` still contributes a definition
+    rather than a blank, and contributes the same one every time.
+    """
+    if not values:
+        return None
+    tagged = [v for v in values if isinstance(v, Literal)]
+    for want in (language, None):
+        for value in tagged:
+            if getattr(value, "lang", None) == want:
+                return value
+    return sorted(values, key=lambda v: str(getattr(v, "value", v)))[0]
 EXAMPLE_PREDICATES = [IRI(SKOS + "example")]
 SCOPE_NOTE_PREDICATES = [IRI(SKOS + "scopeNote"), IRI(SKOS + "note")]
 
@@ -256,7 +289,7 @@ def extract_ontology_header(graph, ns_to_prefix):
         for pred in preds:
             vals = graph.objects(subj, pred)
             if vals:
-                v = vals[0]
+                v = preferred_literal(vals)
                 return v.value if isinstance(v, Literal) else str(v)
         return ""
 
@@ -408,7 +441,7 @@ def extract(graph, ns_to_prefix, local_ns, local_prefix, ontology_text):
             for pred in preds:
                 vals = graph.objects(subj, pred)
                 if vals:
-                    v = vals[0]
+                    v = preferred_literal(vals)
                     return v.value if isinstance(v, Literal) else str(v)
             return ""
 
@@ -475,12 +508,33 @@ def extract(graph, ns_to_prefix, local_ns, local_prefix, ontology_text):
     return classes, obj_props, dt_props, sections_in_order
 
 
-def get_definition_from_reference(ref_graph, ref_ns_to_prefix, term_curie):
-    # find the subject whose curie matches term_curie
+def get_definition_from_reference(ref_graph, term_iri):
+    """Look the term up in a `--ref` vocabulary by its IRI.
+
+    By IRI, not by CURIE, and that is the whole point. This compared the
+    CURIE the *reference* file would write against the CURIE the *ontology*
+    wrote, so resolution depended on two independent files having chosen the
+    same prefix -- and silently found nothing when they had not.
+
+    Which is the common case, not an edge case. A published vocabulary
+    typically declares its own namespace twice: once named, once as the
+    default. W3C's `org.ttl` has both `@prefix org:` and `@prefix :` for
+    `http://www.w3.org/ns/org#`; the prefix map is built by inverting
+    {prefix: ns}, so the later declaration wins and every term in it renders
+    `:OrganizationalUnit`. The ontology under test calls the same term
+    `org:OrganizationalUnit`. The strings differ, the lookup fails, and the
+    output reports "5 external terms (0 resolved)" while sitting on a file
+    that defines them.
+
+    `extract_external_reuse` above already learned this -- its local-namespace
+    test compares namespace URIs precisely because several prefixes can alias
+    one namespace, with a comment saying so. The lesson had not reached here.
+    An IRI is the term's identity; a prefix is one file's shorthand for it.
+    """
     for subj in ref_graph._by_subject:
         if not isinstance(subj, IRI):
             continue
-        if curie(subj, ref_ns_to_prefix) == term_curie:
+        if str(subj) == str(term_iri):
             types = set(ref_graph.types(subj))
             if OWL_CLASS in types:
                 kind = "Class"
@@ -493,7 +547,7 @@ def get_definition_from_reference(ref_graph, ref_ns_to_prefix, term_curie):
             for pred in DEFINITION_PREDICATES:
                 vals = ref_graph.objects(subj, pred)
                 if vals:
-                    v = vals[0]
+                    v = preferred_literal(vals)
                     return {"kind": kind, "definition": v.value if isinstance(v, Literal) else str(v)}
             return {"kind": kind, "definition": ""}
     return None
@@ -540,7 +594,9 @@ def extract_external_reuse(graph, ns_to_prefix, local_ns, ref_graphs_and_ns):
         if c.endswith(":"):
             return  # e.g. an owl:imports target that is itself exactly a
                      # declared namespace URI with no local name - not a term
-        external_terms.add(c)
+        # The CURIE is what the reader sees; the IRI is what the lookup uses.
+        # Keeping both is what stops the two files' prefix choices mattering.
+        external_terms.add((c, str(term)))
 
     for s, p, o in graph.triples:
         for term in (s, p, o):
@@ -551,10 +607,10 @@ def extract_external_reuse(graph, ns_to_prefix, local_ns, ref_graphs_and_ns):
                 maybe_add(term)
 
     reuse = []
-    for term_curie in sorted(external_terms):
+    for term_curie, term_iri in sorted(external_terms):
         info = None
-        for ref_graph, ref_ns in ref_graphs_and_ns:
-            info = get_definition_from_reference(ref_graph, ref_ns, term_curie)
+        for ref_graph, _ref_ns in ref_graphs_and_ns:
+            info = get_definition_from_reference(ref_graph, term_iri)
             if info:
                 break
         if info:
@@ -620,7 +676,7 @@ def main(argv=None):
     ref_graphs_and_ns = []
     for ref_path in args.ref:
         ref_text = read_normalized(ref_path)
-        ref_triples, ref_prefixes = parse_turtle(ref_text)
+        ref_triples, ref_prefixes = parse_turtle(ref_text, source=ref_path)
         ref_graph = Graph(ref_triples)
         ref_ns_to_prefix = build_ns_maps(ref_prefixes)
         ref_graphs_and_ns.append((ref_graph, ref_ns_to_prefix))

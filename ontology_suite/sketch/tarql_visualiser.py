@@ -95,6 +95,56 @@ def variables_to_entities(construct_text):
     return VARIABLE_PATTERN.sub(r":\1", construct_text)
 
 
+def terminate_block(turtle_text):
+    """Ensure one CONSTRUCT block's turtle ends in a statement terminator.
+
+    SPARQL lets the last triple of a template omit its ``.`` before the
+    closing brace, and lets a property list end on a dangling ``;``. Both are
+    legal and neither is legal Turtle, so a block copied out verbatim
+    produced a ``sketch.ttl`` that this suite then failed to parse -- a crash
+    on a valid input file, in the stage whose whole job is reading valid
+    input files.
+
+    Terminating each *block* rather than the file is what makes this
+    complete. ``parse_query`` joins blocks with a newline, so a file with two
+    CONSTRUCTs where only the first is unterminated glues the second onto it;
+    a terminator added at the end of the file would fix the single-block case
+    and leave that one broken. Three shapes, three different parser messages,
+    one cause:
+
+      one block, no final ``.``        -> "EOF found after object"
+      two blocks, first unterminated   -> "expected '.' or '}' or ']'"
+      trailing ``;`` before ``}``      -> "objectList expected"
+
+    None of them ever produced *wrong* triples -- Turtle rejects all three
+    rather than splicing them into something valid -- so this was always a
+    crash and never bad data. Worth knowing, since it is the first question
+    anyone asks of a bug in a writer.
+
+    Comments are why this is not a one-line ``rstrip``. A block may end with
+    a trailing comment (this repo's own fixtures do), and appending " ." to
+    that line puts the terminator inside the comment. The comment scanner
+    from ``bind_analysis`` blanks comments while preserving offsets, so the
+    last *meaningful* character can be found in the mask and acted on in the
+    original.
+    """
+    from .bind_analysis import strip_comments   # local: keeps this module's imports light
+
+    masked = strip_comments(turtle_text).rstrip()
+    if not masked:
+        return turtle_text.rstrip()
+    last = len(masked) - 1
+    char = masked[last]
+    if char == ".":
+        return turtle_text.rstrip()
+    if char in ";,":
+        # A dangling separator: the statement is complete, so make it say so
+        # rather than appending a "." that would follow an empty object list.
+        return (turtle_text[:last] + "." + turtle_text[last + 1:]).rstrip()
+    # On its own line, so a trailing comment cannot swallow it.
+    return turtle_text.rstrip() + "\n."
+
+
 def parse_query(path):
     """Read one query file (a local path, an http(s) URL, or either
     gzip-compressed) and pull out its prefixes and turtle-ified CONSTRUCT
@@ -102,7 +152,10 @@ def parse_query(path):
     text = io_utils.read_text(path)
     prefixes = extract_prefixes(text)
     blocks = extract_construct_blocks(text)
-    triples = "\n".join(variables_to_entities(block).strip() for block in blocks if block.strip())
+    triples = "\n".join(
+        terminate_block(variables_to_entities(block).strip())
+        for block in blocks if block.strip()
+    )
     return QueryGraph(source=path, prefixes=prefixes, triples=triples)
 
 
@@ -200,15 +253,29 @@ def visualise_folder(folder_in, path_out, patterns=DEFAULT_QUERY_GLOBS, **write_
     `patterns` is a comma-separated list of glob patterns (relative to
     `folder_in`) used to find query files, e.g. "*.sparql,*.rq".
     """
-    paths = sorted(
-        {
-            p
-            for pattern in patterns.split(",")
-            for p in glob.glob(os.path.join(folder_in, pattern.strip()))
-        }
-    )
+    if os.path.isfile(folder_in):
+        # A single query file. This module's own description has always said
+        # "for a single query file or a whole folder of them", and the flag
+        # reads that way too -- but the glob was joined onto the argument
+        # unconditionally, so a file produced "No files matching '*.rq' found
+        # in employees.rq", which names the file it was given and says it
+        # cannot find it. The pattern is not applied here: naming a file is
+        # already the narrowest possible selection, and filtering it out
+        # again would be the same confusing silence in a different form.
+        paths = [folder_in]
+    else:
+        paths = sorted(
+            {
+                p
+                for pattern in patterns.split(",")
+                for p in glob.glob(os.path.join(folder_in, pattern.strip()))
+            }
+        )
     if not paths:
-        raise FileNotFoundError(f"No files matching '{patterns}' found in {folder_in}")
+        hint = "" if os.path.isdir(folder_in) else f" ({folder_in} is not a directory)"
+        raise FileNotFoundError(
+            f"No files matching '{patterns}' found in {folder_in}{hint}"
+        )
     graphs = [parse_query(p) for p in paths]
     write_turtle(graphs, path_out, **write_turtle_kwargs)
     return paths

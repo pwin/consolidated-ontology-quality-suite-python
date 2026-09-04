@@ -75,7 +75,11 @@ def _print_summary(rows: List[ResultRow], out_dir: Path, warnings: List[str]) ->
     return counts
 
 
-def _filter_own_namespace(rows: List[ResultRow], own_namespace: Optional[str]) -> List[ResultRow]:
+def _filter_own_namespace(
+    rows: List[ResultRow],
+    own_namespace: Optional[str],
+    warnings: Optional[List[str]] = None,
+) -> List[ResultRow]:
     """Restrict a finished ResultRow set to findings in the caller's own
     namespace -- a report-layer filter (applied after checking, right before
     writing reports/printing the summary), not a re-scoping of what's
@@ -84,7 +88,38 @@ def _filter_own_namespace(rows: List[ResultRow], own_namespace: Optional[str]) -
     stay resolved -- they're just excluded from the shown/written results."""
     if not own_namespace:
         return rows
-    return [r for r in rows if r.focus_node.startswith(own_namespace)]
+    kept = [r for r in rows if r.focus_node.startswith(own_namespace)]
+
+    # A filter that removes everything is indistinguishable from a clean run,
+    # and this one is a literal IRI-prefix string match: a wrong scheme, host
+    # or trailing separator silently reports success. Reported from real use
+    # -- `http://example.org/acme#` against an ontology whose namespace is
+    # `https://acme.example.org/ns/` printed "0 total" and looked like a pass.
+    #
+    # The warning fires only when there *were* findings to lose, because
+    # "nothing matched because there was nothing" is a genuinely clean run and
+    # saying otherwise would train people to ignore the message. The nearest
+    # real namespaces are named, since the usual cause is a near miss and the
+    # answer is nearly always visible in that list.
+    if rows and not kept:
+        seen = sorted({
+            r.focus_node.rsplit("#", 1)[0] + "#" if "#" in r.focus_node
+            else r.focus_node.rsplit("/", 1)[0] + "/"
+            for r in rows
+            # Blank nodes are not namespaces, and `_:0_b56` sorts to the front
+            # of the list -- so the first thing the hint showed was the one
+            # entry that could never be the answer.
+            if r.focus_node and not r.focus_node.startswith("_:")
+        })
+        if warnings is not None:
+            warnings.append(
+                f"--own-namespace {own_namespace} matched none of the {len(rows)} findings, "
+                f"so this run reports nothing. It is a literal IRI-prefix match -- check the "
+                f"scheme, host and trailing separator against the ontology's own @prefix line. "
+                f"Namespaces actually seen: {', '.join(seen[:5])}"
+                + (f" (+{len(seen) - 5} more)" if len(seen) > 5 else "")
+            )
+    return kept
 
 
 def _exit_code(counts: dict, fail_on: str) -> int:
@@ -391,7 +426,7 @@ def cmd_checks(args) -> int:
         import_dir=args.import_dir, exclude_imports=args.exclude_imports, allow_network=args.allow_network,
         verbose=args.verbose,
     )
-    rows = _filter_own_namespace(stage.rows, args.own_namespace)
+    rows = _filter_own_namespace(stage.rows, args.own_namespace, stage.warnings)
     _write_reports(rows, registry, out_dir, "Registry Checks Report")
     counts = _print_summary(rows, out_dir, stage.warnings)
     return _exit_code(counts, args.fail_on)
@@ -444,7 +479,7 @@ def cmd_data(args) -> int:
         import_dir=args.import_dir, exclude_imports=args.exclude_imports, allow_network=args.allow_network,
         verbose=args.verbose,
     )
-    rows = _filter_own_namespace(stage.rows, args.own_namespace)
+    rows = _filter_own_namespace(stage.rows, args.own_namespace, stage.warnings)
     _write_reports(rows, registry, out_dir, "Data Quality & Conformance Report")
     counts = _print_summary(rows, out_dir, stage.warnings)
     if stage.artifacts.get("sample_note"):
@@ -696,7 +731,7 @@ def cmd_run(args) -> int:
         rows += stage.rows
         warnings += stage.warnings
 
-    rows = _filter_own_namespace(rows, args.own_namespace)
+    rows = _filter_own_namespace(rows, args.own_namespace, warnings)
     _write_reports(rows, registry, out_dir, "Consolidated Ontology Suite Report", artifacts)
     counts = _print_summary(rows, out_dir, warnings)
     return _exit_code(counts, args.fail_on)
