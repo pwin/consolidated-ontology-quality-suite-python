@@ -118,6 +118,33 @@ compatible?" but "does this value exist at all?" -- asked directly against
 the taxonomy, which is exactly what `check_taxonomy_references` does. The
 worked example below demonstrates this concretely.
 
+## How a per-row entity is told apart from a hard-coded reference
+
+`check_taxonomy_references` reports the IRIs a CONSTRUCT template uses as
+*values* and the taxonomy doesn't declare. Most of what a template writes in
+that position is not a reference at all -- it is the per-row entity the query
+builds, `?vehicle_IRI` and the like -- so recognising those and skipping them
+is what keeps the check readable.
+
+They are recognised by IRI, and the rule is less obvious than it looks.
+`variables_to_entities` rewrites `?road` to `:road`, a CURIE in the *empty*
+prefix, and `:` is bound to the scratch namespace (`https://tarqlviz.org/`)
+**only when no query declares its own**. A query that says
+`PREFIX : <https://example.org/mine#>` -- most do -- has its per-row entities
+land in that namespace instead.
+
+Testing the scratch namespace alone therefore missed them. Measured against a
+four-mapping set where each file declared its own `:`, eleven of twelve
+findings named a CONSTRUCT variable rather than a hard-coded term, burying the
+one real one. Since 0.14.3, `tarql_visualiser.per_row_entity_iris` computes
+both candidate namespaces -- the scratch one, and each query's own empty
+prefix -- crossed with the variable names that query's CONSTRUCT blocks use,
+so the answer holds whichever binding won.
+
+Worth knowing if you write your own check over `sketch.ttl`: a namespace test
+cannot separate a mapping's own entities from the model's terms. Ask what a
+term is *declared* as instead.
+
 ## The gap `check_taxonomy_references` itself can't cover: dynamically-built values
 
 `check_taxonomy_references` inspects the CONSTRUCT template's own text --

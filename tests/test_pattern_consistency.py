@@ -347,3 +347,61 @@ def test_rdf_type_renders_as_a_not_an_opaque_qname():
     dot_text = pc.consistency_dot([FIXED_TRANSFORM], [ONTOLOGY], [TAXONOMY])
     assert "ns1:type" not in dot_text
     assert 'label="a"' in dot_text
+
+
+# --- per-row entities when a query declares its own empty prefix ------------
+
+DECLARED_EMPTY_PREFIX_TRANSFORM = """
+prefix :     <https://example.org/vehicle-demo/>
+prefix gist: <https://w3id.org/semanticarts/ns/ontology/gist/>
+
+CONSTRUCT {
+  ?vehicle_IRI a :Vehicle ;
+    gist:isCategorizedBy :Gasoline ;
+    :registeredTo ?owner_IRI .
+} WHERE {
+  BIND(IRI(CONCAT("https://example.org/vehicle-demo/vehicle-", ?id)) AS ?vehicle_IRI)
+  BIND(IRI(CONCAT("https://example.org/vehicle-demo/owner-", ?ownerid)) AS ?owner_IRI)
+}
+"""
+
+
+def test_per_row_entities_are_not_reported_when_the_query_declares_its_own_empty_prefix(tmp_path):
+    """The sketch mints ?vehicle_IRI as `:vehicle_IRI`, and `:` is whatever
+    the *query* bound it to -- only the scratch namespace when no query
+    declares one. Testing the scratch namespace alone therefore missed every
+    per-row entity of a query that declared `PREFIX : <...>`, and reported
+    each as a nonexistent taxonomy reference.
+
+    Measured against a four-mapping set that each declared their own `:`:
+    eleven of twelve findings named a CONSTRUCT variable, burying the one
+    real one. Here the only finding that should survive is :Gasoline, which
+    the taxonomy genuinely does not declare (it uses :Petrol).
+    """
+    transform = tmp_path / "transform.rq"
+    transform.write_text(DECLARED_EMPTY_PREFIX_TRANSFORM, encoding="utf-8")
+
+    gaps = pc.check_taxonomy_references([str(transform)], [ONTOLOGY], [TAXONOMY])
+    terms = {gap.term for gap in gaps}
+
+    assert str(EX.Gasoline) in terms, "the genuine hard-coded reference must still be reported"
+    assert str(EX.vehicle_IRI) not in terms, "?vehicle_IRI is a per-row entity, not a taxonomy reference"
+    assert str(EX.owner_IRI) not in terms, "?owner_IRI is a per-row entity, not a taxonomy reference"
+    assert terms == {str(EX.Gasoline)}
+
+
+def test_per_row_entity_iris_covers_both_candidate_namespaces(tmp_path):
+    """The helper returns the variable under the scratch namespace *and*
+    under the query's own empty prefix, since which one the sketch used
+    depends on the whole query set rather than on this file alone."""
+    from ontology_suite.sketch.tarql_visualiser import per_row_entity_iris, scratch_namespace
+
+    transform = tmp_path / "transform.rq"
+    transform.write_text(DECLARED_EMPTY_PREFIX_TRANSFORM, encoding="utf-8")
+
+    iris = per_row_entity_iris([str(transform)])
+    assert str(EX.vehicle_IRI) in iris
+    assert scratch_namespace() + "vehicle_IRI" in iris
+    # Variables that appear only in the WHERE clause are not entities in the
+    # sketch, which renders the CONSTRUCT template alone.
+    assert str(EX.ownerid) not in iris

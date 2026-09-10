@@ -31,6 +31,13 @@ Scope/limitations, stated up front rather than silently:
     script instead treats them as alternatives (at least one must be
     satisfied), since that's usually what's intended in practice and is a
     more useful signal for a quality report than strict RDFS entailment.
+  - A literal's datatype is read as RDF 1.1 defines it: an untagged literal
+    is an `xsd:string`, and a language-tagged one is an `rdf:langString`.
+    They are different datatypes, so `"Widget"@en` does NOT satisfy a range
+    of `xsd:string` and is reported as a CNF-004 range violation -- declare
+    the range `rdfs:Literal` (which accepts any literal) if tagged values
+    are intended. The TypeScript port's `rangeDatatypes` tests pin the same
+    behavior.
 
 As with the other two scripts, tarql_visualiser.py's namespace-legend
 triples (`:isRepresentedBy` / `:hasAmbiguousPrefix`) are excluded from every
@@ -353,7 +360,21 @@ def check_conformance(declarations, data_graph):
                 else:
                     expected_datatypes = {c for c in range_classes if str(c).startswith(str(XSD))}
                     if expected_datatypes:
-                        actual = o.datatype or (RDFS.langString if o.language else XSD.string)
+                        # RDF 1.1 gives an untagged literal the datatype
+                        # xsd:string, and a language-tagged one rdf:langString
+                        # -- an RDF term, not an RDFS one. Spelled RDFS this
+                        # raised rather than returning a wrong-but-harmless
+                        # IRI, because rdflib's RDFS is a closed
+                        # DefinedNamespace: `AttributeError: term 'langString'
+                        # not in namespace '...rdf-schema#'`, taking down the
+                        # whole data stage and every other check in the run.
+                        # Reachable from any property with an xsd: range and a
+                        # language-tagged value -- `rdfs:range xsd:string` with
+                        # a "..."@en value is the everyday case. Never caught
+                        # because the one test covering a tagged literal used
+                        # foaf:name, whose rdfs:Literal range short-circuits
+                        # two lines above this.
+                        actual = o.datatype or (RDF.langString if o.language else XSD.string)
                         if actual not in expected_datatypes:
                             range_violations[p].add(o)
             else:

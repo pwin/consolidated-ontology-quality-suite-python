@@ -61,7 +61,12 @@ from . import io_utils
 from .checks.merge import ResultRow
 from .dataquality import data_quality
 from .sketch import dot_export, prefix_alignment as pa
-from .sketch.tarql_visualiser import DEFAULT_BASE, DEFAULT_QUERY_GLOBS, scratch_namespace
+from .sketch.tarql_visualiser import (
+    DEFAULT_BASE,
+    DEFAULT_QUERY_GLOBS,
+    per_row_entity_iris,
+    scratch_namespace,
+)
 
 
 @dataclass
@@ -100,13 +105,17 @@ def check_taxonomy_references(
     declarations = data_quality.ontology_declarations(ontology_graph)
     known_individuals = set(taxonomy_graph.subjects(None, None))
     scratch_ns = scratch_namespace(DEFAULT_BASE)
+    # The scratch namespace alone does not identify the sketch's per-row
+    # entities: it is only where they land when no query declares its own
+    # empty prefix. See tarql_visualiser.per_row_entity_iris.
+    per_row_entities = per_row_entity_iris(io_utils.expand_sources(tarql_sources, query_pattern))
 
     findings: List[TaxonomyReferenceGap] = []
     seen = set()
     for _s, p, o in sketch_graph:
         if p == RDF.type or not isinstance(o, URIRef):
             continue
-        if str(o).startswith(scratch_ns):
+        if str(o).startswith(scratch_ns) or str(o) in per_row_entities:
             continue  # a per-row constructed entity, not a hardcoded reference
         if o in declarations["classes"] or o in declarations["properties"]:
             continue

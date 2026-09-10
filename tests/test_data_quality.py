@@ -127,3 +127,53 @@ def test_genuine_range_datatype_violation_still_caught():
     """, format="turtle")
     conf = dq.check_conformance(decl, data)
     assert conf["range_violations"] == {rdflib.URIRef("https://example.org/price"): {rdflib.Literal("not-a-number")}}
+
+
+XSD_STRING_ONTOLOGY = """
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix ex: <https://example.org/> .
+ex:Widget a owl:Class .
+ex:note a owl:DatatypeProperty ; rdfs:domain ex:Widget ; rdfs:range xsd:string .
+"""
+
+
+def test_language_tagged_literal_against_an_xsd_range_does_not_raise():
+    """A language-tagged value for a property with an xsd: range used to
+    raise rather than report.
+
+    `actual = o.datatype or (RDFS.langString if o.language else XSD.string)`
+    spelled the RDF 1.1 term rdf:langString as an RDFS one; rdflib's RDFS is
+    a closed DefinedNamespace, so the attribute access raised AttributeError
+    and took down the whole data stage -- every other check in the run with
+    it. Reachable from any xsd: range plus a tagged value, which
+    `rdfs:range xsd:string` with a "..."@en value makes an everyday case.
+
+    The existing tagged-literal test above cannot catch it: it uses
+    foaf:name, whose rdfs:Literal range short-circuits before this branch.
+    """
+    decl = _declarations(XSD_STRING_ONTOLOGY)
+    data = rdflib.Graph().parse(data="""
+        @prefix ex: <https://example.org/> .
+        ex:widget-1 a ex:Widget ; ex:note "Checked"@en .
+    """, format="turtle")
+    conf = dq.check_conformance(decl, data)  # must not raise
+    assert list(conf["range_violations"]) == [rdflib.URIRef("https://example.org/note")]
+
+
+def test_language_tagged_literal_is_not_an_xsd_string():
+    """rdf:langString is its own datatype, so a tagged literal does not
+    satisfy an xsd:string range -- while an untagged one does, RDF 1.1 giving
+    it xsd:string. Matches the TypeScript port's own rangeDatatypes test."""
+    decl = _declarations(XSD_STRING_ONTOLOGY)
+    tagged = rdflib.Graph().parse(data="""
+        @prefix ex: <https://example.org/> .
+        ex:widget-1 a ex:Widget ; ex:note "Checked"@en .
+    """, format="turtle")
+    untagged = rdflib.Graph().parse(data="""
+        @prefix ex: <https://example.org/> .
+        ex:widget-2 a ex:Widget ; ex:note "Checked" .
+    """, format="turtle")
+    assert dq.check_conformance(decl, tagged)["range_violations"]
+    assert dq.check_conformance(decl, untagged)["range_violations"] == {}

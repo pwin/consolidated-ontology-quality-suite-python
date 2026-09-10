@@ -95,6 +95,40 @@ def variables_to_entities(construct_text):
     return VARIABLE_PATTERN.sub(r":\1", construct_text)
 
 
+def per_row_entity_iris(paths, base: str = DEFAULT_BASE) -> set:
+    """Every IRI the sketch mints from a CONSTRUCT-template variable, for the
+    given query files.
+
+    ``variables_to_entities`` rewrites ``?road`` to ``:road`` -- a CURIE in
+    the *empty* prefix. Which namespace that resolves to is not fixed:
+    ``write_turtle`` binds ``:`` to ``scratch_namespace(base)`` only when no
+    query declares its own, and a query that says ``PREFIX : <...>`` -- most
+    do -- has its per-row entities land in that namespace instead.
+
+    So "is this a per-row entity?" cannot be answered by testing the scratch
+    namespace alone, which is what ``pattern_consistency.check_taxonomy_references``
+    did: against four mappings that each declared their own ``:``, eleven of
+    its twelve findings named a CONSTRUCT variable rather than a hard-coded
+    term, burying the one real one. Both candidate namespaces are returned
+    here -- the scratch one, and each query's own empty prefix -- crossed with
+    the variable names that query's CONSTRUCT blocks actually use, so the
+    answer holds whichever binding won.
+    """
+    scratch = scratch_namespace(base)
+    iris = set()
+    for path in paths:
+        text = io_utils.read_text(str(path))
+        namespaces = {scratch}
+        declared_empty = extract_prefixes(text).get("")
+        if declared_empty:
+            namespaces.add(declared_empty)
+        names = set()
+        for block in extract_construct_blocks(text):
+            names.update(VARIABLE_PATTERN.findall(block))
+        iris.update(namespace + name for namespace in namespaces for name in names)
+    return iris
+
+
 def terminate_block(turtle_text):
     """Ensure one CONSTRUCT block's turtle ends in a statement terminator.
 
