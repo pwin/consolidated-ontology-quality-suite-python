@@ -1,6 +1,6 @@
 [project]
 name = "ontology-quality-suite"
-version = "0.14.3"
+version = "0.14.4"
 description = "Ontology Quality Suite -- assess OWL2 DL/RL/QL ontologies, TARQL/oxi-gen CONSTRUCT-query sketches, and the RDF data graphs they triplify -- structural, logical, documentation, efficiency, style, data quality, OWL2 profile membership, and reasoner-based consistency -- plus ontology-version and TARQL/ontology consistency checking with suggested repair diffs, locally or against a live Fuseki triplestore."
 readme = "README.md"
 license = "MIT OR Apache-2.0"
@@ -38,7 +38,11 @@ reasoner = [
     "owlready2>=0.47",
 ]
 native-shacl = [
-    "shacl>=0.1.12",
+    # Upper bound deliberate. 0.3.0 changed the default meaning of
+    # sh:conforms to the specification's -- warnings and infos break
+    # conformance, as they already did in pyshacl -- so a minor bump is
+    # not safe to pick up unattended. See issue #4.
+    "shacl>=0.3.0,<0.4",
 ]
 
 [dependency-groups]
