@@ -45,8 +45,9 @@ python -m ontology_suite.sketch.prefix_alignment \
 - `--ontology` -- an ontology file (repeatable -- pass every file you want
   considered, e.g. the main ontology plus each import; there is no
   `owl:imports` resolution here).
-- `--file-pattern` -- glob pattern(s) for folder mode
-  (default `*.sparql,*.rq,*.tarql,*.tq`).
+- `--query-pattern` -- glob pattern(s) for folder mode
+  (default `*.sparql,*.rq,*.tarql,*.tq`). Spelled `--file-pattern` before
+  0.15.0, which still works.
 - `--ignore-prefix` -- add to the default-ignored structural prefixes
   (`owl`, `rdf`, `rdfs`, `xml`, `xsd`).
 - `--fail-on-mismatch` -- exit `1` if anything is found (default: always

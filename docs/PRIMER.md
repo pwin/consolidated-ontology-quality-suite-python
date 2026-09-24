@@ -296,7 +296,9 @@ Any `CNF-001`/`CNF-002` here names exactly which query references
 vocabulary the new version no longer declares -- caught before a single row
 of real data is triplified. Pair with `--verbose` to see exactly which
 query files were checked, especially useful when `--queries` points at a
-folder with a non-default `--file-pattern`.
+folder with a non-default `--query-pattern`. (`--file-pattern` is the older
+spelling and still works everywhere it used to; `--query-pattern` is what
+`run` has always called it, and since 0.15.0 every subcommand accepts both.)
 
 ## 8. Use case: an ontology renamed something -- can the fix be automated?
 

@@ -459,8 +459,10 @@ def main(argv):
                          help="a taxonomy file of controlled-vocabulary individuals (repeatable)")
     parser.add_argument("--output-data", action="append", default=None, dest="output_data",
                          help="real triplified output to also check (repeatable; omit to skip this layer)")
-    parser.add_argument("--file-pattern", default=DEFAULT_QUERY_GLOBS,
-                         help=f"comma-separated glob pattern(s) for query folders (default: {DEFAULT_QUERY_GLOBS})")
+    parser.add_argument("--query-pattern", "--file-pattern", dest="query_pattern",
+                         default=DEFAULT_QUERY_GLOBS,
+                         help=f"comma-separated glob pattern(s) for query folders (default: "
+                              f"{DEFAULT_QUERY_GLOBS}). Also accepted as --file-pattern, the older spelling.")
     parser.add_argument("--ignore-prefix", action="append", default=[],
                          help="an additional prefix name to ignore in the ontology<->transformation prefix check "
                               "(repeatable)")
@@ -472,13 +474,13 @@ def main(argv):
                               "docs/MODELLING_PATTERN_CONSISTENCY.md) -- render with e.g. "
                               "'dot -Tsvg file.dot -o file.svg'")
     parser.add_argument("-v", "--verbose", action="store_true",
-                         help="print which query files --file-pattern actually matched, and which "
+                         help="print which query files --query-pattern actually matched, and which "
                               "--ontology/--taxonomy/--output-data files are being used, before running")
     args = parser.parse_args(argv)
 
     if args.verbose:
-        expanded = io_utils.expand_sources(args.queries, args.file_pattern)
-        print(f"[verbose] {args.queries} (--file-pattern {args.file_pattern}): {len(expanded)} query file(s) matched:")
+        expanded = io_utils.expand_sources(args.queries, args.query_pattern)
+        print(f"[verbose] {args.queries} (--query-pattern {args.query_pattern}): {len(expanded)} query file(s) matched:")
         for p in expanded:
             print(f"    {p}")
         print(f"[verbose] {len(args.ontologies)} ontology file(s): {args.ontologies}")
@@ -490,7 +492,7 @@ def main(argv):
     report = check_four_layer_consistency(
         args.queries, args.ontologies, args.taxonomies,
         output_data_paths=args.output_data,
-        query_pattern=args.file_pattern,
+        query_pattern=args.query_pattern,
         ignore_prefixes=ignore_prefixes,
     )
     print(format_four_layer_report(report))
@@ -498,7 +500,7 @@ def main(argv):
     if args.dot:
         dot_path = write_consistency_dot(
             args.queries, args.ontologies, args.taxonomies, args.dot,
-            query_pattern=args.file_pattern, ignore_prefixes=ignore_prefixes,
+            query_pattern=args.query_pattern, ignore_prefixes=ignore_prefixes,
         )
         print(f"Wrote {dot_path}")
 

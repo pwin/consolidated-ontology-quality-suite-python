@@ -178,7 +178,7 @@ def _add_verbose_arg(p: argparse.ArgumentParser) -> None:
     p.add_argument(
         "-v", "--verbose", action="store_true",
         help="print what each input option actually resolved to before running: which query/data "
-             "files --file-pattern matched, which owl:imports resolved (and from where) or failed to, "
+             "files --query-pattern/--data-pattern matched, which owl:imports resolved (and from where) or failed to, "
              "and which check engine ran",
     )
 
@@ -227,7 +227,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
     skt.add_argument("--queries", required=True)
     skt.add_argument("--ontology", default=None, help="if given, diff the sketch's classes/properties against the ontology's declarations")
     _add_import_args(skt)
-    skt.add_argument("--file-pattern", default=tarql_visualiser.DEFAULT_QUERY_GLOBS)
+    skt.add_argument("--query-pattern", "--file-pattern", dest="query_pattern",
+                     default=tarql_visualiser.DEFAULT_QUERY_GLOBS,
+                     help=f"comma-separated glob pattern(s) used to find query files when --queries is a "
+                     f"folder (default: {tarql_visualiser.DEFAULT_QUERY_GLOBS}). Also accepted as --file-pattern, "
+                     f"the older spelling.")
     skt.add_argument("--registry", default=str(config.DEFAULT_REGISTRY_PATH))
     skt.add_argument(
         "--sparql", default=str(config.DEFAULT_SPARQL_DIR),
@@ -256,9 +260,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
     dat.add_argument("data", nargs="+", help="turtle file(s) and/or folder(s) of them")
     dat.add_argument("--ontology", default=None)
     _add_import_args(dat)
-    dat.add_argument("--file-pattern", default=data_quality.DEFAULT_DATA_GLOBS,
+    dat.add_argument("--data-pattern", "--file-pattern", dest="data_pattern",
+                      default=data_quality.DEFAULT_DATA_GLOBS,
                       help=f"comma-separated glob pattern(s) used to find data files when a `data` argument is a "
-                           f"folder (default: {data_quality.DEFAULT_DATA_GLOBS})")
+                      f"folder (default: {data_quality.DEFAULT_DATA_GLOBS}). Also accepted as --file-pattern, "
+                      f"the older spelling.")
     dat.add_argument("--registry", default=str(config.DEFAULT_REGISTRY_PATH))
     dat.add_argument("--sparql", default=str(config.DEFAULT_SPARQL_DIR))
     dat.add_argument("--sample", type=int, default=None, help="cap the reasoning pass to a CBD sample of this many named subjects")
@@ -341,7 +347,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
                             "always included). --new's own owl:imports are already resolved automatically via "
                             "--import-dir/--allow-network below -- this flag is for extra files outside that "
                             "resolution, e.g. a vocabulary not reachable via owl:imports at all")
-    cons.add_argument("--file-pattern", default=tarql_visualiser.DEFAULT_QUERY_GLOBS)
+    cons.add_argument("--query-pattern", "--file-pattern", dest="query_pattern",
+                      default=tarql_visualiser.DEFAULT_QUERY_GLOBS,
+                      help=f"comma-separated glob pattern(s) used to find query files when --queries is a "
+                      f"folder (default: {tarql_visualiser.DEFAULT_QUERY_GLOBS}). Also accepted as --file-pattern, "
+                      f"the older spelling.")
     _add_import_args(cons)
     cons.add_argument("--out-dir", default="out/consistency")
     cons.add_argument("--apply-repairs", action="store_true",
@@ -377,9 +387,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
                        help="a taxonomy file of controlled-vocabulary individuals (repeatable)")
     patc.add_argument("--output-data", action="append", default=None, dest="output_data",
                        help="real triplified output to also check (repeatable; omit to skip this layer)")
-    patc.add_argument("--file-pattern", default=tarql_visualiser.DEFAULT_QUERY_GLOBS,
-                       help=f"comma-separated glob pattern(s) for query folders "
-                            f"(default: {tarql_visualiser.DEFAULT_QUERY_GLOBS})")
+    patc.add_argument("--query-pattern", "--file-pattern", dest="query_pattern",
+                       default=tarql_visualiser.DEFAULT_QUERY_GLOBS,
+                       help=f"comma-separated glob pattern(s) used to find query files when --queries is a "
+                       f"folder (default: {tarql_visualiser.DEFAULT_QUERY_GLOBS}). Also accepted as --file-pattern, "
+                       f"the older spelling.")
     patc.add_argument("--ignore-prefix", action="append", default=[],
                        help="an additional prefix name to ignore in the ontology<->transformation prefix check "
                             "(repeatable)")
@@ -436,7 +448,7 @@ def cmd_sketch(args) -> int:
     out_dir = Path(args.out_dir)
     registry = Registry.load(args.registry)
     stage = pipeline.run_sketch_stage(
-        args.queries, out_dir, ontology_path=args.ontology, query_pattern=args.file_pattern,
+        args.queries, out_dir, ontology_path=args.ontology, query_pattern=args.query_pattern,
         import_dir=args.import_dir, exclude_imports=args.exclude_imports, allow_network=args.allow_network,
         verbose=args.verbose, registry=registry, sparql_dir=args.sparql,
     )
@@ -475,7 +487,7 @@ def cmd_data(args) -> int:
     stage = pipeline.run_data_stage(
         args.data, out_dir, ontology_path=args.ontology, registry=registry,
         sparql_root=args.sparql, sample=args.sample, reasoner=args.reasoner, engine=args.engine,
-        data_pattern=args.file_pattern,
+        data_pattern=args.data_pattern,
         import_dir=args.import_dir, exclude_imports=args.exclude_imports, allow_network=args.allow_network,
         verbose=args.verbose,
     )
@@ -548,7 +560,7 @@ def cmd_consistency(args) -> int:
         old_ontology=args.old,
         tarql_sources=args.queries,
         ontology_paths=[args.new] + args.ontology_paths,
-        query_pattern=args.file_pattern,
+        query_pattern=args.query_pattern,
         import_dir=args.import_dir,
         exclude_imports=args.exclude_imports,
         allow_network=args.allow_network,
@@ -623,8 +635,8 @@ def cmd_pattern_consistency(args) -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     if args.verbose:
-        expanded = io_utils.expand_sources(args.queries, args.file_pattern)
-        print(f"[verbose] {args.queries} (--file-pattern {args.file_pattern}): {len(expanded)} query file(s) matched:")
+        expanded = io_utils.expand_sources(args.queries, args.query_pattern)
+        print(f"[verbose] {args.queries} (--query-pattern {args.query_pattern}): {len(expanded)} query file(s) matched:")
         for p in expanded:
             print(f"    {p}")
         print(f"[verbose] {len(args.ontologies)} ontology file(s): {args.ontologies}")
@@ -636,7 +648,7 @@ def cmd_pattern_consistency(args) -> int:
     report = pattern_consistency.check_four_layer_consistency(
         args.queries, args.ontologies, args.taxonomies,
         output_data_paths=args.output_data,
-        query_pattern=args.file_pattern,
+        query_pattern=args.query_pattern,
         ignore_prefixes=ignore_prefixes,
     )
     text = pattern_consistency.format_four_layer_report(report)
@@ -647,7 +659,7 @@ def cmd_pattern_consistency(args) -> int:
     if args.dot:
         dot_path = pattern_consistency.write_consistency_dot(
             args.queries, args.ontologies, args.taxonomies, args.dot,
-            query_pattern=args.file_pattern, ignore_prefixes=ignore_prefixes,
+            query_pattern=args.query_pattern, ignore_prefixes=ignore_prefixes,
         )
         print(f"Wrote {dot_path}")
 

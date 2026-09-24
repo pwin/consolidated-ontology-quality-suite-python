@@ -549,9 +549,12 @@ def main(argv):
     )
     parser.add_argument("inputs", nargs="+", help="one or more turtle data files, or folders of them")
     parser.add_argument(
+        "--data-pattern",
         "--file-pattern",
+        dest="data_pattern",
         default=DEFAULT_DATA_GLOBS,
-        help=f"comma-separated glob pattern(s) used to find files when an input is a folder (default: {DEFAULT_DATA_GLOBS})",
+        help=f"comma-separated glob pattern(s) used to find files when an input is a folder "
+             f"(default: {DEFAULT_DATA_GLOBS}). Also accepted as --file-pattern, the older spelling.",
     )
     parser.add_argument("--ontology", default=None, help="an OWL2/RDFS ontology turtle file supplying the real classes/properties/hierarchy")
     parser.add_argument("--base", default=DEFAULT_BASE, help=f"base IRI the input was written with (default: {DEFAULT_BASE})")
@@ -568,13 +571,13 @@ def main(argv):
     parser.add_argument("--top", type=int, default=20, help="max rows/samples per table or flag, 0 for all (default: 20)")
     parser.add_argument("--json", action="store_true", help="emit machine-readable JSON instead of a text report")
     parser.add_argument("-v", "--verbose", action="store_true",
-                         help="print which files --file-pattern actually matched before running")
+                         help="print which files --data-pattern actually matched before running")
     args = parser.parse_args(argv)
 
     ignored_predicates = default_ignored_predicates(args.base, args.namespace_predicate, args.namespace_conflict_predicate)
-    paths = resolve_input_paths(args.inputs, args.file_pattern)
+    paths = resolve_input_paths(args.inputs, args.data_pattern)
     if args.verbose:
-        print(f"[verbose] {args.inputs} (--file-pattern {args.file_pattern}): {len(paths)} file(s) matched:")
+        print(f"[verbose] {args.inputs} (--data-pattern {args.data_pattern}): {len(paths)} file(s) matched:")
         for p in paths:
             print(f"    {p}")
     combined_graph, per_file = load_data_graphs(paths, ignored_predicates)

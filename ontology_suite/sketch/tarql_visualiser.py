@@ -326,10 +326,12 @@ def main(argv):
     parser.add_argument("-o", "--output", default=None, help="output .ttl file (default: <input>.ttl)")
     parser.add_argument(
         "-p",
+        "--query-pattern",
         "--file-pattern",
+        dest="query_pattern",
         default=DEFAULT_QUERY_GLOBS,
         help=f"comma-separated glob pattern(s) used to find query files when input is a folder "
-             f"(default: {DEFAULT_QUERY_GLOBS})",
+             f"(default: {DEFAULT_QUERY_GLOBS}). Also accepted as --file-pattern, the older spelling.",
     )
     parser.add_argument(
         "--namespace-predicate",
@@ -349,7 +351,7 @@ def main(argv):
         help="omit the namespace legend and prefix-conflict triples from the output",
     )
     parser.add_argument("-v", "--verbose", action="store_true",
-                         help="print which query files --file-pattern actually matched, when input is a folder")
+                         help="print which query files --query-pattern actually matched, when input is a folder")
     args = parser.parse_args(argv)
     write_turtle_kwargs = {
         "namespace_predicate": args.namespace_predicate,
@@ -359,9 +361,9 @@ def main(argv):
 
     if os.path.isdir(args.input):
         output = args.output or os.path.normpath(args.input) + ".ttl"
-        paths = visualise_folder(args.input, output, args.file_pattern, **write_turtle_kwargs)
+        paths = visualise_folder(args.input, output, args.query_pattern, **write_turtle_kwargs)
         if args.verbose:
-            print(f"[verbose] {args.input} (--file-pattern {args.file_pattern}): {len(paths)} query file(s) matched:")
+            print(f"[verbose] {args.input} (--query-pattern {args.query_pattern}): {len(paths)} query file(s) matched:")
             for p in paths:
                 print(f"    {p}")
         noun = "query" if len(paths) == 1 else "queries"

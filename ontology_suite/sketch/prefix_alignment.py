@@ -303,8 +303,10 @@ def main(argv):
                          help="a query file or folder of them (repeatable)")
     parser.add_argument("--ontology", action="append", required=True, dest="ontologies",
                          help="an ontology file (repeatable -- pass every file you want considered)")
-    parser.add_argument("--file-pattern", default=DEFAULT_QUERY_GLOBS,
-                         help=f"comma-separated glob pattern(s) for query folders (default: {DEFAULT_QUERY_GLOBS})")
+    parser.add_argument("--query-pattern", "--file-pattern", dest="query_pattern",
+                         default=DEFAULT_QUERY_GLOBS,
+                         help=f"comma-separated glob pattern(s) for query folders (default: "
+                              f"{DEFAULT_QUERY_GLOBS}). Also accepted as --file-pattern, the older spelling.")
     parser.add_argument("--ignore-prefix", action="append", default=[],
                          help="an additional prefix name to ignore, on top of the structural-vocabulary defaults "
                               f"({', '.join(sorted(DEFAULT_IGNORED_PREFIXES))}) (repeatable)")
@@ -312,18 +314,18 @@ def main(argv):
                          help="exit 1 if any misalignment or undeclared term is found "
                               "(default: always exit 0, report only)")
     parser.add_argument("-v", "--verbose", action="store_true",
-                         help="print which query files --file-pattern actually matched before running")
+                         help="print which query files --query-pattern actually matched before running")
     args = parser.parse_args(argv)
 
     if args.verbose:
-        expanded = io_utils.expand_sources(args.queries, args.file_pattern)
-        print(f"[verbose] {args.queries} (--file-pattern {args.file_pattern}): {len(expanded)} query file(s) matched:")
+        expanded = io_utils.expand_sources(args.queries, args.query_pattern)
+        print(f"[verbose] {args.queries} (--query-pattern {args.query_pattern}): {len(expanded)} query file(s) matched:")
         for p in expanded:
             print(f"    {p}")
 
     report = check_tarql_ontology_alignment(
         args.queries, args.ontologies,
-        query_pattern=args.file_pattern,
+        query_pattern=args.query_pattern,
         ignore_prefixes=DEFAULT_IGNORED_PREFIXES | set(args.ignore_prefix),
     )
     print(format_alignment_report(report))
