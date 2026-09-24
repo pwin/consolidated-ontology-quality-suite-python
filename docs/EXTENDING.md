@@ -123,8 +123,27 @@ the `WHERE` clause, so every `BIND` is gone before it exists. That is a
 reason `TQL-001`..`TQL-003` are Python. It is not a reason a TARQL check
 *cannot* be a query, because the run now publishes the query source as its
 own graph: `bind-facts.ttl`, one node per `BIND` carrying its target,
-expression, skeleton, file and line, plus one per `CONSTRUCT` variable
-(`sketch/bind_analysis.py::bind_report_to_graph`).
+expression, skeleton, file and line, plus one per `CONSTRUCT` variable and
+one per `PREFIX` declaration (`sketch/bind_analysis.py::bind_report_to_graph`).
+
+Two of those facts exist for questions about a mapping *set* rather than a
+query, and are worth knowing about before reaching for Python:
+
+- **`tq:PrefixBinding`** -- one node per `PREFIX` line, carrying `tq:prefix`,
+  `tq:namespace` and `tq:source`. One prefix bound to two namespaces by two
+  files is a `GROUP BY`. It is invisible to everything else: each file is
+  internally consistent, so the term-level checks report an undeclared term
+  in whichever file is wrong and never mention the file holding the other
+  half of the disagreement.
+- **`prefix_alignment.build_sketch_dataset()`** -- the same sketch as
+  `build_sketch_graph`, but with each query file's triples in a named graph
+  named after the file, so `GRAPH ?g { ... }` asks per-file questions: one
+  class built with a property by one mapping and without it by another, one
+  predicate filled with two datatypes. The default graph still holds the
+  union, so a check written against the merged graph keeps working when
+  handed a dataset. The graph name is the file's basename under the same
+  `tarql/data/` namespace the `BIND` facts use, so the two join without a
+  lookup table.
 
 So the recipe is §1's, with two differences:
 

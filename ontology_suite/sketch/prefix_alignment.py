@@ -24,7 +24,9 @@ from __future__ import annotations
 
 import argparse
 import sys
+import os
 import tempfile
+from urllib.parse import quote
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List
@@ -33,7 +35,7 @@ import rdflib
 
 from .. import io_utils
 from ..dataquality import data_quality
-from . import graph_quality, tarql_visualiser
+from . import bind_analysis, graph_quality, tarql_visualiser
 from .tarql_visualiser import DEFAULT_QUERY_GLOBS, extract_prefixes
 
 DEFAULT_IGNORED_PREFIXES = frozenset({"rdf", "rdfs", "owl", "xsd", "xml"})
@@ -169,6 +171,38 @@ def load_merged_ontology_graph(ontology_paths: Iterable[str | Path]) -> rdflib.G
     for path in _expand_paths(ontology_paths, DEFAULT_ONTOLOGY_GLOBS):
         io_utils.parse_graph(merged, path)
     return merged
+
+
+def build_sketch_dataset(
+    tarql_sources: Iterable[str | Path], query_pattern: str = DEFAULT_QUERY_GLOBS
+) -> rdflib.Dataset:
+    """The sketch, with each query file's triples in a named graph of its own.
+
+    ``build_sketch_graph`` merges every query into one graph, which is the
+    right answer for "what does this mapping set build" and the wrong one for
+    every question about the *set*: one class built two ways by two files is
+    indistinguishable from one class built one way once the graphs are
+    merged, and so is one predicate carrying two datatypes.
+
+    The graph name is the file's basename under the same ``tarql/data/``
+    namespace the BIND facts use, so a check can join the two -- what a file
+    builds, and what its BINDs fill it with -- without a lookup table.
+
+    The default graph holds the union, so a query written against
+    ``build_sketch_graph``'s output keeps working when handed this instead.
+    """
+    paths = _expand_paths(tarql_sources, query_pattern)
+    dataset = rdflib.Dataset()
+    # `default_context` is the older spelling and is deprecated in rdflib 7.6.
+    default = getattr(dataset, "default_graph", None) or dataset.default_context
+    for path in paths:
+        name = rdflib.URIRef(bind_analysis.TQD + quote(os.path.basename(str(path)), safe=""))
+        per_file = build_sketch_graph([path], query_pattern)
+        named = dataset.graph(name)
+        for triple in per_file:
+            named.add(triple)
+            default.add(triple)
+    return dataset
 
 
 def build_sketch_graph(

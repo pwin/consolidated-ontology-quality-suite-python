@@ -78,6 +78,7 @@ from rdflib import Graph, Literal, Namespace, URIRef
 from rdflib.namespace import RDF, XSD
 
 from .. import io_utils
+from . import tarql_visualiser
 from ..checks.merge import ResultRow
 
 # The vocabulary the BIND facts are published in, and the namespace their
@@ -355,6 +356,13 @@ class QueryFacts:
     binds: List[BindStatement] = field(default_factory=list)
     construct_vars: Set[str] = field(default_factory=set)
     where_vars: Set[str] = field(default_factory=set)
+    prefixes: Dict[str, str] = field(default_factory=dict)
+    """The query's own PREFIX table, prefix name (without the colon) to
+    namespace. Published because a mapping set can disagree with itself about
+    what a prefix means, and nothing downstream could see that: each file is
+    internally consistent, so the term-level checks report an undeclared term
+    in whichever file is wrong and never mention the file holding the other
+    half of the disagreement."""
 
     @property
     def bound(self) -> Set[str]:
@@ -415,6 +423,7 @@ def parse_query_facts(path: str) -> QueryFacts:
         binds=extract_binds(text, path),
         construct_vars=construct_vars,
         where_vars=where_vars,
+        prefixes=tarql_visualiser.extract_prefixes(text),
     )
 
 
@@ -534,6 +543,17 @@ def bind_report_to_graph(
         graph.add((query_node, RDF.type, TQ.Query))
         graph.add((query_node, TQ.source, Literal(name)))
         graph.add((query_node, TQ.path, Literal(query.source)))
+
+        # One node per PREFIX declaration rather than a pair of literals on
+        # the query, so "which files bind this prefix, and to what" is a
+        # GROUP BY rather than a join a check would have to fake.
+        for prefix, namespace in sorted(query.prefixes.items()):
+            binding = URIRef(f"{query_node}/prefix/{quote(prefix or '_empty', safe='')}")
+            graph.add((binding, RDF.type, TQ.PrefixBinding))
+            graph.add((binding, TQ.inQuery, query_node))
+            graph.add((binding, TQ.prefix, Literal(prefix)))
+            graph.add((binding, TQ.namespace, Literal(str(namespace))))
+            graph.add((binding, TQ.source, Literal(name)))
 
         for bind in query.binds:
             bind_node = URIRef(f"{query_node}/bind/{bind.line}")
