@@ -20,7 +20,7 @@ from rdflib import BNode, Graph
 from rdflib.collection import Collection
 from rdflib.namespace import RDF, Namespace
 
-from .registry import Registry
+from .registry import OQ, Registry
 
 SH = Namespace("http://www.w3.org/ns/shacl#")
 
@@ -56,6 +56,15 @@ class ResultRow:
     message: str
     remediation: Optional[str]
     sources: List[str] = field(default_factory=list)
+    # Where the finding is in a file, when that is knowable. Two routes, and
+    # they differ in how much they can be trusted. The TARQL checks fill these
+    # from `oq:sourceFile`/`oq:sourceLine`, which `bind_analysis` produced by
+    # parsing the query text -- exact. Ontology findings get them from
+    # `locate.locate_rows`, which searches the file for the focus node's
+    # declaration -- best-effort, and `None` whenever it cannot settle the
+    # question. Both stay `None` rather than guessing; see `checks/locate.py`.
+    source_file: Optional[str] = None
+    line: Optional[int] = None
 
 
 def _path_expression(graph: Graph, node, _depth: int = 0) -> str:
@@ -207,6 +216,16 @@ def _extract_rows(
         if value is None and focus is not None:
             value = str(focus)
 
+        # A check that knows where in a file its finding is says so with
+        # `oq:sourceFile`/`oq:sourceLine` on the result. Only the TARQL checks
+        # can: `bind_analysis` parses the query text, so it has the real line,
+        # and the alternative was what TQL-004 and TQL-005 used to do --
+        # CONCAT the position into the message prose, where nothing can sort,
+        # filter or click it, and where it is then repeated by any renderer
+        # that also shows the position properly.
+        source_file = results_graph.value(result, OQ.sourceFile)
+        source_line = results_graph.value(result, OQ.sourceLine)
+
         rows.append(
             ResultRow(
                 check_id=check_id,
@@ -224,6 +243,8 @@ def _extract_rows(
                 ),
                 remediation=check.remediation if check else None,
                 sources=[source_label],
+                source_file=str(source_file) if source_file is not None else None,
+                line=int(source_line) if source_line is not None else None,
             )
         )
     return rows

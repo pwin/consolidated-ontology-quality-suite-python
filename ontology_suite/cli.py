@@ -26,7 +26,7 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional, Sequence, Tuple
 
 from . import config, io_utils, pipeline
 from . import consistency as consistency_api
@@ -38,6 +38,8 @@ from .reasoning.consistency import REASONER_CHOICES
 from .remote import fuseki
 from .remote import manifest as graph_manifest
 from .report.cucumber import write_cucumber_json, write_gherkin_feature_files
+from .report.findings_text import load_themes, write_findings_text
+from .checks.locate import locate_rows
 from .report.html_report import write_html_report
 from .report.plots import write_all_plots
 from .report.tables import write_all_tables
@@ -55,8 +57,27 @@ def _write_reports(
     out_dir: Path,
     title: str,
     artifacts: Optional[List[Tuple[str, Path]]] = None,
+    sources: Optional[Sequence[Optional[str]]] = None,
+    themes_path: Optional[str] = None,
 ) -> None:
+    """One file per audience, and no file that restates another.
+
+    `findings.txt` for a person, `full_results.csv` for a script,
+    `cucumber.json` (and the `features/` rendering of it) for CI, `report.html`
+    for a browser, `plots/` because the HTML embeds them.
+
+    `sources` are the files the findings are about, searched in order for each
+    focus node's declaring line. Rows that already carry a position keep it,
+    so a TARQL finding placed exactly by the query parser is never overwritten
+    by a guess. Done here rather than at each subcommand so there is one place
+    where a finding acquires a position.
+    """
     out_dir.mkdir(parents=True, exist_ok=True)
+    for source in sources or []:
+        if source:
+            locate_rows(rows, source)
+    themes = load_themes(themes_path) if themes_path else None
+    write_findings_text(rows, registry, out_dir / "findings.txt", themes)
     write_all_tables(rows, registry, out_dir)
     write_all_plots(rows, out_dir / "plots")
     write_cucumber_json(rows, registry, out_dir / "cucumber.json")
@@ -68,7 +89,8 @@ def _print_summary(rows: List[ResultRow], out_dir: Path, warnings: List[str]) ->
     counts = {sev: sum(1 for r in rows if r.severity == sev) for sev in ("Violation", "Warning", "Info")}
     print(f"Findings: {len(rows)} total ({counts['Violation']} Violation, {counts['Warning']} Warning, {counts['Info']} Info)")
     print(f"Reports written to: {out_dir.resolve()}")
-    print(f"  - {out_dir / 'report.html'} (start here)")
+    print(f"  - {out_dir / 'findings.txt'} (start here -- what, where, and the source line)")
+    print(f"  - {out_dir / 'report.html'}")
     print(f"  - {out_dir / 'full_results.csv'}")
     for w in warnings:
         print(f"WARNING: {w}", file=sys.stderr)
@@ -203,6 +225,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     ont.add_argument("--ontology", required=True)
     _add_import_args(ont)
     ont.add_argument("--registry", default=str(config.DEFAULT_REGISTRY_PATH))
+    ont.add_argument("--themes", default=None,
+                       help="a JSON or CSV map of check id to a question in your own words, used to add a \"by question\" index to findings.txt -- see docs/REPORTS.md")
     ont.add_argument("--sparql", default=str(config.DEFAULT_SPARQL_DIR))
     ont.add_argument("--out-dir", default="out/ontology")
     _add_profile_arg(ont)
@@ -216,6 +240,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     chk.add_argument("--shapes", default=str(config.DEFAULT_SHAPES_DIR))
     chk.add_argument("--sparql", default=str(config.DEFAULT_SPARQL_DIR))
     chk.add_argument("--registry", default=str(config.DEFAULT_REGISTRY_PATH))
+    chk.add_argument("--themes", default=None,
+                       help="a JSON or CSV map of check id to a question in your own words, used to add a \"by question\" index to findings.txt -- see docs/REPORTS.md")
     chk.add_argument("--inference", default="none", choices=["none", "rdfs", "owlrl", "both"])
     _add_engine_arg(chk)
     chk.add_argument("--out-dir", default="out/checks")
@@ -233,6 +259,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
                      f"folder (default: {tarql_visualiser.DEFAULT_QUERY_GLOBS}). Also accepted as --file-pattern, "
                      f"the older spelling.")
     skt.add_argument("--registry", default=str(config.DEFAULT_REGISTRY_PATH))
+    skt.add_argument("--themes", default=None,
+                       help="a JSON or CSV map of check id to a question in your own words, used to add a \"by question\" index to findings.txt -- see docs/REPORTS.md")
     skt.add_argument(
         "--sparql", default=str(config.DEFAULT_SPARQL_DIR),
         help="query tree holding the check files; its `tarql/` subdirectory is run against the "
@@ -266,6 +294,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
                       f"folder (default: {data_quality.DEFAULT_DATA_GLOBS}). Also accepted as --file-pattern, "
                       f"the older spelling.")
     dat.add_argument("--registry", default=str(config.DEFAULT_REGISTRY_PATH))
+    dat.add_argument("--themes", default=None,
+                       help="a JSON or CSV map of check id to a question in your own words, used to add a \"by question\" index to findings.txt -- see docs/REPORTS.md")
     dat.add_argument("--sparql", default=str(config.DEFAULT_SPARQL_DIR))
     dat.add_argument("--sample", type=int, default=None, help="cap the reasoning pass to a CBD sample of this many named subjects")
     _add_engine_arg(dat)
@@ -308,6 +338,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
                       help=f"comma-separated glob pattern(s) used to find data files under --data, for any "
                            f"argument that's a folder (default: {data_quality.DEFAULT_DATA_GLOBS})")
     run.add_argument("--registry", default=str(config.DEFAULT_REGISTRY_PATH))
+    run.add_argument("--themes", default=None,
+                       help="a JSON or CSV map of check id to a question in your own words, used to add a \"by question\" index to findings.txt -- see docs/REPORTS.md")
     run.add_argument("--shapes", default=str(config.DEFAULT_SHAPES_DIR))
     run.add_argument("--sparql", default=str(config.DEFAULT_SPARQL_DIR))
     run.add_argument("--oxi-gen-bin", default=None)
@@ -421,7 +453,8 @@ def cmd_ontology(args) -> int:
         print(pipeline.format_import_report(args.ontology, stage.artifacts["import_report"]))
     artifacts = [("ontology_evaluation.txt", out_dir / "ontology_evaluation.txt"),
                  ("ontology_evaluation.json", out_dir / "ontology_evaluation.json")]
-    _write_reports(stage.rows, registry, out_dir, "Ontology Evaluation Report", artifacts)
+    _write_reports(stage.rows, registry, out_dir, "Ontology Evaluation Report", artifacts,
+                   sources=[args.ontology], themes_path=args.themes)
     counts = _print_summary(stage.rows, out_dir, stage.warnings)
     return _exit_code(counts, args.fail_on)
 
@@ -439,7 +472,8 @@ def cmd_checks(args) -> int:
         verbose=args.verbose,
     )
     rows = _filter_own_namespace(stage.rows, args.own_namespace, stage.warnings)
-    _write_reports(rows, registry, out_dir, "Registry Checks Report")
+    _write_reports(rows, registry, out_dir, "Registry Checks Report",
+                   sources=[args.ontology, args.data], themes_path=args.themes)
     counts = _print_summary(rows, out_dir, stage.warnings)
     return _exit_code(counts, args.fail_on)
 
@@ -457,7 +491,8 @@ def cmd_sketch(args) -> int:
         ("bind-review.txt", stage.artifacts["bind_report_path"]),
         ("bind-facts.ttl", stage.artifacts["bind_facts_path"]),
     ]
-    _write_reports(stage.rows, registry, out_dir, "TARQL/oxi-gen Sketch Report", artifacts)
+    _write_reports(stage.rows, registry, out_dir, "TARQL/oxi-gen Sketch Report", artifacts,
+                   sources=[args.ontology], themes_path=args.themes)
     counts = _print_summary(stage.rows, out_dir, stage.warnings)
     gm = stage.artifacts["graph_metrics"]
     print(f"Sketch used {len(stage.artifacts['used_queries'])} query file(s); "
@@ -492,7 +527,8 @@ def cmd_data(args) -> int:
         verbose=args.verbose,
     )
     rows = _filter_own_namespace(stage.rows, args.own_namespace, stage.warnings)
-    _write_reports(rows, registry, out_dir, "Data Quality & Conformance Report")
+    _write_reports(rows, registry, out_dir, "Data Quality & Conformance Report",
+                   sources=[args.ontology], themes_path=args.themes)
     counts = _print_summary(rows, out_dir, stage.warnings)
     if stage.artifacts.get("sample_note"):
         print(stage.artifacts["sample_note"])
@@ -744,7 +780,8 @@ def cmd_run(args) -> int:
         warnings += stage.warnings
 
     rows = _filter_own_namespace(rows, args.own_namespace, warnings)
-    _write_reports(rows, registry, out_dir, "Consolidated Ontology Suite Report", artifacts)
+    _write_reports(rows, registry, out_dir, "Consolidated Ontology Suite Report", artifacts,
+                   sources=[args.ontology, *data_paths], themes_path=args.themes)
     counts = _print_summary(rows, out_dir, warnings)
     return _exit_code(counts, args.fail_on)
 

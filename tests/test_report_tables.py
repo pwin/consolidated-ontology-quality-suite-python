@@ -25,7 +25,7 @@ def test_rows_to_dataframe_empty_has_the_full_column_set():
     assert df.empty
     assert list(df.columns) == [
         "check_id", "category", "title", "severity", "focus_node", "path", "value",
-        "message", "remediation", "sources",
+        "message", "remediation", "sources", "source_file", "line",
     ]
 
 

@@ -27,6 +27,12 @@ PREFIX tq:  <https://semantechs.co.uk/ontology-quality/tarql/>
 # Absent, never guessed: a bare `BIND(?x AS ?y_DT)` may be passing on a value
 # that was typed earlier, so nothing is reported unless the parser positively
 # recognised a different kind.
+#
+# The position is carried as `oq:sourceFile`/`oq:sourceLine` rather than
+# CONCATenated into the message. `bind_analysis` parsed the query text and
+# knows the real line, so the fact belongs in a field where a reader can sort
+# and filter on it and a renderer can turn it into `file:line` -- and where it
+# is stated once instead of both in the prose and in the header above it.
 CONSTRUCT {
   _:r a sh:ValidationResult ;
     sh:resultSeverity sh:Warning ;
@@ -34,19 +40,20 @@ CONSTRUCT {
     sh:resultPath tq:expression ;
     sh:value ?expression ;
     sh:sourceConstraintComponent oq:TQL-005 ;
-    sh:resultMessage ?msg .
+    sh:resultMessage ?msg ;
+    oq:sourceFile ?path ;
+    oq:sourceLine ?line .
 }
 WHERE {
   ?bind a tq:Bind ;
         tq:target ?target ;
         tq:expression ?expression ;
         tq:producesKind ?kind ;
-        tq:source ?source ;
+        tq:path ?path ;
         tq:line ?line .
   FILTER(?kind != "TypedLiteral")
   FILTER(STRENDS(?target, "_DT") || STRENDS(?target, "_dt"))
   BIND(CONCAT("?", ?target, " is named as a typed value but produces a ", ?kind,
-              " (", ?source, ":", STR(?line),
-              "). The triple will load and carry an untyped string. Wrap the ",
+              ". The triple will load and carry an untyped string. Wrap the ",
               "expression in STRDT(..., xsd:<type>).") AS ?msg)
 }

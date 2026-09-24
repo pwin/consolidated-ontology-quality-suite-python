@@ -26,6 +26,12 @@ PREFIX tq:  <https://semantechs.co.uk/ontology-quality/tarql/>
 # settle it -- a bare `BIND(?x AS ?y_IRI)` may be passing on an IRI from an
 # earlier BIND. So this check cannot fire on something the parser merely
 # failed to recognise, which is what lets it be a Violation.
+#
+# The position is carried as `oq:sourceFile`/`oq:sourceLine` rather than
+# CONCATenated into the message. `bind_analysis` parsed the query text and
+# knows the real line, so the fact belongs in a field where a reader can sort
+# and filter on it and a renderer can turn it into `file:line` -- and where it
+# is stated once instead of both in the prose and in the header above it.
 CONSTRUCT {
   _:r a sh:ValidationResult ;
     sh:resultSeverity sh:Violation ;
@@ -33,20 +39,21 @@ CONSTRUCT {
     sh:resultPath tq:expression ;
     sh:value ?expression ;
     sh:sourceConstraintComponent oq:TQL-004 ;
-    sh:resultMessage ?msg .
+    sh:resultMessage ?msg ;
+    oq:sourceFile ?path ;
+    oq:sourceLine ?line .
 }
 WHERE {
   ?bind a tq:Bind ;
         tq:target ?target ;
         tq:expression ?expression ;
         tq:producesKind ?kind ;
-        tq:source ?source ;
+        tq:path ?path ;
         tq:line ?line .
   FILTER(?kind != "IRI")
   FILTER(STRENDS(?target, "_IRI") || STRENDS(?target, "_iri")
          || STRENDS(?target, "_URI") || STRENDS(?target, "_uri"))
-  BIND(CONCAT("?", ?target, " is built as a string and never converted to an IRI (",
-              ?source, ":", STR(?line),
-              "). Every triple using it is dropped. Wrap it in tarql:expandPrefixedName() ",
+  BIND(CONCAT("?", ?target, " is built as a string and never converted to an IRI. ",
+              "Every triple using it is dropped. Wrap it in tarql:expandPrefixedName() ",
               "for a prefixed name, or IRI() for a full one.") AS ?msg)
 }

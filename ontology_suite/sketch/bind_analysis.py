@@ -564,6 +564,11 @@ def bind_report_to_graph(
             graph.add((bind_node, TQ.skeleton, Literal(bind.skeleton)))
             graph.add((bind_node, TQ.line, Literal(bind.line, datatype=XSD.integer)))
             graph.add((bind_node, TQ.source, Literal(name)))
+            # The basename above is for reading; this is for opening. A check
+            # that reports a position has to hand the reporter something it
+            # can actually resolve -- `findings.txt` quotes the source line,
+            # and a bare "bad.rq" is not a file anyone can find.
+            graph.add((bind_node, TQ.path, Literal(query.source)))
 
             # The two facts that need the parse rather than the text. A check
             # asking "does this build an IRI" would otherwise have to search

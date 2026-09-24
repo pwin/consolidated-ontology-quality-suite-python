@@ -1,8 +1,14 @@
 """
-Builds tabular summaries of the unified result set: a full results table,
-a per-check summary, a per-category summary, and a "top offenders" table
-(the focus nodes with the most findings) -- the kind of views a human or
-an AI agent needs to triage issues quickly.
+Tabular views of the unified result set.
+
+`rows_to_dataframe` is the complete record, and `write_all_tables` puts it on
+disk as `full_results.csv` -- the one file here that cannot be derived from
+another, and the only one this package now writes.
+
+The three aggregates -- `summary_by_category`, `summary_by_check` and
+`top_offenders` -- are computed for `html_report` and `plots` to render. They
+are no longer written as files of their own; see `write_all_tables` for what
+was dropped and why.
 """
 from __future__ import annotations
 
@@ -17,7 +23,7 @@ from ..checks.registry import Registry
 
 _FULL_RESULTS_COLUMNS = [
     "check_id", "category", "title", "severity", "focus_node", "path", "value",
-    "message", "remediation", "sources",
+    "message", "remediation", "sources", "source_file", "line",
 ]
 
 
@@ -43,6 +49,11 @@ def rows_to_dataframe(rows: List[ResultRow]) -> pd.DataFrame:
                 "message": r.message,
                 "remediation": r.remediation or "",
                 "sources": "+".join(r.sources),
+                # Empty, not 0 or "unknown", when the finding could not be
+                # placed: a reader filtering on `line` must not have to know
+                # which sentinel means "no line". See checks/locate.py.
+                "source_file": r.source_file or "",
+                "line": r.line if r.line is not None else "",
             }
             for r in rows
         ]
@@ -101,24 +112,23 @@ def top_offenders(df: pd.DataFrame, n: int = 15) -> pd.DataFrame:
 
 
 def write_all_tables(rows: List[ResultRow], registry: Registry, out_dir: str | Path) -> None:
+    """Writes the one table that is not derivable from another.
+
+    This used to write seven files: `full_results.csv`, and then each of the
+    three summaries as both a `.csv` and a `.md` -- the same numbers in two
+    syntaxes, three times over, plus `top_offenders` a third time as a PNG.
+    Every one of the six was a `groupby` over `full_results.csv`, and a search
+    of this repo, its three notebooks and its docs found not one reader of any
+    of them. They were written on every run of every subcommand, by nobody's
+    request, and the cost was not the disk: it was that an out/ directory of
+    thirteen files gives no clue which one to open.
+
+    The aggregates themselves are not gone and were never the duplication.
+    `summary_by_category`, `summary_by_check` and `top_offenders` are still
+    here and still called -- by `html_report`, which renders them as tables,
+    and by `plots`, which draws them. One computation, rendered where someone
+    reads it, instead of six files nobody opened.
+    """
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-
-    df = rows_to_dataframe(rows)
-    df.to_csv(out_dir / "full_results.csv", index=False)
-
-    cat = summary_by_category(df)
-    cat.to_csv(out_dir / "summary_by_category.csv", index=False)
-    (out_dir / "summary_by_category.md").write_text(
-        cat.to_markdown(index=False) if not cat.empty else "_No results._", encoding="utf-8"
-    )
-
-    chk = summary_by_check(df, registry)
-    chk.to_csv(out_dir / "summary_by_check.csv", index=False)
-    (out_dir / "summary_by_check.md").write_text(chk.to_markdown(index=False), encoding="utf-8")
-
-    top = top_offenders(df)
-    top.to_csv(out_dir / "top_offenders.csv", index=False)
-    (out_dir / "top_offenders.md").write_text(
-        top.to_markdown(index=False) if not top.empty else "_No results._", encoding="utf-8"
-    )
+    rows_to_dataframe(rows).to_csv(out_dir / "full_results.csv", index=False)

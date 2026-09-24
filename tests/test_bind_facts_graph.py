@@ -229,8 +229,12 @@ def test_tql004_fires_on_the_unconverted_concat():
     expected = next(
         n for n, line in enumerate(fixture, 1) if "AS ?holder_IRI)" in line
     )
-    assert f"catalogue_to_rdf.rq:{expected}" in row.message, (
-        "the message must name the place to open"
+    # Carried as fields, not CONCATenated into the message. The message used
+    # to end "(catalogue_to_rdf.rq:25)", which no reader could sort or filter
+    # on and every renderer that shows the position properly then repeated.
+    assert row.line == expected, "the check must report the line it found the BIND on"
+    assert row.source_file is not None and row.source_file.endswith("catalogue_to_rdf.rq"), (
+        "the position must name a path that can actually be opened, not a bare filename"
     )
 
 

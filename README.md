@@ -53,6 +53,12 @@ See `docs/CONSISTENCY_AND_REPAIR.md` for the local-file workflow,
 the inherited pipeline this all sits on top of, and
 `docs/UPSTREAM_README.md` for that pipeline's own original README.
 
+Got a run's output and want to know which file to open? `docs/REPORTS.md`
+covers what each one is for, why `findings.txt` is the one to start with,
+where its `file:line` positions come from and when it declines to guess one,
+and how `--themes` groups the findings under questions in your own words
+instead of under check ids.
+
 Working on TARQL/oxi-gen queries? `docs/TESTING_TARQL.md` is the guide to
 testing a query folder: what goes wrong in a `CONSTRUCT` query, which check
 catches each thing, what none of them catch, and a review order that puts the
