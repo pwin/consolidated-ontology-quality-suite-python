@@ -97,6 +97,54 @@ def _print_summary(rows: List[ResultRow], out_dir: Path, warnings: List[str]) ->
     return counts
 
 
+BUILTIN_QUERIES = "@builtin"
+
+_SPARQL_HELP = (
+    "a directory of .rq check queries, or @builtin for the suite's own tree wherever this "
+    "install put it. Repeatable: pass it more than once to run a project's "
+    "own checks alongside the suite's, which is what you almost always want. Given at all, it "
+    "replaces the built-in tree, so `--sparql mine` runs only yours -- the run warns when that "
+    "happens. See docs/EXTENDING.md."
+)
+
+
+def _resolve_sparql_dirs(values: Optional[List[str]], warnings: List[str]) -> List[str]:
+    """The query trees to run, and a warning if the suite's own is not among them.
+
+    `--sparql mine` means only `mine`, which is the behaviour this flag has
+    always had and is sometimes exactly right -- the competency harness runs
+    one tree at a time on purpose. What was wrong was the silence. Pointing
+    the flag at a project's eight checks dropped the suite's 42 and said
+    nothing, so a CI gate reported a clean run having skipped almost
+    everything it was built to catch. Found in exactly that state.
+
+    The warning names the count rather than telling the reader what to do
+    about it, because both answers are legitimate: add the built-in tree as a
+    second `--sparql`, or keep the narrow run deliberately.
+    """
+    if not values:
+        return [str(config.DEFAULT_SPARQL_DIR)]
+
+    # `@builtin` is the suite's own tree, wherever this install put it. The
+    # alternative is writing the absolute path into a committed config, which
+    # is wrong on every other machine and wrong again after an upgrade -- an
+    # editable checkout resolves it to the source tree and a wheel to
+    # site-packages, and a gate config cannot know which it is looking at.
+    values = [str(config.DEFAULT_SPARQL_DIR) if v == BUILTIN_QUERIES else v for v in values]
+
+    default = config.DEFAULT_SPARQL_DIR.resolve()
+    if not any(Path(v).resolve() == default for v in values):
+        from .checks.sparql_runner import discover_queries
+        mine = len(discover_queries(values))
+        theirs = len(discover_queries(config.DEFAULT_SPARQL_DIR))
+        warnings.append(
+            f"--sparql replaced the suite's own query tree: {mine} project check(s) ran and "
+            f"{theirs} built-in check(s) did not. Pass --sparql {config.DEFAULT_SPARQL_DIR} "
+            f"as well to run both."
+        )
+    return values
+
+
 def _filter_own_namespace(
     rows: List[ResultRow],
     own_namespace: Optional[str],
@@ -227,7 +275,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     ont.add_argument("--registry", default=str(config.DEFAULT_REGISTRY_PATH))
     ont.add_argument("--themes", default=None,
                        help="a JSON or CSV map of check id to a question in your own words, used to add a \"by question\" index to findings.txt -- see docs/REPORTS.md")
-    ont.add_argument("--sparql", default=str(config.DEFAULT_SPARQL_DIR))
+    ont.add_argument("--sparql", action="append", default=None, help=_SPARQL_HELP)
     ont.add_argument("--out-dir", default="out/ontology")
     _add_profile_arg(ont)
     _add_common_reasoning_args(ont)
@@ -238,7 +286,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     chk.add_argument("--data", default=None)
     _add_import_args(chk)
     chk.add_argument("--shapes", default=str(config.DEFAULT_SHAPES_DIR))
-    chk.add_argument("--sparql", default=str(config.DEFAULT_SPARQL_DIR))
+    chk.add_argument("--sparql", action="append", default=None, help=_SPARQL_HELP)
     chk.add_argument("--registry", default=str(config.DEFAULT_REGISTRY_PATH))
     chk.add_argument("--themes", default=None,
                        help="a JSON or CSV map of check id to a question in your own words, used to add a \"by question\" index to findings.txt -- see docs/REPORTS.md")
@@ -262,8 +310,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     skt.add_argument("--themes", default=None,
                        help="a JSON or CSV map of check id to a question in your own words, used to add a \"by question\" index to findings.txt -- see docs/REPORTS.md")
     skt.add_argument(
-        "--sparql", default=str(config.DEFAULT_SPARQL_DIR),
-        help="query tree holding the check files; its `tarql/` subdirectory is run against the "
+        "--sparql", action="append", default=None,
+        help="query tree holding the check files; repeatable, and its `tarql/` subdirectory is run against the "
              "BIND facts graph built from --queries. Point it at your own tree to add "
              "project-specific query-source checks -- see docs/TESTING_TARQL.md",
     )
@@ -296,7 +344,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     dat.add_argument("--registry", default=str(config.DEFAULT_REGISTRY_PATH))
     dat.add_argument("--themes", default=None,
                        help="a JSON or CSV map of check id to a question in your own words, used to add a \"by question\" index to findings.txt -- see docs/REPORTS.md")
-    dat.add_argument("--sparql", default=str(config.DEFAULT_SPARQL_DIR))
+    dat.add_argument("--sparql", action="append", default=None, help=_SPARQL_HELP)
+    dat.add_argument("--shapes", default=str(config.DEFAULT_SHAPES_DIR))
     dat.add_argument("--sample", type=int, default=None, help="cap the reasoning pass to a CBD sample of this many named subjects")
     _add_engine_arg(dat)
     dat.add_argument("--out-dir", default="out/data-eval")
@@ -341,7 +390,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     run.add_argument("--themes", default=None,
                        help="a JSON or CSV map of check id to a question in your own words, used to add a \"by question\" index to findings.txt -- see docs/REPORTS.md")
     run.add_argument("--shapes", default=str(config.DEFAULT_SHAPES_DIR))
-    run.add_argument("--sparql", default=str(config.DEFAULT_SPARQL_DIR))
+    run.add_argument("--sparql", action="append", default=None, help=_SPARQL_HELP)
     run.add_argument("--oxi-gen-bin", default=None)
     run.add_argument("--sample", type=int, default=None)
     _add_engine_arg(run)
@@ -443,16 +492,19 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 def cmd_ontology(args) -> int:
     out_dir = Path(args.out_dir)
+    warnings: List[str] = []
+    sparql_dirs = _resolve_sparql_dirs(args.sparql, warnings)
     registry = Registry.load(args.registry)
     stage = pipeline.run_ontology_stage(
         args.ontology, out_dir,
         import_dir=args.import_dir, exclude_imports=args.exclude_imports, allow_network=args.allow_network,
-        reasoner=args.reasoner, registry=registry, sparql_root=args.sparql, profiles=tuple(args.profile),
+        reasoner=args.reasoner, registry=registry, sparql_root=sparql_dirs, profiles=tuple(args.profile),
     )
     if args.verbose:
         print(pipeline.format_import_report(args.ontology, stage.artifacts["import_report"]))
     artifacts = [("ontology_evaluation.txt", out_dir / "ontology_evaluation.txt"),
                  ("ontology_evaluation.json", out_dir / "ontology_evaluation.json")]
+    stage.warnings[:0] = warnings
     _write_reports(stage.rows, registry, out_dir, "Ontology Evaluation Report", artifacts,
                    sources=[args.ontology], themes_path=args.themes)
     counts = _print_summary(stage.rows, out_dir, stage.warnings)
@@ -464,13 +516,16 @@ def cmd_checks(args) -> int:
     if not args.ontology and not args.data:
         print("error: 'checks' needs at least one of --ontology or --data", file=sys.stderr)
         return 2
+    warnings: List[str] = []
+    sparql_dirs = _resolve_sparql_dirs(args.sparql, warnings)
     registry = Registry.load(args.registry)
     stage = pipeline.run_checks_stage(
         registry, out_dir, ontology_path=args.ontology, data_path=args.data,
-        shapes_dir=args.shapes, sparql_dir=args.sparql, inference=args.inference, engine=args.engine,
+        shapes_dir=args.shapes, sparql_dir=sparql_dirs, inference=args.inference, engine=args.engine,
         import_dir=args.import_dir, exclude_imports=args.exclude_imports, allow_network=args.allow_network,
         verbose=args.verbose,
     )
+    stage.warnings[:0] = warnings
     rows = _filter_own_namespace(stage.rows, args.own_namespace, stage.warnings)
     _write_reports(rows, registry, out_dir, "Registry Checks Report",
                    sources=[args.ontology, args.data], themes_path=args.themes)
@@ -480,17 +535,20 @@ def cmd_checks(args) -> int:
 
 def cmd_sketch(args) -> int:
     out_dir = Path(args.out_dir)
+    warnings: List[str] = []
+    sparql_dirs = _resolve_sparql_dirs(args.sparql, warnings)
     registry = Registry.load(args.registry)
     stage = pipeline.run_sketch_stage(
         args.queries, out_dir, ontology_path=args.ontology, query_pattern=args.query_pattern,
         import_dir=args.import_dir, exclude_imports=args.exclude_imports, allow_network=args.allow_network,
-        verbose=args.verbose, registry=registry, sparql_dir=args.sparql,
+        verbose=args.verbose, registry=registry, sparql_dir=sparql_dirs,
     )
     artifacts = [
         ("sketch.ttl", stage.artifacts["sketch_path"]),
         ("bind-review.txt", stage.artifacts["bind_report_path"]),
         ("bind-facts.ttl", stage.artifacts["bind_facts_path"]),
     ]
+    stage.warnings[:0] = warnings
     _write_reports(stage.rows, registry, out_dir, "TARQL/oxi-gen Sketch Report", artifacts,
                    sources=[args.ontology], themes_path=args.themes)
     counts = _print_summary(stage.rows, out_dir, stage.warnings)
@@ -518,14 +576,17 @@ def cmd_triplify(args) -> int:
 
 def cmd_data(args) -> int:
     out_dir = Path(args.out_dir)
+    warnings: List[str] = []
+    sparql_dirs = _resolve_sparql_dirs(args.sparql, warnings)
     registry = Registry.load(args.registry)
     stage = pipeline.run_data_stage(
         args.data, out_dir, ontology_path=args.ontology, registry=registry,
-        sparql_root=args.sparql, sample=args.sample, reasoner=args.reasoner, engine=args.engine,
-        data_pattern=args.data_pattern,
+        sparql_root=sparql_dirs, shapes_dir=args.shapes, sample=args.sample, reasoner=args.reasoner,
+        engine=args.engine, data_pattern=args.data_pattern,
         import_dir=args.import_dir, exclude_imports=args.exclude_imports, allow_network=args.allow_network,
         verbose=args.verbose,
     )
+    stage.warnings[:0] = warnings
     rows = _filter_own_namespace(stage.rows, args.own_namespace, stage.warnings)
     _write_reports(rows, registry, out_dir, "Data Quality & Conformance Report",
                    sources=[args.ontology], themes_path=args.themes)
@@ -710,10 +771,11 @@ def cmd_run(args) -> int:
     rows: List[ResultRow] = []
     warnings: List[str] = []
     artifacts: List[Tuple[str, Path]] = []
+    sparql_dirs = _resolve_sparql_dirs(args.sparql, warnings)
 
     if args.ontology:
         stage = pipeline.run_ontology_stage(
-            args.ontology, out_dir / "ontology", reasoner=args.reasoner, registry=registry, sparql_root=args.sparql,
+            args.ontology, out_dir / "ontology", reasoner=args.reasoner, registry=registry, sparql_root=sparql_dirs,
             import_dir=args.import_dir, exclude_imports=args.exclude_imports, allow_network=args.allow_network,
             profiles=tuple(args.profile),
         )
@@ -739,7 +801,7 @@ def cmd_run(args) -> int:
         stage = pipeline.run_checks_stage(
             registry, out_dir / "checks", ontology_path=args.ontology,
             data_path=(args.data[0] if args.data and len(args.data) == 1 else None),
-            shapes_dir=args.shapes, sparql_dir=args.sparql, engine=args.engine,
+            shapes_dir=args.shapes, sparql_dir=sparql_dirs, engine=args.engine,
             import_dir=args.import_dir, exclude_imports=args.exclude_imports, allow_network=args.allow_network,
             verbose=args.verbose,
         )
@@ -750,7 +812,7 @@ def cmd_run(args) -> int:
         stage = pipeline.run_sketch_stage(
             args.queries, out_dir / "sketch", ontology_path=args.ontology, query_pattern=args.query_pattern,
             import_dir=args.import_dir, exclude_imports=args.exclude_imports, allow_network=args.allow_network,
-            verbose=args.verbose, registry=registry, sparql_dir=args.sparql,
+            verbose=args.verbose, registry=registry, sparql_dir=sparql_dirs,
         )
         rows += stage.rows
         warnings += stage.warnings
@@ -771,7 +833,8 @@ def cmd_run(args) -> int:
     if data_paths:
         stage = pipeline.run_data_stage(
             data_paths, out_dir / "data-eval", ontology_path=args.ontology, registry=registry,
-            sparql_root=args.sparql, sample=args.sample, reasoner=args.reasoner, engine=args.engine,
+            sparql_root=sparql_dirs, shapes_dir=args.shapes, sample=args.sample, reasoner=args.reasoner,
+            engine=args.engine,
             data_pattern=args.data_pattern,
             import_dir=args.import_dir, exclude_imports=args.exclude_imports, allow_network=args.allow_network,
             verbose=args.verbose,

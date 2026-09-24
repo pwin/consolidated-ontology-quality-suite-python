@@ -11,6 +11,8 @@ silently saying nothing.
 from __future__ import annotations
 
 from pathlib import Path
+
+from ..checks.sparql_runner import as_dirs
 from typing import List
 
 from rdflib import Graph
@@ -39,7 +41,9 @@ def run_consistency_checks(
     if reasoner not in REASONER_CHOICES:
         raise ValueError(f"Unknown reasoner {reasoner!r}; choose one of {REASONER_CHOICES}")
 
-    sparql_root = Path(sparql_root)
+    # One root or several -- `--sparql` is repeatable, so a project's own
+    # closure-safe or reasoning queries are found alongside the suite's.
+    sparql_roots = as_dirs(sparql_root)
     rows: List[ResultRow] = []
 
     if reasoner == "none":
@@ -60,7 +64,9 @@ def run_consistency_checks(
     # axioms, none authored redundantly) purely from this. See
     # docs/REASONING.md.
     owlrl_rows, _outcomes = owlrl_backend.run_owlrl_checks(
-        graph, registry, [sparql_root / "logical" / "closure-safe", sparql_root / "reasoning"]
+        graph, registry,
+        [root / part for root in sparql_roots
+         for part in (Path("logical") / "closure-safe", Path("reasoning"))]
     )
     rows.extend(owlrl_rows)
 

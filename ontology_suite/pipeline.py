@@ -31,7 +31,7 @@ from .checks.runner import load_graph
 from .checks.shacl_native_runner import run_shacl_native_rows
 from .checks.shacl_native_runner import available as native_shacl_available
 from .checks.shacl_runner import load_shapes_graph, run_shacl
-from .checks.sparql_runner import run_sparql_checks
+from .checks.sparql_runner import as_dirs, run_sparql_checks
 from .dataquality import data_quality
 from .docgen import build_documentation, extract_ontology_data
 from .docgen import class_diagrams as class_diagrams_module
@@ -540,9 +540,11 @@ def run_sketch_stage(
     bind_facts = bind_analysis.bind_report_to_graph(bind_report)
     bind_facts_path = out_dir / "bind-facts.ttl"
     bind_facts.serialize(destination=str(bind_facts_path), format="turtle")
-    tarql_query_dir = Path(sparql_dir) / "tarql"
-    if tarql_query_dir.is_dir():
-        tarql_results, tarql_outcomes = run_sparql_checks(bind_facts, tarql_query_dir)
+    # The `tarql/` subdirectory of every root, so a project can add its own
+    # query-source checks beside the suite's rather than instead of them.
+    tarql_query_dirs = [d / "tarql" for d in as_dirs(sparql_dir) if (d / "tarql").is_dir()]
+    if tarql_query_dirs:
+        tarql_results, tarql_outcomes = run_sparql_checks(bind_facts, tarql_query_dirs)
         rows += build_unified_results(Graph(), tarql_results, registry)
         for outcome in tarql_outcomes:
             if not outcome.ok:
@@ -618,6 +620,7 @@ def run_data_stage(
     ontology_path: Optional[str | Path] = None,
     registry: Optional[Registry] = None,
     sparql_root: str | Path = config.DEFAULT_SPARQL_DIR,
+    shapes_dir: str | Path = config.DEFAULT_SHAPES_DIR,
     sample: Optional[int] = None,
     reasoner: str = "auto",
     data_pattern: str = data_quality.DEFAULT_DATA_GLOBS,
@@ -662,7 +665,11 @@ def run_data_stage(
                 working_graph.add(triple)
         if verbose:
             print(f"[verbose] engine: {engine}")
-        rows += run_registry_suite_on_graph(working_graph, registry, config.DEFAULT_SHAPES_DIR, sparql_root, engine=engine)
+        # shapes_dir, not the packaged default: a project could pass its own
+        # SHACL shapes to `checks` but not to `data`, which ran the built-in
+        # set regardless of what was asked for -- the same trap as --sparql
+        # replacing the query tree, in the tier next door.
+        rows += run_registry_suite_on_graph(working_graph, registry, shapes_dir, sparql_root, engine=engine)
 
     sample_note = None
     reasoning_graph = aggregate_graph

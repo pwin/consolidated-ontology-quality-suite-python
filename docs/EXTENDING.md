@@ -22,6 +22,50 @@ let you point at your own copy instead without touching the installed
 package at all -- see `docs/PRIMER.md` §13 for the full copy-edit-point-at
 worked example, verified against a real `pip install`.
 
+## What the registry decides, and what it doesn't
+
+This catches people out, so it is worth stating before anything else.
+
+**The registry declares; the directories decide.** `registry.json` says what
+a finding is *called* -- its title, category, severity and remediation.
+Discovery is filesystem-based and separate: every `.rq` under `--sparql` runs,
+every `.ttl` in `--shapes` loads, and the registry is consulted afterwards to
+map each result back to an entry.
+
+So a query with no registry entry still runs, and its findings come out
+`UNMAPPED` with no title or remediation. And a registry entry with no file
+never fires -- silently, which is why `tests/test_check_coverage.py` pins that
+every SHACL-implemented check has a portable `.rq` twin.
+
+**`--sparql` replaces the built-in tree, and it is repeatable.** Given once,
+it runs only what you point it at:
+
+```bash
+ontology-quality-suite checks --ontology model.ttl --sparql my-checks/
+# WARNING: --sparql replaced the suite's own query tree: 8 project check(s)
+# ran and 42 built-in check(s) did not.
+```
+
+Pass it more than once to run both, which is almost always what you want:
+
+```bash
+ontology-quality-suite checks --ontology model.ttl   --sparql my-checks/ --sparql @builtin
+```
+
+`@builtin` is the suite's own tree wherever this install put it -- the source
+checkout for an editable install, site-packages for a wheel. Write it rather
+than an absolute path in anything you commit: a path is wrong on every other
+machine and wrong again after an upgrade.
+
+Roots are deduplicated by resolved path, so overlapping trees run each query
+once. Subject-specific directories (`tarql/`) are filtered per root, so adding
+a second root never changes whether the first one's are excluded.
+
+The warning exists because a narrow run is sometimes exactly right -- a
+harness that runs one tree at a time on purpose -- and the problem was never
+the behaviour but the silence. A real CI gate was found running eight checks
+while its merged registry declared 61, and reporting clean.
+
 ## 1. A portable SPARQL `CONSTRUCT` check (most checks)
 
 Fits anything expressible as a graph pattern over a single merged graph:
