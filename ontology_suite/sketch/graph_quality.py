@@ -60,7 +60,13 @@ def cross_namespace_groups(terms):
 
 
 def _resolve_predicate(predicate, scratch_namespace):
-    """Turn a `:localName` or full IRI into the full IRI to match against parsed triples."""
+    """Turn a `:localName` or full IRI into the full IRI to match against parsed triples.
+
+    Kept as a thin wrapper over the emitter's own resolver so the ignore-set
+    and the triples it is meant to ignore cannot disagree about what a legend
+    predicate is called. They did disagree once, whenever a query declared an
+    empty prefix -- see tarql_visualiser.legend_predicate_iri.
+    """
     if predicate.startswith(":"):
         return scratch_namespace + predicate[1:]
     return predicate
@@ -73,12 +79,18 @@ def default_ignored_predicates(
 ):
     """The prefix-legend predicates tarql_visualiser.py adds by default, as full IRIs.
 
-    ``tarql_visualiser.write_turtle`` always emits ``@base <base> .`` followed
-    by ``@prefix : <scratch_namespace(base)> .`` (unless the query itself
-    defines an empty prefix) -- see that function's own docstring for
+    ``tarql_visualiser.write_turtle`` writes the legend predicates as absolute
+    IRIs in the scratch namespace -- see that function's own docstring for
     exactly how the scratch namespace is derived from ``base``. Reusing it
     here (rather than re-deriving it) is what keeps this ignore-set able to
     actually match the legend triples ``write_turtle`` produced.
+
+    Before the predicates were absolute they were written as the CURIE
+    ``:isRepresentedBy``, which meant the scratch namespace only when no
+    query declared an empty prefix. This set resolved against the scratch
+    namespace either way, so for every query that declared one the ignore-set
+    matched nothing and the tool's own predicate was reported as an
+    undeclared property of the project.
     """
     ns = scratch_namespace(base)
     return {

@@ -193,18 +193,62 @@ def parse_query(path):
     return QueryGraph(source=path, prefixes=prefixes, triples=triples)
 
 
-def namespace_legend_triples(prefixes, predicate=DEFAULT_NAMESPACE_PREDICATE):
+def legend_predicate_iri(predicate, base=DEFAULT_BASE):
+    """The full IRI a legend predicate is written with.
+
+    `:isRepresentedBy` is this tool's own vocabulary, so it belongs in this
+    tool's namespace whatever the queries happen to call `:`. Written as the
+    bare CURIE it did not: `write_turtle` binds `:` to the scratch namespace
+    only when no query declares an empty prefix, and most queries declare
+    one -- so the legend predicate landed in the *project's* namespace, where
+    the conformance layer correctly reported a property nobody had declared.
+    The project had not used it; the tool had invented it.
+
+    `graph_quality.default_ignored_predicates` has always resolved these
+    against the scratch namespace, so the ignore-set and the emitter agreed
+    only in the case that almost never happens. Now they always agree.
+
+    A predicate given as a full IRI, or as a CURIE on a prefix the queries
+    really define, is left alone -- a caller who passes one means it.
+    """
+    if predicate.startswith(":"):
+        return scratch_namespace(base) + predicate[1:]
+    return predicate
+
+
+def _legend_term(predicate, base=DEFAULT_BASE):
+    """The legend predicate as a turtle term.
+
+    Four forms reach this, and each keeps meaning what it meant before:
+    `:local` (the tool's own, resolved into the scratch namespace), an IRI
+    already in angle brackets (given back exactly -- wrapping it again
+    produced `<<...>>` and turtle that does not parse), a bare absolute IRI
+    (wrapped), and a CURIE on a prefix the queries define (left alone, since
+    the writer has just emitted that @prefix line above it).
+    """
+    if predicate.startswith(":"):
+        return f"<{legend_predicate_iri(predicate, base)}>"
+    if predicate.startswith("<") and predicate.endswith(">"):
+        return predicate
+    if "://" in predicate:
+        return f"<{predicate}>"
+    return predicate
+
+
+def namespace_legend_triples(prefixes, predicate=DEFAULT_NAMESPACE_PREDICATE, base=DEFAULT_BASE):
     """Describe each namespace's prefix abbreviation as a data triple, e.g.
 
-    <http://xmlns.com/foaf/0.1/> :isRepresentedBy "foaf" .
+    <http://xmlns.com/foaf/0.1/> <https://tarqlviz.org/isRepresentedBy> "foaf" .
 
     so the abbreviation-to-namespace mapping is visible in the graph itself,
     not just in the (often visualiser-invisible) @prefix directives.
     """
-    return "\n".join(f'<{iri}> {predicate} "{name}" .' for name, iri in prefixes.items())
+    term = _legend_term(predicate, base)
+    return "\n".join(f'<{iri}> {term} "{name}" .' for name, iri in prefixes.items())
 
 
-def namespace_conflict_triples(namespace_names, predicate=DEFAULT_NAMESPACE_CONFLICT_PREDICATE):
+def namespace_conflict_triples(namespace_names, predicate=DEFAULT_NAMESPACE_CONFLICT_PREDICATE,
+                               base=DEFAULT_BASE):
     """Flag namespaces that were abbreviated with more than one distinct prefix, e.g.
 
     <https://example.org/> :hasAmbiguousPrefix true .
@@ -215,8 +259,9 @@ def namespace_conflict_triples(namespace_names, predicate=DEFAULT_NAMESPACE_CONF
     (one node fanning out to several abbreviation literals); this adds an
     explicit, queryable/filterable marker on top of that for visualisers.
     """
+    term = _legend_term(predicate, base)
     return "\n".join(
-        f"<{iri}> {predicate} true ."
+        f"<{iri}> {term} true ."
         for iri, names in namespace_names.items()
         if len(names) > 1
     )
@@ -263,8 +308,8 @@ def write_turtle(
         print(file=out)
         if include_namespace_legend and merged_prefixes:
             print("# namespace legend", file=out)
-            print(namespace_legend_triples(merged_prefixes, namespace_predicate), file=out)
-            conflicts = namespace_conflict_triples(namespace_names, namespace_conflict_predicate)
+            print(namespace_legend_triples(merged_prefixes, namespace_predicate, base), file=out)
+            conflicts = namespace_conflict_triples(namespace_names, namespace_conflict_predicate, base)
             if conflicts:
                 print(conflicts, file=out)
             print(file=out)
