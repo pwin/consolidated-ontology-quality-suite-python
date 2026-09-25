@@ -230,3 +230,60 @@ def test_combined_alignment_report_clean_when_nothing_to_report(tmp_path):
     assert pa.format_alignment_report(report) == (
         "No prefix/namespace misalignments or undeclared classes/properties found."
     )
+
+
+# --------------------------------------------------------------------------
+# The empty prefix. An ontology written `@prefix : <...#>` with its terms in
+# that namespace is the ordinary case, and the loader used to skip the
+# declaration entirely -- on the reasoning that a bare `:` is not comparable
+# across files, which is true of the prefix *name* and not of the namespace
+# IRI it binds. The IRI went missing with it, so the "does this appear in the
+# ontology set under any prefix at all" question answered no about the
+# ontology's own namespace, for every mapping that used it. Six such findings
+# in this suite's worked example, none of them true.
+# --------------------------------------------------------------------------
+DEFAULT_NS = "https://example.org/model#"
+
+
+def _default_prefix_ontology(tmp_path, iri=DEFAULT_NS):
+    return _write(
+        tmp_path, "onto.ttl",
+        f"@prefix : <{iri}>\n.\n@prefix owl: <http://www.w3.org/2002/07/owl#> .\n"
+        f":DemoOntology a owl:Ontology .\n:Thing a owl:Class .\n",
+    )
+
+
+def _default_prefix_query(tmp_path, name="q.rq", iri=DEFAULT_NS):
+    return _write(
+        tmp_path, name,
+        f"PREFIX : <{iri}>\nCONSTRUCT {{ ?s a :Thing . }} WHERE {{ BIND(?x AS ?s) }}\n",
+    )
+
+
+def test_the_ontologys_own_default_namespace_is_not_reported_as_undeclared(tmp_path):
+    onto = _default_prefix_ontology(tmp_path)
+    query = _default_prefix_query(tmp_path)
+    assert pa.check_tarql_ontology_prefix_alignment([query], [onto]) == []
+
+
+def test_rebinding_the_default_prefix_is_a_namespace_mismatch(tmp_path):
+    """The query's `:` is not the ontology's `:`. Worth reporting -- and
+    reporting as the mismatch it is, rather than as a namespace nobody
+    declares, which is what a reader was told before."""
+    onto = _default_prefix_ontology(tmp_path)
+    query = _default_prefix_query(tmp_path, iri="https://example.org/OTHER#")
+    findings = pa.check_tarql_ontology_prefix_alignment([query], [onto])
+    assert len(findings) == 1
+    assert findings[0].kind == "namespace_mismatch"
+    assert findings[0].prefix == ""
+
+
+def test_the_default_namespace_is_found_under_another_prefix_too(tmp_path):
+    """Declared `:` in the ontology, used as `model:` in the query: the same
+    namespace, abbreviated differently, which is the readability smell rather
+    than a missing declaration."""
+    onto = _default_prefix_ontology(tmp_path)
+    query = _query(tmp_path, "q.rq", "model", DEFAULT_NS)
+    findings = pa.check_tarql_ontology_prefix_alignment([query], [onto])
+    assert len(findings) == 1
+    assert findings[0].kind == "prefix_name_mismatch"

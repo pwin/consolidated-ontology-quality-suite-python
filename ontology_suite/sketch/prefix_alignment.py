@@ -63,15 +63,29 @@ class OntologyNamespaces:
 def load_ontology_namespaces(ontology_paths: Iterable[str | Path]) -> OntologyNamespaces:
     """Parse each given ontology file's own namespace declarations (no
     owl:imports resolution -- pass every file you want considered, e.g. the
-    main ontology plus each import, explicitly)."""
+    main ontology plus each import, explicitly).
+
+    The empty prefix is included. It was skipped, on the reasoning that a
+    bare `:` is not comparable across files -- true of the prefix *name*, and
+    the reason `namespace_mismatch` was never reported for it. But dropping
+    the declaration also dropped its namespace IRI, and the third check asks
+    whether the IRI appears in the ontology set *under any prefix at all*. So
+    an ontology written the ordinary way, `@prefix : <...#>` with its terms
+    in that namespace, had its own namespace reported as one nothing
+    declares -- for every mapping that used it. Six such findings in this
+    suite's own worked example, none of them true.
+
+    With it included, a query whose `:` is the ontology's `:` matches and is
+    silent, and a query that rebinds `:` to something else is reported as the
+    namespace_mismatch it is, which is both accurate and more useful than
+    "undeclared".
+    """
     by_prefix: Dict[str, Dict[str, str]] = {}
     by_namespace: Dict[str, Dict[str, str]] = {}
     for path in _expand_paths(ontology_paths, DEFAULT_ONTOLOGY_GLOBS):
         graph = rdflib.Graph(bind_namespaces="none")
         io_utils.parse_graph(graph, path)
         for prefix, namespace in graph.namespaces():
-            if not prefix:
-                continue  # the bare default `:` prefix isn't comparable across files
             iri = str(namespace)
             by_prefix.setdefault(prefix, {}).setdefault(iri, str(path))
             by_namespace.setdefault(iri, {}).setdefault(prefix, str(path))
