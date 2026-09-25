@@ -440,6 +440,13 @@ partial bindings, and `--sample-limit` are in `docs/FUSEKI.md`.
 
 ## 11. Use case: producing something a non-technical stakeholder can read
 
+Every check above produces six artefacts under `--out-dir`, one per audience:
+`findings.txt` for a person, `full_results.csv` for a script, `cucumber.json`
+and `features/` for CI, and `report.html` with the `plots/` it embeds for a
+browser. A run with none of those audiences -- a CI gate that reads the exit
+code, a fixture that seeds one defect -- can pass `--reports minimal` and get
+the first two only, which also skips the plotting.
+
 Every check above produces `report.html`/`full_results.csv` (start with the
 former), but for the ontology's own structure -- not findings -- `docgen`
 generates a standalone reference page:

@@ -59,12 +59,19 @@ def _write_reports(
     artifacts: Optional[List[Tuple[str, Path]]] = None,
     sources: Optional[Sequence[Optional[str]]] = None,
     themes_path: Optional[str] = None,
+    reports: str = "all",
 ) -> None:
     """One file per audience, and no file that restates another.
 
     `findings.txt` for a person, `full_results.csv` for a script,
     `cucumber.json` (and the `features/` rendering of it) for CI, `report.html`
     for a browser, `plots/` because the HTML embeds them.
+
+    `reports="minimal"` writes the first two and stops. It is for the runs
+    where nobody opens a browser: a CI gate reads the exit code and maybe the
+    CSV, and a fixture that seeds one defect does not need three charts of
+    three findings. Skipping them also skips the plotting, which on a small
+    run is most of the time spent.
 
     `sources` are the files the findings are about, searched in order for each
     focus node's declaring line. Rows that already carry a position keep it,
@@ -79,6 +86,8 @@ def _write_reports(
     themes = load_themes(themes_path) if themes_path else None
     write_findings_text(rows, registry, out_dir / "findings.txt", themes)
     write_all_tables(rows, registry, out_dir)
+    if reports == "minimal":
+        return
     write_all_plots(rows, out_dir / "plots")
     write_cucumber_json(rows, registry, out_dir / "cucumber.json")
     write_gherkin_feature_files(rows, registry, out_dir / "features")
@@ -90,7 +99,8 @@ def _print_summary(rows: List[ResultRow], out_dir: Path, warnings: List[str]) ->
     print(f"Findings: {len(rows)} total ({counts['Violation']} Violation, {counts['Warning']} Warning, {counts['Info']} Info)")
     print(f"Reports written to: {out_dir.resolve()}")
     print(f"  - {out_dir / 'findings.txt'} (start here -- what, where, and the source line)")
-    print(f"  - {out_dir / 'report.html'}")
+    if (out_dir / "report.html").exists():
+        print(f"  - {out_dir / 'report.html'}")
     print(f"  - {out_dir / 'full_results.csv'}")
     for w in warnings:
         print(f"WARNING: {w}", file=sys.stderr)
@@ -208,6 +218,17 @@ def _add_common_reasoning_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--fail-on", default="Violation", choices=["Violation", "Warning", "Info", "never"])
 
 
+def _add_reports_arg(p: argparse.ArgumentParser) -> None:
+    p.add_argument(
+        "--reports", default="all", choices=["all", "minimal"],
+        help="which report files to write under --out-dir: 'all' (default) writes "
+             "findings.txt, full_results.csv, report.html, cucumber.json, features/ and "
+             "plots/; 'minimal' writes findings.txt and full_results.csv only -- the one "
+             "for a person and the one for a script -- and skips the plotting, which is "
+             "most of the time a small run spends",
+    )
+
+
 def _add_profile_arg(p: argparse.ArgumentParser) -> None:
     p.add_argument(
         "--profile", action="append", choices=["EL", "QL", "RL"], default=[], dest="profile",
@@ -277,6 +298,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
                        help="a JSON or CSV map of check id to a question in your own words, used to add a \"by question\" index to findings.txt -- see docs/REPORTS.md")
     ont.add_argument("--sparql", action="append", default=None, help=_SPARQL_HELP)
     ont.add_argument("--out-dir", default="out/ontology")
+    _add_reports_arg(ont)
     _add_profile_arg(ont)
     _add_common_reasoning_args(ont)
     _add_verbose_arg(ont)
@@ -293,6 +315,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     chk.add_argument("--inference", default="none", choices=["none", "rdfs", "owlrl", "both"])
     _add_engine_arg(chk)
     chk.add_argument("--out-dir", default="out/checks")
+    _add_reports_arg(chk)
     chk.add_argument("--fail-on", default="Violation", choices=["Violation", "Warning", "Info", "never"])
     _add_own_namespace_arg(chk)
     _add_verbose_arg(chk)
@@ -316,6 +339,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
              "project-specific query-source checks -- see docs/TESTING_TARQL.md",
     )
     skt.add_argument("--out-dir", default="out/sketch")
+    _add_reports_arg(skt)
     skt.add_argument("--fail-on", default="never", choices=["Violation", "Warning", "Info", "never"])
     _add_verbose_arg(skt)
 
@@ -349,6 +373,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     dat.add_argument("--sample", type=int, default=None, help="cap the reasoning pass to a CBD sample of this many named subjects")
     _add_engine_arg(dat)
     dat.add_argument("--out-dir", default="out/data-eval")
+    _add_reports_arg(dat)
     _add_common_reasoning_args(dat)
     _add_own_namespace_arg(dat)
     _add_verbose_arg(dat)
@@ -395,6 +420,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     run.add_argument("--sample", type=int, default=None)
     _add_engine_arg(run)
     run.add_argument("--out-dir", default="out")
+    _add_reports_arg(run)
     _add_profile_arg(run)
     _add_common_reasoning_args(run)
     _add_own_namespace_arg(run)
@@ -506,7 +532,7 @@ def cmd_ontology(args) -> int:
                  ("ontology_evaluation.json", out_dir / "ontology_evaluation.json")]
     stage.warnings[:0] = warnings
     _write_reports(stage.rows, registry, out_dir, "Ontology Evaluation Report", artifacts,
-                   sources=[args.ontology], themes_path=args.themes)
+                   sources=[args.ontology], themes_path=args.themes, reports=args.reports)
     counts = _print_summary(stage.rows, out_dir, stage.warnings)
     return _exit_code(counts, args.fail_on)
 
@@ -528,7 +554,7 @@ def cmd_checks(args) -> int:
     stage.warnings[:0] = warnings
     rows = _filter_own_namespace(stage.rows, args.own_namespace, stage.warnings)
     _write_reports(rows, registry, out_dir, "Registry Checks Report",
-                   sources=[args.ontology, args.data], themes_path=args.themes)
+                   sources=[args.ontology, args.data], themes_path=args.themes, reports=args.reports)
     counts = _print_summary(rows, out_dir, stage.warnings)
     return _exit_code(counts, args.fail_on)
 
@@ -550,7 +576,7 @@ def cmd_sketch(args) -> int:
     ]
     stage.warnings[:0] = warnings
     _write_reports(stage.rows, registry, out_dir, "TARQL/oxi-gen Sketch Report", artifacts,
-                   sources=[args.ontology], themes_path=args.themes)
+                   sources=[args.ontology], themes_path=args.themes, reports=args.reports)
     counts = _print_summary(stage.rows, out_dir, stage.warnings)
     gm = stage.artifacts["graph_metrics"]
     print(f"Sketch used {len(stage.artifacts['used_queries'])} query file(s); "
@@ -589,7 +615,7 @@ def cmd_data(args) -> int:
     stage.warnings[:0] = warnings
     rows = _filter_own_namespace(stage.rows, args.own_namespace, stage.warnings)
     _write_reports(rows, registry, out_dir, "Data Quality & Conformance Report",
-                   sources=[args.ontology], themes_path=args.themes)
+                   sources=[args.ontology], themes_path=args.themes, reports=args.reports)
     counts = _print_summary(rows, out_dir, stage.warnings)
     if stage.artifacts.get("sample_note"):
         print(stage.artifacts["sample_note"])
@@ -844,7 +870,7 @@ def cmd_run(args) -> int:
 
     rows = _filter_own_namespace(rows, args.own_namespace, warnings)
     _write_reports(rows, registry, out_dir, "Consolidated Ontology Suite Report", artifacts,
-                   sources=[args.ontology, *data_paths], themes_path=args.themes)
+                   sources=[args.ontology, *data_paths], themes_path=args.themes, reports=args.reports)
     counts = _print_summary(rows, out_dir, warnings)
     return _exit_code(counts, args.fail_on)
 
