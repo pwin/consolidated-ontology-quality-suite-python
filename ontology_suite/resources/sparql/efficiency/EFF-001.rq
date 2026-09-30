@@ -27,6 +27,15 @@ WHERE {
   ?c5 rdfs:subClassOf ?c6 .
   FILTER(?c0 != ?c1 && ?c1 != ?c2 && ?c2 != ?c3 && ?c3 != ?c4 && ?c4 != ?c5 && ?c5 != ?c6)
   FILTER(?c0 != ?c2 && ?c0 != ?c3 && ?c0 != ?c4 && ?c0 != ?c5 && ?c0 != ?c6)
+  # The chain's far end is often an anonymous class expression, and STR() is
+  # defined for literals and IRIs only (SPARQL 1.1 17.4.2.5) -- so STR() of a
+  # blank node is a type error, CONCAT errors, BIND leaves ?msg unbound and the
+  # template drops the message. rdflib returns the internal blank node id rather
+  # than raising, so under rdflib the message survived and named something that
+  # differs on every run; under a conformant engine, which is what the extension
+  # runs, it vanished. IF() evaluates only the branch it takes, so STR() is never
+  # reached for a blank node and both engines produce the same text.
+  BIND(IF(isBlank(?c6), "[a blank node]", STR(?c6)) AS ?endText)
   BIND(CONCAT("Class ", STR(?c0), " has a subClassOf chain at least 6 hops deep (reaching ",
-              STR(?c6), "), increasing reasoning/traversal cost.") AS ?msg)
+              ?endText, "), increasing reasoning/traversal cost.") AS ?msg)
 }

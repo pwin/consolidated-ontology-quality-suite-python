@@ -23,17 +23,21 @@ CONSTRUCT {
 WHERE {
   ?e rdfs:label ?l .
   FILTER(LANG(?l) = "")
-  # COALESCE, because STR() is defined for literals and IRIs only (SPARQL 1.1
-  # 17.4.2.5) and a focus node here is very often a blank node -- an anonymous
-  # restriction or axiom carrying an rdfs:label. STR() on one is a type error,
-  # which makes CONCAT error, which leaves ?msg unbound, which drops the
-  # sh:resultMessage from the result entirely. rdflib does not raise -- it
-  # returns the internal blank node id -- so under rdflib alone the message is
-  # present but says something meaningless and unstable between runs, and under
-  # a conformant engine it vanishes. Measured on examples/checks_stress_test:
-  # 60 of 65 results affected, message present under rdflib and absent under
-  # both pyoxigraph and HOLOS.
-  BIND(COALESCE(STR(?e), "[a blank node]") AS ?focusText)
+  # A focus node here is very often a blank node -- an anonymous restriction or
+  # axiom carrying an rdfs:label -- and STR() is defined for literals and IRIs
+  # only (SPARQL 1.1 17.4.2.5). STR() of a blank node is therefore a type error:
+  # CONCAT errors, BIND leaves ?msg unbound, and the template drops the message.
+  # Measured on examples/checks_stress_test: 60 of 65 results affected, and the
+  # extension ships this query to oxigraph, so the message went missing there in
+  # the field.
+  #
+  # IF() rather than COALESCE(STR(?e), ...), which was the first fix and is the
+  # weaker one. COALESCE catches the error, so it only helps where STR() *does*
+  # error -- rdflib returns the internal blank node id instead of raising, so
+  # under rdflib the message stayed present and named something meaningless that
+  # differs on every run. IF() evaluates only the branch it takes, so STR() is
+  # never called on a blank node at all, and both engines produce the same text.
+  BIND(IF(isBlank(?e), "[a blank node]", STR(?e)) AS ?focusText)
   BIND(CONCAT("Label '", STR(?l), "' on ", ?focusText,
               " has no language tag; add e.g. @en for internationalisation clarity.") AS ?msg)
 }
