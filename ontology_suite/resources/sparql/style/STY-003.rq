@@ -23,6 +23,17 @@ CONSTRUCT {
 WHERE {
   ?e rdfs:label ?l .
   FILTER(LANG(?l) = "")
-  BIND(CONCAT("Label '", STR(?l), "' on ", STR(?e),
-              "' has no language tag; add e.g. @en for internationalisation clarity.") AS ?msg)
+  # COALESCE, because STR() is defined for literals and IRIs only (SPARQL 1.1
+  # 17.4.2.5) and a focus node here is very often a blank node -- an anonymous
+  # restriction or axiom carrying an rdfs:label. STR() on one is a type error,
+  # which makes CONCAT error, which leaves ?msg unbound, which drops the
+  # sh:resultMessage from the result entirely. rdflib does not raise -- it
+  # returns the internal blank node id -- so under rdflib alone the message is
+  # present but says something meaningless and unstable between runs, and under
+  # a conformant engine it vanishes. Measured on examples/checks_stress_test:
+  # 60 of 65 results affected, message present under rdflib and absent under
+  # both pyoxigraph and HOLOS.
+  BIND(COALESCE(STR(?e), "[a blank node]") AS ?focusText)
+  BIND(CONCAT("Label '", STR(?l), "' on ", ?focusText,
+              " has no language tag; add e.g. @en for internationalisation clarity.") AS ?msg)
 }

@@ -48,6 +48,11 @@ native-shacl = [
 [dependency-groups]
 dev = [
     "pytest>=8.0.0",
+    # A second SPARQL engine, for tests/test_sparql_engine_parity.py. rdflib is
+    # what the suite ships on; this is the independent opinion that catches a
+    # check leaning on one engine's leniency. Not a runtime dependency, and the
+    # parity test skips without it.
+    "pyoxigraph>=0.5",
 ]
 
 [project.scripts]
