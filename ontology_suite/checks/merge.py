@@ -65,6 +65,14 @@ class ResultRow:
     # question. Both stay `None` rather than guessing; see `checks/locate.py`.
     source_file: Optional[str] = None
     line: Optional[int] = None
+    # Whether ``focus_node`` is a blank node label rather than an IRI. Set
+    # from the RDF term at extraction, never guessed from the string: the two
+    # routes into this dataclass render a blank node differently (the graph
+    # route gives rdflib's bare label, the native engine's structured API
+    # gives ``_:label``), and neither is distinguishable from a relative IRI
+    # by inspection. ``build_unified_results`` needs it because a blank node's
+    # label is not comparable between the engines -- see there.
+    focus_is_blank: bool = False
 
 
 def _path_expression(graph: Graph, node, _depth: int = 0) -> str:
@@ -133,11 +141,53 @@ def _joined(values: List[str]) -> Optional[str]:
     return ", ".join(sorted(set(values)))
 
 
+def _without_blank_label(message: str, label: str) -> str:
+    """`message` with an already-interpolated blank node label taken back out.
+
+    The label is the engine's internal identifier for an anonymous node. It is
+    not an address a reader can follow, it is not the same string on the next
+    run, and it is not the same string in the other engine -- so a message
+    built around it tells a reader nothing and makes two reports of identical
+    findings diff against each other.
+
+    Both spellings, because the two routes differ and they differ in *what
+    they hand this function*: the graph route reads rdflib's bare label off a
+    `BNode` (`n` plus 32 hex digits), while the native engine's structured API
+    gives it already prefixed (`_:0_b36`). So the prefix is normalised off
+    before anything is matched -- prefixing an already-prefixed label produced
+    `_:_:0_b36`, which matched nothing, and the engine's own short labels then
+    fell under the length floor below and survived into the prose. Measured on
+    `examples/checks_stress_test`: 60 messages reading "A label on _:0_b36 has
+    no language tag."
+
+    The two spellings are then treated differently, because the risk is not
+    symmetric. `_:` cannot begin an English word, so the prefixed form is
+    unambiguous and is replaced whatever its length. A bare label could
+    collide with prose, so that form is only hunted for when it is long enough
+    to be an opaque token rather than a word.
+    """
+    bare = label[2:] if label.startswith("_:") else label
+    if not bare:
+        return message
+    message = message.replace("_:" + bare, ANONYMOUS_FOCUS)
+    if len(bare) >= 8:
+        message = message.replace(bare, ANONYMOUS_FOCUS)
+    return message
+
+
+#: What a message calls a focus node that has no name. The portable `.rq`
+#: checks build the same words with `IF(isBlank(?e), "[a blank node]", ...)`,
+#: and the two arms of one check have to agree or `merge` shows a reader two
+#: different sentences about one finding.
+ANONYMOUS_FOCUS = "[a blank node]"
+
+
 def substitute_message_placeholders(
     message: Optional[str],
     focus: Optional[str],
     path: Optional[str],
     value: Optional[str],
+    focus_is_blank: bool = False,
 ) -> str:
     """Fill in a SHACL message's `{$this}` / `{$value}` / `{$path}`.
 
@@ -168,9 +218,39 @@ def substitute_message_placeholders(
     Called at ResultRow construction, never earlier. `shacl_native_runner`
     indexes the shapes graph on `sh:message` text to resolve blank source
     shapes, so substituting before that ran would break check-id resolution.
+
+    `focus_is_blank` is the other half of a defect whose first half was fixed
+    in the queries. A blank node's label is an internal identifier: it names
+    nothing a reader can look up, and it differs between runs and between
+    engines. The portable checks stopped interpolating it by guarding `STR()`
+    with `isBlank()`; a *shape* cannot, because `{$this}` is SHACL's own
+    substitution and the engine has already made the text. So it is caught
+    here instead, which fixes it for every shape at once rather than one
+    `sh:message` at a time -- measured on `examples/checks_stress_test`, 60 of
+    65 `STY-003` findings. Worth knowing why it survived the first fix:
+    `--engine sparql` reads the query's message and was correct, while the
+    default mode merges both formulations and shows the *shape's*, so the
+    configuration most runs use was the one still naming an identifier.
     """
-    if not message or "{" not in message:
-        return message or ""
+    if not message:
+        return ""
+    if focus_is_blank and focus:
+        # Not just the placeholder route. pyshacl fills `{$this}` in itself
+        # before the results graph reaches us -- the docstring above measures
+        # it leaving only 2 of 84 unsubstituted -- so by the time a message
+        # arrives here the label is usually *already* in the prose and there
+        # is no placeholder left to catch. Both routes have to be covered or
+        # the fix works only for the engine that was lazier about it.
+        message = _without_blank_label(message, str(focus))
+        # `sh:value` defaults to the focus node when a constraint binds no
+        # value of its own (see `_extract_rows`), so when the focus is
+        # anonymous the value placeholder is holding the same label and has to
+        # be replaced with the same words.
+        if value is not None and str(value) == str(focus):
+            value = ANONYMOUS_FOCUS
+        focus = ANONYMOUS_FOCUS
+    if "{" not in message:
+        return message
     for name, replacement in (("this", focus), ("value", value), ("path", path)):
         if replacement is None:
             continue
@@ -240,14 +320,52 @@ def _extract_rows(
                     str(focus) if focus is not None else None,
                     path,
                     value,
+                    focus_is_blank=isinstance(focus, BNode),
                 ),
                 remediation=check.remediation if check else None,
                 sources=[source_label],
                 source_file=str(source_file) if source_file is not None else None,
                 line=int(source_line) if source_line is not None else None,
+                focus_is_blank=isinstance(focus, BNode),
             )
         )
     return rows
+
+
+def _anonymous_key(row: ResultRow, seen: Dict[tuple, int]) -> tuple:
+    """A dedup key for a finding whose focus node is anonymous.
+
+    A blank node's label is not usable in the key. The two formulations of one
+    check see the *same* anonymous restriction under different labels, because
+    the portable checks run on holosdb and the shapes run on the rdflib graph,
+    and an engine is free to relabel blank nodes when it parses a document --
+    holosdb and oxigraph both do (`checks/holos_sparql.py` has the measurement).
+    Keyed on the label, every such finding therefore survived once per
+    formulation: on `examples/checks_stress_test` that was 60 duplicated
+    `STY-003` rows, 322 findings becoming 382.
+
+    Dropping the focus node from the key instead would merge *distinct*
+    anonymous findings that agree on check, path and value -- two unlabelled
+    restrictions carrying the same untagged label text would collapse into one
+    row, and the reader would fix one and believe they were done. So the key
+    keeps a count rather than an identity: the nth anonymous finding one arm
+    reports for a (check, path, value) pairs with the nth the other arm
+    reports. Counts come out exactly right, duplicates collapse, and nothing
+    within a single arm ever merges.
+
+    Which specific pair is matched up is arbitrary, and cannot be otherwise --
+    the labels carry no information to match on. It costs nothing: rows paired
+    this way agree on every field a reader can act on, and differ only in a
+    label that was already arbitrary and already varied between runs.
+    """
+    arm = row.sources[0] if row.sources else ""
+    bucket = (arm, row.check_id, row.path, row.value)
+    ordinal = seen.get(bucket, 0)
+    seen[bucket] = ordinal + 1
+    # No focus node in the key, and the ordinal in its place. The literal
+    # marker keeps an anonymous finding from ever colliding with a named one
+    # that happens to share the rest of the key.
+    return (row.check_id, "<anonymous>", row.path, row.value, ordinal)
 
 
 def build_unified_results(
@@ -280,8 +398,14 @@ def build_unified_results(
     ]
 
     merged: Dict[tuple, ResultRow] = {}
+    # How many anonymous findings each arm has already contributed for a given
+    # (check, path, value). See `_anonymous_ordinal` for what this buys.
+    anonymous_seen: Dict[tuple, int] = {}
     for row in shacl_rows + sparql_rows + extra_rows:
-        key = (row.check_id, row.focus_node, row.path, row.value)
+        if row.focus_is_blank:
+            key = _anonymous_key(row, anonymous_seen)
+        else:
+            key = (row.check_id, row.focus_node, row.path, row.value)
         if key in merged:
             merged[key].sources = sorted(set(merged[key].sources + row.sources))
         else:

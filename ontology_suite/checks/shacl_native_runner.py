@@ -407,6 +407,12 @@ def run_shacl_native_rows(
             title=check.title if check else None,
             severity=result.severity,
             focus_node=focus or "",
+            # The structured API renders a blank node in N-Triples syntax, so
+            # the prefix is the term's own and not an inference about it. The
+            # graph route reads the flag off an rdflib BNode instead; the two
+            # spellings of a label are why merge.ResultRow carries the fact
+            # rather than letting build_unified_results work it out.
+            focus_is_blank=bool(focus and focus.startswith("_:")),
             path=path,
             value=value,
             # The engine returns `sh:message` verbatim, placeholders and all
@@ -419,6 +425,7 @@ def run_shacl_native_rows(
                 focus,
                 path,
                 value,
+                focus_is_blank=bool(focus and focus.startswith("_:")),
             ),
             remediation=check.remediation if check else None,
             sources=["shacl"],

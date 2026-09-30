@@ -2,9 +2,12 @@
 Runs the standalone SPARQL CONSTRUCT tests under sparql/**/*.rq.
 
 Each query is fully self-contained and produces standard
-``sh:ValidationResult`` triples. This is the "portable" execution path:
-it needs nothing but a SPARQL 1.1 engine (rdflib here, oxigraph in the
-Rust framework) and no SHACL processor at all.
+``sh:ValidationResult`` triples. This is the "portable" execution path: it
+needs nothing but a SPARQL engine and no SHACL processor at all.
+
+The engine is holosdb -- see `holos_sparql.py` for why it is not rdflib, what
+that measurably fixed, and the one thing it changes in the output. rdflib is
+still what parses the input and holds the results.
 """
 from __future__ import annotations
 
@@ -13,6 +16,8 @@ from pathlib import Path
 from typing import List, Sequence, Union
 
 from rdflib import Graph
+
+from .holos_sparql import HolosSession, QueryFailed
 
 #: One query tree, or several to compose.
 QueryRoots = Union[str, Path, Sequence[Union[str, Path]]]
@@ -87,27 +92,35 @@ def run_sparql_checks(graph: Graph, sparql_dirs: QueryRoots) -> tuple[Graph, Lis
 
     Returns a merged results graph plus a per-check outcome list (useful for
     surfacing queries that failed to execute, e.g. due to an engine that
-    does not support a SPARQL 1.1 feature used in one of the checks).
+    does not support a SPARQL feature used in one of the checks).
+
+    The graph is transferred into one holosdb store up front and every check
+    queries that store, so the cost of crossing between the two libraries is
+    paid once per run rather than once per check.
     """
     results = Graph()
     outcomes: List[SparqlCheckOutcome] = []
 
-    for path in discover_queries(sparql_dirs):
-        check_id = path.stem
-        query_text = path.read_text(encoding="utf-8")
-        try:
-            qres = graph.query(query_text)
+    queries = discover_queries(sparql_dirs)
+    if not queries:
+        # No store, because building one means serialising the whole graph for
+        # nothing. A caller pointing at an empty tree is a real case: project
+        # roots are passed alongside the suite's own.
+        return results, outcomes
+
+    with HolosSession(graph) as session:
+        for path in queries:
+            check_id = path.stem
+            query_text = path.read_text(encoding="utf-8")
+            try:
+                constructed = session.construct(query_text)
+            except QueryFailed as exc:
+                outcomes.append(SparqlCheckOutcome(check_id, str(path), False, str(exc), 0))
+                continue
             count = 0
-            for triple in qres.graph if qres.graph is not None else []:
+            for triple in constructed:
                 results.add(triple)
                 count += 1
-            # rdflib CONSTRUCT results exposes .graph; guard for older versions
-            if qres.type == "CONSTRUCT" and qres.graph is None:
-                for row in qres:
-                    results.add(row)
-                    count += 1
             outcomes.append(SparqlCheckOutcome(check_id, str(path), True, None, count))
-        except Exception as exc:  # noqa: BLE001 - we want to keep going on any error
-            outcomes.append(SparqlCheckOutcome(check_id, str(path), False, str(exc), 0))
 
     return results, outcomes

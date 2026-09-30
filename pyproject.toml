@@ -20,8 +20,21 @@ classifiers = [
     "Topic :: Software Development :: Quality Assurance",
 ]
 dependencies = [
+    # rdflib parses, holds graphs and holds results. It no longer evaluates
+    # anything: SPARQL is holosdb's job and SHACL is the `shacl` engine's. The
+    # direction of travel is for those two to take the remaining jobs as well
+    # -- see "Which engine does the work" in docs/ARCHITECTURE.md.
     "rdflib>=7.6.0",
-    "pyshacl>=0.25.0",
+    # The SPARQL engine the portable .rq checks run on. A runtime dependency
+    # rather than an option: rdflib's leniency let a check pass here and fail
+    # in the field, so there is one engine and it is the conformant one. See
+    # checks/holos_sparql.py.
+    "holosdb>=0.15",
+    # The SHACL engine. Upper bound deliberate: 0.3.0 changed the default
+    # meaning of sh:conforms to the specification's -- warnings and infos break
+    # conformance, as they already did in pyshacl -- so a minor bump is not
+    # safe to pick up unattended. See issue #4.
+    "shacl>=0.3.0,<0.4",
     "pandas>=2.0.0",
     "matplotlib>=3.7.0",
     "tabulate>=0.9.0",
@@ -37,22 +50,28 @@ Issues = "https://github.com/pwin/consolidated-ontology-quality-suite-python/iss
 reasoner = [
     "owlready2>=0.47",
 ]
-native-shacl = [
-    # Upper bound deliberate. 0.3.0 changed the default meaning of
-    # sh:conforms to the specification's -- warnings and infos break
-    # conformance, as they already did in pyshacl -- so a minor bump is
-    # not safe to pick up unattended. See issue #4.
-    "shacl>=0.3.0,<0.4",
-]
+# Kept so that `uv sync --extra native-shacl` and any requirements file
+# carrying it are still valid. It installs nothing: `shacl` is a runtime
+# dependency now, not an opt-in. Plain `uv sync` used to *uninstall* it and
+# silently move the default engine back to pyshacl, which is exactly the trap
+# that made it worth promoting.
+native-shacl = []
 
 [dependency-groups]
 dev = [
     "pytest>=8.0.0",
-    # A second SPARQL engine, for tests/test_sparql_engine_parity.py. rdflib is
-    # what the suite ships on; this is the independent opinion that catches a
-    # check leaning on one engine's leniency. Not a runtime dependency, and the
-    # parity test skips without it.
+    # Two independent engines, for the parity tests only. Neither is a runtime
+    # dependency: the suite runs on holosdb and `shacl`, and these exist to
+    # disagree with them when they are wrong.
+    #
+    #   pyoxigraph  a second SPARQL engine (tests/test_sparql_engine_parity.py)
+    #               -- also what the VS Code extension ships, as oxigraph for
+    #               JS, so it speaks for those users here.
+    #   pyshacl     a second SHACL engine (tests/test_engine_parity_stress.py,
+    #               tests/test_shacl_native_runner.py) -- it has caught real
+    #               native-engine bugs, see checks/shacl_runner.py.
     "pyoxigraph>=0.5",
+    "pyshacl>=0.25.0",
 ]
 
 [project.scripts]

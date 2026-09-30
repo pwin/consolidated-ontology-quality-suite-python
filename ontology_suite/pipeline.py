@@ -30,7 +30,7 @@ from .checks.registry import Registry
 from .checks.runner import load_graph
 from .checks.shacl_native_runner import run_shacl_native_rows
 from .checks.shacl_native_runner import available as native_shacl_available
-from .checks.shacl_runner import load_shapes_graph, run_shacl
+from .checks.shacl_runner import load_shapes_graph
 from .checks.sparql_runner import as_dirs, run_sparql_checks
 from .dataquality import data_quality
 from .docgen import build_documentation, extract_ontology_data
@@ -64,24 +64,31 @@ def _capture_stdout(fn, *args, **kwargs) -> str:
 
 ENGINE_CHOICES = ("both", "sparql", "shacl", "native", "native+sparql")
 
+#: Which names run the SHACL formulation, and which the portable one. `shacl`
+#: and `native` are the same thing now, as are `both` and `native+sparql`: the
+#: distinction existed only while pyshacl and the native engine were two
+#: choices, and the names outlived it because scripts pass them.
+SHACL_ENGINES = ("both", "shacl", "native", "native+sparql")
+SPARQL_ENGINES = ("both", "sparql", "native+sparql")
+
 
 def default_engine() -> str:
-    """``"native+sparql"`` when the optional native engine package is
-    installed, else ``"both"`` -- the CLI's own ``--engine`` default
-    (`cli.py::_add_engine_arg`), so anyone with the wheel installed gets the
-    ~600x-faster path with no flag needed, and anyone without it keeps
-    today's pyshacl-based behavior unchanged. Verified exact-parity findings
-    between the two (`tests/test_shacl_native_runner.py`), so this changes
-    wall-clock time, not results.
+    """``"native+sparql"`` -- both formulations, each on its own engine.
+
+    It used to depend on whether the optional `shacl` package was importable,
+    falling back to `"both"`/pyshacl when it was not. There is no fallback
+    now: pyshacl is not a runtime dependency, so the SHACL formulation either
+    runs on the `shacl` engine or does not run, and `--engine sparql` is the
+    answer for an environment without it.
 
     Deliberately *not* used as the default for `run_registry_suite_on_graph`/
     `run_checks_stage`/`run_data_stage` themselves: those keep a literal
     `"both"` default so library callers get deterministic, environment-
-    independent behavior -- `tests/test_vehicle_gist_checks.py` in particular
-    pins an exact finding count against pyshacl specifically and calls
-    `run_registry_suite_on_graph` without passing `engine`.
+    independent behavior. `"both"` and `"native+sparql"` now name the same
+    two engines, so that default no longer means a different engine from this
+    one -- which is what it used to mean, and was a trap.
     """
-    return "native+sparql" if native_shacl_available() else "both"
+    return "native+sparql"
 
 
 def run_registry_suite_on_graph(
@@ -97,61 +104,60 @@ def run_registry_suite_on_graph(
     from file paths first) and ``run_data_stage`` (which already has the
     aggregate data(+ontology) graph in memory).
 
-    ``engine`` picks which of the two cross-validated formulations to run:
+    ``engine`` picks which of the two cross-validated formulations to run.
+    Both are now served by pwin's own engines -- the SHACL formulation by the
+    native Rust engine (`shacl`, https://github.com/pwin/SHACL_Engine) and the
+    portable formulation by holosdb (`checks/holos_sparql.py`). pyshacl is no
+    longer in the runtime path; see "Which engine does the work" in
+    docs/ARCHITECTURE.md.
 
-    - ``"both"`` (default) -- pyshacl *and* the portable SPARQL layer, as
-      originally designed, so a check that only fires from one engine and
-      not the other is a visible signal that the two formulations have
-      drifted apart (see docs/EXTENDING.md).
+    - ``"both"`` (default) -- the SHACL formulation *and* the portable SPARQL
+      layer, as originally designed, so a check that only fires from one and
+      not the other is a visible signal that the two formulations have drifted
+      apart (see docs/EXTENDING.md).
     - ``"sparql"`` -- portable SPARQL only. Every check with a SHACL shape
       also has a portable SPARQL twin, and there is no check implemented in
       SHACL alone -- which is the property that makes this a pure speed
       choice, and the one `tests/test_check_coverage.py` guards rather than
-      leaving to this sentence. 21 of the 59 registry entries carry both
-      formulations at the time of writing. Running SPARQL-only therefore
-      finds the exact same set of real findings, just without the cross-validation
-      signal -- and roughly 8x faster: pyshacl spends the overwhelming
-      majority of a run's wall-clock time on its own Python-level shape
-      traversal and constraint dispatch, on top of the same SPARQL
-      execution the portable layer already does directly (measured: ~193s
-      pyshacl vs. ~27s portable SPARQL for the same ~50-check pass over a
-      real ~3,300-triple ontology).
-    - ``"shacl"`` -- pyshacl only, for symmetry/completeness; not
-      recommended given the above (strictly slower, no broader coverage).
-    - ``"native"`` -- the native (Rust) SHACL engine only
-      (`checks/shacl_native_runner.py`), instead of pyshacl. Verified to
-      find the exact same findings pyshacl does on this suite's own shapes
-      (see `tests/test_shacl_native_runner.py`); requires the optional
-      `shacl` package (see that module's docstring -- not on PyPI yet).
-      `inference` may be `"none"` or `"rdfs"` under this engine -- the
-      native engine's own supported subset (no OWL2-RL reasoner); `"owlrl"`
-      or `"both"` raise `ValueError` here rather than silently downgrading.
-    - ``"native+sparql"`` -- the native engine *and* the portable SPARQL
-      layer, i.e. the fast analogue of `"both"`: the same cross-validation
-      drift-detection signal, without pyshacl's cost.
+      leaving to this sentence. Running SPARQL-only therefore finds the exact
+      same set of real findings, just without the cross-validation signal.
+    - ``"shacl"`` -- the SHACL formulation only, for symmetry/completeness.
+    - ``"native"`` -- a spelling of ``"shacl"``, and ``"native+sparql"`` a
+      spelling of ``"both"``. They date from when the native engine was an
+      opt-in alternative to pyshacl and are kept because scripts pass them:
+      `tests/test_shacl_native_runner.py` pins the equivalence so the two
+      spellings cannot drift.
+
+    ``inference`` may be ``"none"`` or ``"rdfs"``. ``"owlrl"``/``"both"`` used
+    to be served by pyshacl and now raise `ValueError`: the native engine has
+    no OWL2-RL reasoner, and silently downgrading to RDFS would drop findings
+    that depend on OWL2-RL-specific rules. OWL2-RL closure is still available,
+    as its own stage -- `reasoning/backends/owlrl_backend.py`.
 
     If a future check is ever added in SHACL only (no `.rq` twin),
     ``"sparql"`` would silently miss it -- `tests/test_check_coverage.py`
     guards against that by asserting the SHACL-only set stays empty.
     """
-    uses_pyshacl = engine in ("both", "shacl")
-    uses_native = engine in ("native", "native+sparql")
-    shapes_graph = load_shapes_graph(shapes_dir) if (uses_pyshacl or uses_native) else Graph()
+    uses_shacl = engine in SHACL_ENGINES
+    shapes_graph = load_shapes_graph(shapes_dir) if uses_shacl else Graph()
 
     shacl_results = Graph()
     native_rows: Optional[List[ResultRow]] = None
-    if uses_pyshacl:
-        _conforms, shacl_results, _text = run_shacl(working_graph, shapes_graph, inference=inference)
-    elif uses_native:
+    if uses_shacl:
         if not native_shacl_available():
             raise RuntimeError(
-                f"--engine {engine} needs the optional `shacl` native engine package -- "
-                "see checks/shacl_native_runner.py's module docstring"
+                f"--engine {engine} needs the `shacl` engine package "
+                "(https://github.com/pwin/SHACL_Engine) -- install it with "
+                "`uv sync --extra native-shacl`, or pass --engine sparql to run "
+                "the portable formulation alone. See "
+                "checks/shacl_native_runner.py's module docstring."
             )
         if inference not in ("none", "rdfs"):
             raise ValueError(
-                f"--engine {engine} only supports --inference none/rdfs (got {inference!r}); "
-                "the native engine has no OWL2-RL reasoner"
+                f"--inference {inference!r} is not available (none/rdfs are); the "
+                "SHACL engine has no OWL2-RL reasoner, and downgrading to RDFS "
+                "would drop findings that depend on OWL2-RL rules. Run the "
+                "reasoning stage for an OWL2-RL closure."
             )
         # Structured results, not a report graph: the round-trip through 180 MB
         # of Turtle was 62% of end-to-end time on a large run. See
@@ -161,7 +167,7 @@ def run_registry_suite_on_graph(
         )
 
     sparql_results = Graph()
-    if engine in ("both", "sparql", "native+sparql"):
+    if engine in SPARQL_ENGINES:
         sparql_results, _outcomes = run_sparql_checks(working_graph, sparql_dir)
 
     # Runs under every engine, deliberately: it covers a blind spot of the

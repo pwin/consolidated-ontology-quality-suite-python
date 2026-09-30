@@ -258,41 +258,104 @@ the same scale (real gist data, 56/56 full parity) -- see
 and `tests/test_vehicle_gist_checks.py::test_native_engine_matches_pyshacl_on_the_real_vehicle_gist_fixture`,
 which still carry regression tests for this.
 
-`--engine native+sparql` is therefore strictly better than `--engine both`
-when the optional `shacl` package is available: same cross-validation
-value, at roughly `--engine sparql` speed -- which is why the CLI's
-`--engine` default (`pipeline.default_engine()`) auto-selects
-`native+sparql` when the package is importable and falls back to `both`
-otherwise, rather than making everyone type the flag by hand. (Library
-callers going through `pipeline.run_registry_suite_on_graph`/
-`run_checks_stage`/`run_data_stage` directly, not via the CLI, still
-default to `"both"` explicitly -- `tests/test_vehicle_gist_checks.py`
-pins an exact finding count against pyshacl specifically and needs that
-default to stay environment-independent.) `shacl` is on PyPI as of 0.1.4
-(0.1.5 for the isIRI($this) fix above -- this package's `native-shacl`
-extra pins `shacl>=0.1.10`, kept current with upstream), installed via the
-opt-in `uv sync --extra native-shacl` (same convention as this package's
-own `reasoner` extra) -- see `shacl_native_runner.py`'s
-module docstring for why its SHACL-core (non-SPARQL) findings need a
-`sh:message`-text fallback to resolve a check id (blank node identifiers
-don't survive the Rust/Python boundary the way pyshacl's own in-process
-ones do).
+`--engine native+sparql` and `--engine both` now name the same two engines,
+so this comparison is history: it described the period when `both` meant
+pyshacl and the choice was real. pyshacl is no longer a runtime dependency,
+`shacl` is (no longer an opt-in extra), and `pipeline.default_engine()`
+returns `"native+sparql"` unconditionally with no fallback. The
+`native-shacl` extra is kept as an empty one so existing
+`uv sync --extra native-shacl` invocations and requirements files stay valid
+-- and the trap it used to carry is gone with it: plain `uv sync` used to
+*uninstall* `shacl` and silently move the default engine back to pyshacl.
 
-**Plain `uv sync` (no `--extra native-shacl`) still uninstalls `shacl`**
--- standard behavior for any opt-in extra, easy to trip over: it silently
-changes the CLI's default engine back to `both`/pyshacl until reinstalled
-with `uv sync --extra native-shacl`. Since the severity fix above that is a
-wall-clock change rather than a change in what gets reported, but a large
-one -- pyshacl is the slow path.
+See `shacl_native_runner.py`'s module docstring for why its SHACL-core
+(non-SPARQL) findings need a `sh:message`-text fallback to resolve a check id
+(blank node identifiers don't survive the Rust/Python boundary the way
+pyshacl's own in-process ones do).
 
-`--inference rdfs` is supported under `--engine native`/`native+sparql` as
-of `shacl` v0.1.3 (materialised into the data graph before validation,
-same semantics as pyshacl's own RDFS option) -- `--inference owlrl`/`both`
-raise a `ValueError` under the native engine rather than silently
-downgrading, since it has no OWL2-RL reasoner (`reasoning/backends/
-owlrl_backend.py`'s pure-Python OWL2-RL closure is deliberately not
-swapped for it -- RDFS-only entailment would silently drop real findings
-that depend on OWL2-RL-specific rules).
+`--inference rdfs` is supported (materialised into the data graph before
+validation, the same semantics pyshacl's own RDFS option had).
+`--inference owlrl`/`both` raise rather than silently downgrading: the engine
+has no OWL2-RL reasoner, and RDFS-only entailment would drop real findings
+that depend on OWL2-RL-specific rules. `reasoning/backends/owlrl_backend.py`'s
+pure-Python OWL2-RL closure remains the way to get one, as its own stage.
+
+## Which engine does the work
+
+Two engines evaluate, and both are ours:
+
+| Job | Engine | Where |
+|---|---|---|
+| The portable `.rq` checks (SPARQL) | **holosdb** | `checks/holos_sparql.py` |
+| The SHACL shapes | **`shacl`** ([pwin/SHACL_Engine](https://github.com/pwin/SHACL_Engine)) | `checks/shacl_native_runner.py` |
+
+rdflib is still a runtime dependency, and still does three things: it parses
+input, it holds graphs, and it holds results. It no longer *evaluates*
+anything. **The direction of travel is for holosdb and the `shacl` engine to
+take the remaining jobs too**, and rdflib to become a parsing and term-model
+facade that can eventually be dropped. Nothing new should route evaluation
+through rdflib.
+
+### Why, concretely
+
+Because leniency in a dependency became a defect in the field. rdflib does not
+raise where the specification says a type error occurs, and `STY-003` built its
+message with `STR(?focusNode)` -- which SPARQL 1.1 17.4.2.5 defines for
+literals and IRIs only. Under rdflib the message was present and named the
+internal blank node identifier; under any conformant engine the `CONCAT`
+errored, `BIND` left the variable unbound, and the CONSTRUCT template dropped
+the message entirely. 60 of 65 findings on `examples/checks_stress_test`, and
+it shipped that way in the VS Code extension, which runs the same query files
+through oxigraph and has no SHACL formulation to fall back on. Every test here
+passed throughout: the check fired at the right count, the right severity and
+the right focus node.
+
+A second case, in the other direction. rdflib's `NORMALIZE_LITERALS` rewrites
+an invalid `xsd:boolean` to `"false"` while parsing, so the authored lexical
+form is gone before any SPARQL expression can see it and `DAT-001` cannot
+report it. holosdb keeps it: 3 bad literals on the stress fixture where rdflib
+finds 2. `checks/literal_typing.py` exists to cover that natively, and is what
+makes the suite's answer complete either way.
+
+### What is checked against what
+
+Third-party engines are *development* dependencies now, and their job is to
+disagree with ours when ours are wrong:
+
+| Cross-check | Against | Test |
+|---|---|---|
+| holosdb | rdflib, pyoxigraph | `tests/test_sparql_engine_parity.py` |
+| `shacl` | pyshacl | `tests/test_engine_parity_stress.py`, `tests/test_shacl_native_runner.py` |
+
+pyoxigraph is also what the VS Code extension ships (as oxigraph for JS), so it
+speaks for those users here. Keeping pyshacl is deliberate for the same reason:
+it has caught real native-engine bugs, including the `isIRI($this)` blank-node
+regression fixed in `shacl` 0.1.5. Removing it would remove the evidence that
+the engine doing the work is right.
+
+### Consequences worth knowing
+
+- **Blank node labels are not stable across engines.** A parsed document's
+  labels are document-scoped and an engine may rename them; holosdb and
+  oxigraph both do. So `merge.build_unified_results` cannot key its dedup on a
+  blank node's label, and matches anonymous findings positionally within
+  `(check, path, value)` instead -- see `merge._anonymous_key`.
+- **A message must never be built out of a label.** Guarded in the queries with
+  `IF(isBlank(?x), "[a blank node]", STR(?x))` and centrally for every shape in
+  `merge.substitute_message_placeholders`.
+- **Generalised RDF does not cross the boundary.** `owlrl`'s closure derives
+  `owl:sameAs` and `rdf:type` over *literals* -- 1,773 of the vehicle fixture
+  closure's 10,176 triples have a literal subject. rdflib stores them; no
+  conformant engine can. They are dropped on transfer and counted
+  (`HolosSession.skipped`).
+- **`--inference owlrl`/`both` are gone** from the checks path. pyshacl served
+  them; the `shacl` engine has no OWL2-RL reasoner, and downgrading to RDFS
+  would drop findings that depend on OWL2-RL rules. OWL2-RL closure remains
+  available as its own stage (`reasoning/backends/owlrl_backend.py`).
+- **`--engine shacl` and `native` are the same thing now**, as are `both` and
+  `native+sparql`. The pairs existed only while pyshacl and the `shacl` engine
+  were two choices. Both spellings are kept because scripts pass them, and
+  `pipeline.SHACL_ENGINES`/`SPARQL_ENGINES` are where that is decided.
 
 ## Pipeline stages (`ontology_suite/pipeline.py`, driven by `cli.py`)
 

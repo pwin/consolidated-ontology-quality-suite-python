@@ -127,3 +127,82 @@ def test_both_spellings_are_recognised():
 def test_a_message_with_no_placeholder_is_returned_unchanged():
     assert substitute_message_placeholders("plain text", "ex:A", "ex:p", "v") == "plain text"
     assert substitute_message_placeholders(None, "ex:A", None, None) == ""
+
+
+# ---------------------------------------------------------------------------
+# An anonymous focus node
+# ---------------------------------------------------------------------------
+# A blank node's label is the engine's internal handle for it. It names nothing
+# a reader can look up, it differs between runs, and it differs between
+# engines -- so two reports of identical findings diff against each other. The
+# `.rq` checks stopped interpolating it by guarding STR() with isBlank(); a
+# shape cannot, because {$this} is SHACL's own substitution, so it is caught
+# here for every shape at once.
+#
+# Measured on examples/checks_stress_test: 60 of 65 STY-003 findings. It
+# survived the first fix because that fix was in the queries, and `--engine
+# sparql` reads the query's message -- while the default mode merges both
+# formulations and shows the *shape's*.
+def test_an_anonymous_focus_node_is_named_as_such_not_by_its_label():
+    out = substitute_message_placeholders(
+        "A label on {$this} has no language tag.",
+        "n5c12c828dd864263bf5e00c83c1b99f5b1",
+        None,
+        None,
+        focus_is_blank=True,
+    )
+    assert out == "A label on [a blank node] has no language tag."
+
+
+def test_a_label_already_interpolated_by_the_engine_is_taken_back_out():
+    """pyshacl fills {$this} in itself before the results graph reaches us, so
+    by the time a message arrives here there is usually no placeholder left to
+    catch -- only the label sitting in the prose."""
+    label = "n5c12c828dd864263bf5e00c83c1b99f5b1"
+    out = substitute_message_placeholders(
+        f"A label on {label} has no language tag.", label, None, None,
+        focus_is_blank=True,
+    )
+    assert out == "A label on [a blank node] has no language tag."
+
+
+def test_an_already_prefixed_label_is_handled_too():
+    """The two routes hand this function different spellings: the graph route
+    gives rdflib's bare label, the native engine's structured API gives
+    `_:label`. Prefixing an already-prefixed one produced `_:_:0_b36`, which
+    matched nothing, and the engine's short labels then fell under the length
+    floor and reached the reader."""
+    out = substitute_message_placeholders(
+        "A label on _:0_b36 has no language tag.", "_:0_b36", None, None,
+        focus_is_blank=True,
+    )
+    assert out == "A label on [a blank node] has no language tag."
+
+
+def test_the_value_placeholder_follows_the_focus_when_it_is_the_focus():
+    """sh:value defaults to the focus node when a constraint binds no value of
+    its own, so both placeholders are holding the same label."""
+    label = "n5c12c828dd864263bf5e00c83c1b99f5b1"
+    out = substitute_message_placeholders(
+        "{$this} and {$value}", label, None, label, focus_is_blank=True
+    )
+    assert out == "[a blank node] and [a blank node]"
+
+
+def test_a_named_focus_node_is_untouched():
+    """The guard is only for anonymous nodes: an IRI is exactly what a message
+    should be naming."""
+    out = substitute_message_placeholders(
+        "A label on {$this} has no language tag.",
+        "https://example.org/Chassis", None, None,
+    )
+    assert out == "A label on https://example.org/Chassis has no language tag."
+
+
+def test_prose_is_not_mistaken_for_a_short_label():
+    """A bare label is only hunted for when it is long enough to be an opaque
+    token. `_:`-prefixed is unambiguous and needs no such floor."""
+    out = substitute_message_placeholders(
+        "Class ex:Bin has no label.", "Bin", None, None, focus_is_blank=True
+    )
+    assert out == "Class ex:Bin has no label."

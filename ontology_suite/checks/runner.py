@@ -15,7 +15,9 @@ from .literal_typing import SOURCE_LABEL as LITERAL_TYPING_SOURCE
 from .literal_typing import run_literal_typing_check
 from .merge import ResultRow, build_unified_results
 from .registry import Registry
-from .shacl_runner import load_shapes_graph, run_shacl
+from .shacl_native_runner import available as native_shacl_available
+from .shacl_native_runner import run_shacl_native
+from .shacl_runner import load_shapes_graph
 from .sparql_runner import SparqlCheckOutcome, run_sparql_checks
 
 
@@ -63,7 +65,16 @@ def run_suite(
 
     shapes_graph = load_shapes_graph(shapes_dir)
 
-    conforms, shacl_results_graph, shacl_results_text = run_shacl(
+    # The `shacl` engine (https://github.com/pwin/SHACL_Engine), not pyshacl,
+    # which is no longer a runtime dependency. Same return shape, so this is
+    # the only line that had to know.
+    if not native_shacl_available():
+        raise RuntimeError(
+            "run_suite needs the `shacl` engine package -- install it with "
+            "`uv sync --extra native-shacl`. For the portable formulation "
+            "alone, use pipeline.run_registry_suite_on_graph(engine='sparql')."
+        )
+    conforms, shacl_results_graph, shacl_results_text = run_shacl_native(
         working_graph, shapes_graph, inference=inference
     )
 
