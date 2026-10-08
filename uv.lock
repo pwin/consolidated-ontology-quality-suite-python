@@ -165,15 +165,15 @@ wheels = [
 
 [[package]]
 name = "holosdb"
-version = "0.16.0"
+version = "0.21.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/0e/a7/ef627b91daab484fb3ccb60bf7604807fb5d0dfba082e792c9d413776120/holosdb-0.16.0.tar.gz", hash = "sha256:475959ab422ca378a607bae8584dcace3259b93ea015b0ea336afcc086444e8b", size = 623102, upload-time = "2026-09-30T17:13:52.444Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ea/8b/8579d4dc6726d7709f6ff5e2f2e876f00a519f45d7601c7e0a16ff06a396/holosdb-0.21.0.tar.gz", hash = "sha256:bd035402daaad8a48d4eafdac9704f2f9fbb63bfe79ac5ccb7cd0808be9448f9", size = 655717, upload-time = "2026-10-08T06:47:17.505Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f2/a9/02ac44e0014649e5f97c7c63e74f756d222de315d7d8b19205c5c8a0461f/holosdb-0.16.0-cp39-abi3-macosx_10_13_x86_64.whl", hash = "sha256:44da749dc9f4dd92ffb5f6014b6a6874059da47b93918ccb7b41b47616e7d0b4", size = 5747897, upload-time = "2026-09-30T17:13:39.965Z" },
-    { url = "https://files.pythonhosted.org/packages/6a/46/0bb082f5d1071e9a0567492b694c4a6c1a29a5f529b148ef19037b40e3a2/holosdb-0.16.0-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:9c0f3b6e48407585579bdd9332abbb8e324d818c7f3ac4278779f13c5e36ec96", size = 5216866, upload-time = "2026-09-30T17:13:42.316Z" },
-    { url = "https://files.pythonhosted.org/packages/fe/05/4500831e980e3750e314b5a8580865ac7ea1e425881c5526b4b48c2d9b1e/holosdb-0.16.0-cp39-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:12a7e31eb4c0dd52ecf4d8e3d537000cb743108fe88642439c3a0688f4f05aa3", size = 6139171, upload-time = "2026-09-30T17:13:45.558Z" },
-    { url = "https://files.pythonhosted.org/packages/ac/d4/2dbef2d8e47de2e2cc48bbcc333a4aa7ef22e5e22ed5cb0d99d0bbb21265/holosdb-0.16.0-cp39-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:7bf9562a4b24411faf0ca1d49f051af63469d90869fe42544cf4a5733e8e24cb", size = 6689495, upload-time = "2026-09-30T17:13:47.964Z" },
-    { url = "https://files.pythonhosted.org/packages/a7/a7/c797d6f6c0a16a3ed01f79b879dd4b601f0fe66785efdf608bb0d9be4d3e/holosdb-0.16.0-cp39-abi3-win_amd64.whl", hash = "sha256:50e092a94e1455ae8a66c1acf0d02d596a3713efebf854d7ace287254583833f", size = 5418899, upload-time = "2026-09-30T17:13:50.449Z" },
+    { url = "https://files.pythonhosted.org/packages/e6/6d/469d53897a61e55feccffa2005950f625fe3e85580c4dcd10971348519b9/holosdb-0.21.0-cp39-abi3-macosx_10_13_x86_64.whl", hash = "sha256:44ef925bfc3125c6be87f1f5310007a5902b7c05c9957a498bfe62c048912a27", size = 5747873, upload-time = "2026-10-08T06:47:07.174Z" },
+    { url = "https://files.pythonhosted.org/packages/ef/a1/fd25b1211b685663a38eb5e89a135a8afecc54fd8e2e4d23a29a454bd31e/holosdb-0.21.0-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:fe46189d682918d004d63bcfeaa14ee6b0a03c3a572c9f74d8c4bf7b88d4a133", size = 5217115, upload-time = "2026-10-08T06:47:09.121Z" },
+    { url = "https://files.pythonhosted.org/packages/8d/10/ba379ee48cc63df8bc72c963ab8234d3c5ef8457420e7d7d9a72ed077052/holosdb-0.21.0-cp39-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:766e8efc6e0342679ed0db22300c87395efd3cb86c0388d46508cf56645c7604", size = 6179409, upload-time = "2026-10-08T06:47:11.214Z" },
+    { url = "https://files.pythonhosted.org/packages/50/bb/de6c22d6f8f6b8e6ec2cfb50a4a6383e14088869cfaa89fd8697c256c58d/holosdb-0.21.0-cp39-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:e7dac532c58c07e03847dae7515e1142fd009e9f60dd71effee3fa6d892c2936", size = 6712108, upload-time = "2026-10-08T06:47:13.404Z" },
+    { url = "https://files.pythonhosted.org/packages/44/6b/a0c5e50e00cef233d1cb9bd003ef2f5e76633b3887397d261c50f8ed3e29/holosdb-0.21.0-cp39-abi3-win_amd64.whl", hash = "sha256:c4a04d1f9ec29b69ec103ab9619b1c627f372b4db6ff1b10405dbd549a934068", size = 5420369, upload-time = "2026-10-08T06:47:15.475Z" },
 ]
 
 [[package]]
