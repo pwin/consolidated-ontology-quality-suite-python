@@ -28,7 +28,7 @@ from .checks.literal_typing import run_literal_typing_check
 from .checks.merge import ResultRow, build_unified_results
 from .checks.registry import Registry
 from .checks.runner import load_graph
-from .checks.shacl_native_runner import run_shacl_native_rows
+from .checks.shacl_native_runner import rdfs_closure, run_shacl_native_rows
 from .checks.shacl_native_runner import available as native_shacl_available
 from .checks.shacl_runner import load_shapes_graph
 from .checks.sparql_runner import as_dirs, run_sparql_checks
@@ -141,23 +141,48 @@ def run_registry_suite_on_graph(
     uses_shacl = engine in SHACL_ENGINES
     shapes_graph = load_shapes_graph(shapes_dir) if uses_shacl else Graph()
 
+    # Checked for every engine, not only the ones that run shapes. It used to
+    # sit inside the `uses_shacl` branch, so `--engine sparql --inference owlrl`
+    # was accepted and ignored -- and `--engine sparql` is the combination this
+    # repo's own walkthrough recommends for CI.
+    if inference not in ("none", "rdfs"):
+        raise ValueError(
+            f"--inference {inference!r} is not available (none/rdfs are); the "
+            "SHACL engine has no OWL2-RL reasoner, and downgrading to RDFS "
+            "would drop findings that depend on OWL2-RL rules. Run the "
+            "reasoning stage for an OWL2-RL closure."
+        )
+
+    # Materialised once, here, so both arms read the same graph.
+    #
+    # This used to be a parameter of the SHACL arm's `validate` call, which the
+    # portable SPARQL arm never makes -- so the closure reached half the suite.
+    # The two arms then checked different graphs and their findings were merged
+    # under one dedup key as though they were one run. On
+    # examples/acme_robotics: 479 findings with `--engine both --inference
+    # none`, 497 with `rdfs`, and the 18 were entailment findings the SPARQL
+    # formulation of the very same checks could not see. Under `--engine
+    # sparql` the flag did nothing at all and said nothing about it.
+    #
+    # The closure comes from the engine (`shacl.rdfs_closure`, added for this
+    # in engine 0.3.3) rather than from owlrl or a handful of rules written
+    # here, because a second closure would disagree with the engine's exactly
+    # where two graphs did -- the same defect moved one level up.
+    if inference == "rdfs":
+        working_graph = rdfs_closure(working_graph)
+        # Already real triples by now, so the engine must not close it twice.
+        inference = "none"
+
     shacl_results = Graph()
     native_rows: Optional[List[ResultRow]] = None
     if uses_shacl:
         if not native_shacl_available():
             raise RuntimeError(
                 f"--engine {engine} needs the `shacl` engine package "
-                "(https://github.com/pwin/SHACL_Engine) -- install it with "
-                "`uv sync --extra native-shacl`, or pass --engine sparql to run "
-                "the portable formulation alone. See "
+                "(https://github.com/pwin/SHACL_Engine) -- it is a runtime "
+                "dependency, so `uv sync` installs it; pass --engine sparql to "
+                "run the portable formulation alone. See "
                 "checks/shacl_native_runner.py's module docstring."
-            )
-        if inference not in ("none", "rdfs"):
-            raise ValueError(
-                f"--inference {inference!r} is not available (none/rdfs are); the "
-                "SHACL engine has no OWL2-RL reasoner, and downgrading to RDFS "
-                "would drop findings that depend on OWL2-RL rules. Run the "
-                "reasoning stage for an OWL2-RL closure."
             )
         # Structured results, not a report graph: the round-trip through 180 MB
         # of Turtle was 62% of end-to-end time on a large run. See

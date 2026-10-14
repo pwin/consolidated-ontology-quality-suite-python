@@ -282,9 +282,14 @@ def write_turtle(
         for name, iri in graph.prefixes.items():
             existing = merged_prefixes.get(name)
             if existing is not None and existing != iri:
+                # Each file's triples are now read with that file's own
+                # bindings, so this is no longer "one of you wins" -- it is a
+                # report that one prefix means two things across a mapping
+                # set, which is worth a reviewer's attention on its own.
                 print(
-                    f"warning: prefix '{name}:' redefined in {graph.source} "
-                    f"({existing} -> {iri}); keeping first definition",
+                    f"warning: prefix '{name}:' means <{existing}> in an earlier file and "
+                    f"<{iri}> in {os.path.basename(graph.source)}; each file is read with its "
+                    f"own definition, and the legend below shows the first",
                     file=sys.stderr,
                 )
             else:
@@ -317,6 +322,29 @@ def write_turtle(
             if not graph.triples:
                 continue
             print(f"# source: {os.path.basename(graph.source)}", file=out)
+            # Each file's own prefixes, re-declared ahead of its own triples.
+            #
+            # Without this the whole document was read with the merged block
+            # above -- first definition wins -- so a file that spelled a
+            # namespace differently had its CURIEs resolved against somebody
+            # else's. It cut both ways and silently: with the odd file sorting
+            # first, every *correct* file's triples came out wrong; with it
+            # sorting last, its own mistake was corrected and never reported.
+            # Renaming a file was enough to swap which, with no mapping
+            # changed. Measured on three queries where one spelled gist's
+            # namespace with `#`: gist:Category came out as `.../gist/Category`
+            # in one order and `.../gist#Category` in the other.
+            #
+            # Turtle permits a prefix to be re-declared at the top level at
+            # any point, and the later declaration governs what follows, so
+            # scoping each file this way is ordinary Turtle rather than a
+            # trick. The scratch default is re-emitted for a file that
+            # declares none of its own, so a block cannot inherit `:` from
+            # whichever file happened to precede it.
+            for name, iri in graph.prefixes.items():
+                print(f"@prefix {name}: <{iri}> .", file=out)
+            if "" not in graph.prefixes:
+                print(f"@prefix : <{scratch_namespace(base)}> .", file=out)
             print(graph.triples, file=out)
             print(file=out)
 

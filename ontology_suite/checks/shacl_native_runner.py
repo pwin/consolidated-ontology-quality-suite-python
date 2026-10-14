@@ -253,6 +253,42 @@ def _resolve_blank_source_shapes(results_graph: Graph, message_index: Dict[str, 
             results_graph.add((result_node, SH.sourceShape, resolved))
 
 
+def rdfs_closure(graph: Graph) -> Graph:
+    """``graph`` with the SHACL engine's own RDFS entailments materialised.
+
+    The engine's closure, not a second one. `--inference rdfs` used to reach
+    the SHACL arm only, because it was a parameter of `validate` and the
+    portable SPARQL arm never called `validate` at all. The two arms were
+    reading different graphs and their findings were then merged under one
+    dedup key as though they were the same run: 479 findings against 497 on
+    one ontology, and the 18 were real entailment findings that half the suite
+    could not see.
+
+    Closing the graph here and handing the result to both arms fixes that, and
+    it is also why the closure has to come from the engine rather than from
+    owlrl or a few rules written here. Two closures would disagree exactly
+    where two graphs did, one level further up and harder to notice. owlrl's
+    would be wrong on its own terms as well -- it materialises the axiomatic
+    rules, typing every term `rdfs:Resource`, which turned a two-triple
+    document into twelve and no shape acts on any of it.
+
+    Added to the engine's Python surface as `shacl.rdfs_closure` for this
+    (engine 0.3.3); `crates/shacl/src/inference.rs` documents the six rules it
+    applies and why the axiomatic ones are left out.
+    """
+    if _native_shacl is None:
+        raise RuntimeError(
+            "the native `shacl` package is not installed, so no RDFS closure is "
+            "available -- run `uv sync` (see this module's docstring)"
+        ) from _IMPORT_ERROR
+    closed = _native_shacl.rdfs_closure(graph.serialize(format="turtle"))  # type: ignore[attr-defined]
+    out = Graph()
+    for prefix, namespace in graph.namespaces():
+        out.bind(prefix, namespace)
+    out.parse(data=closed, format="turtle")
+    return out
+
+
 def run_shacl_native(data_graph: Graph, shapes_graph: Graph, *, inference: str = "none") -> Tuple[bool, Graph, str]:
     """Runs the native engine and returns ``(conforms, results_graph,
     results_text)`` -- the same shape ``shacl_runner.run_shacl()`` (pyshacl)

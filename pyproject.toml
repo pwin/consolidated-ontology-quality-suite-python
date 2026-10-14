@@ -34,7 +34,10 @@ dependencies = [
     # meaning of sh:conforms to the specification's -- warnings and infos break
     # conformance, as they already did in pyshacl -- so a minor bump is not
     # safe to pick up unattended. See issue #4.
-    "shacl>=0.3.0,<0.4",
+    # >=0.3.3 for `shacl.rdfs_closure`, which --inference rdfs now applies to
+    # the graph both arms read. Against 0.3.2 the import succeeds and the call
+    # raises AttributeError the first time anyone passes --inference.
+    "shacl>=0.3.3,<0.4",
     "pandas>=2.0.0",
     "matplotlib>=3.7.0",
     "tabulate>=0.9.0",

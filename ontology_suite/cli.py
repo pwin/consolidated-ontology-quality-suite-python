@@ -252,16 +252,14 @@ def _add_import_args(p: argparse.ArgumentParser) -> None:
 def _add_engine_arg(p: argparse.ArgumentParser) -> None:
     p.add_argument(
         "--engine", default=pipeline.default_engine(), choices=list(pipeline.ENGINE_CHOICES),
-        help="which formulation of the registry-driven suite to run: 'both' runs pyshacl and the "
-             "portable SPARQL layer and cross-checks them for drift; 'sparql' runs the portable layer "
-             "only -- every check has a SPARQL form, so this finds the same real findings, just "
-             "without the drift signal, and is typically much faster (pyshacl spends most of a run's "
-             "time on its own Python-level shape traversal on top of the same SPARQL the portable "
-             "layer runs directly); 'shacl' runs pyshacl only; 'native' runs the optional native "
-             "(Rust) SHACL engine instead of pyshacl (see checks/shacl_native_runner.py -- not a "
-             "default dependency; falls back to raising unless installed); 'native+sparql' is the "
-             "fast analogue of 'both'. Defaults to 'native+sparql' if the native engine package is "
-             "installed, else 'both'.",
+        help="which formulation of the registry-driven suite to run. 'both' runs the SHACL shapes "
+             "and the portable SPARQL layer and cross-checks them for drift; 'sparql' runs the "
+             "portable layer alone -- every check has a SPARQL form, so it finds the same real "
+             "findings without the drift signal; 'shacl' runs the shapes alone. 'native' and "
+             "'native+sparql' are older spellings of 'shacl' and 'both', kept because scripts pass "
+             "them. Every SHACL spelling runs the `shacl` engine, which is a runtime dependency: "
+             "pyshacl is now a test-only second opinion (tests/test_engine_parity_stress.py) and no "
+             "engine choice selects it.",
     )
 
 
@@ -312,7 +310,16 @@ def build_arg_parser() -> argparse.ArgumentParser:
     chk.add_argument("--registry", default=str(config.DEFAULT_REGISTRY_PATH))
     chk.add_argument("--themes", default=None,
                        help="a JSON or CSV map of check id to a question in your own words, used to add a \"by question\" index to findings.txt -- see docs/REPORTS.md")
-    chk.add_argument("--inference", default="none", choices=["none", "rdfs", "owlrl", "both"])
+    chk.add_argument(
+        "--inference", default="none", choices=["none", "rdfs"],
+        help="materialise an RDFS closure before the checks run. Applied once to the graph both "
+             "formulations read, so --engine sparql, shacl and both all see it and agree; it used "
+             "to be a parameter of the SHACL arm alone, which left the two arms checking different "
+             "graphs and did nothing at all under --engine sparql. Expect findings to move in both "
+             "directions: entailed triples reveal some and resolve others. 'owlrl'/'both' are "
+             "gone -- the SHACL engine has no OWL2-RL reasoner, and the OWL2-RL closure is its own "
+             "stage (reasoning/backends/owlrl_backend.py).",
+    )
     _add_engine_arg(chk)
     chk.add_argument("--out-dir", default="out/checks")
     _add_reports_arg(chk)

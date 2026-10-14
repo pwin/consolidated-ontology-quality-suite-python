@@ -54,6 +54,16 @@ ex:rex a ex:Cat .
 """
 )
 
+# One impossible class, and no individual asserting the contradiction, so the
+# ontology itself still has a model: `ex:Chimera` simply can never have
+# instances. The distinction this module has to keep straight.
+UNSATISFIABLE_CLASS = (
+    CONSISTENT
+    + """
+ex:Chimera a owl:Class ; rdfs:subClassOf ex:Dog, ex:Cat .
+"""
+)
+
 
 @pytest.fixture(scope="module")
 def reasoner_actually_runs():
@@ -86,3 +96,46 @@ ex:hasBirthDate a owl:DatatypeProperty ; rdfs:domain ex:Animal ; rdfs:range <htt
     rows = external_backend.run_external_reasoner(g(ttl), reasoner="hermit")
     assert len(rows) == 1
     assert rows[0].check_id == "REA-022"
+
+
+def test_an_unsatisfiable_class_is_not_reported_as_an_inconsistent_ontology(reasoner_actually_runs):
+    """REA-020 said "inconsistent" for an ontology that was merely carrying
+    one impossible class.
+
+    owlready2's `inconsistent_classes()` returns every class equivalent to
+    `owl:Nothing`, and `owl:Nothing` is trivially one of them -- so it is in
+    the list whenever anything at all is unsatisfiable. The trigger tested for
+    Thing *or* Nothing, so one bad class produced both REA-021 (right) and
+    REA-020 (wrong).
+
+    The exit status never changed, because REA-021 is a Violation too. What
+    changed was where the finding sent the reader: inconsistency means look at
+    the ABox for the individual asserting the contradiction, unsatisfiability
+    means look at one class's own axioms. Two different searches.
+    """
+    rows = external_backend.run_external_reasoner(g(UNSATISFIABLE_CLASS), reasoner="hermit")
+    ids = {r.check_id for r in rows}
+    assert "REA-021" in ids, "the impossible class must still be reported"
+    assert "REA-020" not in ids, (
+        "the ontology has a model -- no individual asserts the contradiction -- "
+        "so it is not inconsistent"
+    )
+
+
+def test_the_unsatisfiable_class_is_named_and_owl_nothing_is_not(reasoner_actually_runs):
+    """`owl:Nothing` is in the reasoner's answer but is not a finding: it is
+    unsatisfiable by definition, and reporting it would be noise on every run
+    that found anything."""
+    rows = external_backend.run_external_reasoner(g(UNSATISFIABLE_CLASS), reasoner="hermit")
+    focus = {r.focus_node for r in rows if r.check_id == "REA-021"}
+    assert focus == {"https://example.org/hermit-test/Chimera"}
+
+
+def test_an_inconsistent_ontology_is_still_reported_as_inconsistent(reasoner_actually_runs):
+    """The other half of the fix: narrowing the trigger must not turn REA-020
+    off. This case never reaches the trigger at all -- owlready2 raises
+    OwlReadyInconsistentOntologyError and the handler returns REA-020 on its
+    own -- which is why the narrowing is safe."""
+    rows = external_backend.run_external_reasoner(g(INCONSISTENT), reasoner="hermit")
+    ids = {r.check_id for r in rows}
+    assert ids == {"REA-020"}, f"expected REA-020 alone, got {sorted(ids)}"

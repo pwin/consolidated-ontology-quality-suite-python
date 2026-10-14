@@ -125,11 +125,32 @@ def run_external_reasoner(graph: Graph, reasoner: str = "hermit") -> Optional[Li
         except Exception as exc:  # noqa: BLE001
             return [unavailable_row(reasoner, f"reasoner ran but result inspection failed: {exc}")]
 
-        # Belt-and-braces: OwlReadyInconsistentOntologyError (above) is the
-        # normal signal for this, but owlready2's docs note Thing/Nothing can
-        # also show up directly in inconsistent_classes() in some cases.
+        # Only `owl:Thing`. An unsatisfiable `owl:Thing` means every
+        # individual is impossible, which is inconsistency; `owl:Nothing`
+        # being unsatisfiable is a tautology, and owlready2 lists it whenever
+        # *any* class is unsatisfiable.
+        #
+        # Testing for either reported REA-020 ("ontology found inconsistent")
+        # on an ontology that was merely carrying one impossible class.
+        # Measured on three ontologies: clean gave nothing; one unsatisfiable
+        # class gave `inconsistent_classes() == [ex:Impossible, owl:Nothing]`
+        # and so both REA-021 (right) and REA-020 (wrong); a genuinely
+        # inconsistent ontology never reaches here at all, because owlready2
+        # raises OwlReadyInconsistentOntologyError and the handler above
+        # returns REA-020 on its own.
+        #
+        # The harm was misdirection rather than a wrong exit status: REA-021
+        # is a Violation too, so the gate failed either way. But
+        # inconsistency sends a reader to the ABox -- which individual
+        # asserts the contradiction -- and unsatisfiability sends them to one
+        # class's own axioms. Two different searches, and the finding named
+        # the wrong one.
+        #
+        # OwlReadyInconsistentOntologyError is the normal signal. This stays
+        # as belt-and-braces because owlready2's own docs note Thing can
+        # surface here directly in some cases.
         thing_or_nothing = {owlready2.Thing, owlready2.owl.Nothing}
-        if any(c in thing_or_nothing for c in inconsistent):
+        if owlready2.Thing in inconsistent:
             rows.append(_inconsistent_ontology_row(reasoner))
 
         for cls in inconsistent:
