@@ -117,7 +117,11 @@ def test_replacing_the_suite_s_tree_warns_and_counts_both_sides(tmp_path):
     # The number that was actually lost, not a vague "some".
     built_in = len(discover_queries(config.DEFAULT_SPARQL_DIR))
     assert f"{built_in} built-in check(s) did not" in warnings[0]
-    assert str(config.DEFAULT_SPARQL_DIR) in warnings[0], "the hint must name the path to add"
+    # The hint named this directory's absolute path until the release that
+    # added `@builtin` for the reason that a committed path is wrong on every
+    # other machine. See test_silent_and_duplicate_findings.py.
+    assert cli.BUILTIN_QUERIES in warnings[0], "the hint must name the portable answer"
+    assert str(config.DEFAULT_SPARQL_DIR) not in warnings[0]
 
 
 def test_composing_with_the_suite_s_tree_does_not_warn(tmp_path):

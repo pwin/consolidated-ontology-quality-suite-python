@@ -598,7 +598,44 @@ a Rust runner back if it's ever needed -- see `docs/EXTENDING.md`.
 
 ## Aggregate / graph-wide checks and the synthetic focus node
 
-A few checks (`EFF-002`, `QUA-005`) describe a property of the whole graph
-rather than of one resource. These report against a synthetic anchor IRI,
-`oq:Graph`, rather than a real resource -- called out in the check's
-description in `registry.json`/`docs/CHECKS.md`.
+A few checks describe a property of the whole graph rather than of one
+resource, and have no natural focus node. These report against a synthetic
+anchor, `oq:Graph`, rather than a real resource -- called out in the check's
+description in `registry.json`/`docs/CHECKS.md`. The full set:
+
+| Check | What it describes |
+|---|---|
+| `EFF-002` | blank-node ratio across the graph |
+| `QUA-005` | the ontology has no identifying IRI at all |
+| `STY-005` | mixed local-name separator style |
+| `REA-020` | the ontology is inconsistent |
+| `REA-022` | the external DL reasoner could not run |
+
+Two consequences worth knowing.
+
+**`--own-namespace` must not drop them.** That filter keeps findings whose
+focus node starts with the project's namespace, and this anchor starts with
+nobody's, so every one of these was silently removed from a scoped run. The
+worst case was `REA-022`: it is the finding that says "what follows is sound
+but not complete", so a scoped run came back looking *complete* precisely
+because the completeness caveat had been filtered out of it. `QUA-005` is
+pointed in a second way: an ontology with no identifying IRI has no namespace
+of its own to match, so scoping it dropped the finding that says exactly that.
+The filter now asks `checks.merge.is_run_level()` instead of matching
+prefixes.
+
+Run-level findings are kept but do not count as *matches*. The near-miss
+warning asks whether anything in the caller's namespace was found, and
+counting the caveat as an answer would switch that warning off on precisely
+the runs that most need it.
+
+**There are two spellings in circulation.** The `.rq` queries and `.ttl`
+shapes write `oq:Graph` against a declared prefix, so rdflib expands it and
+the row carries `https://semantechs.co.uk/ontology-quality/Graph`. The Python
+reasoning backends write the string `"oq:Graph"` and nothing expands it, so
+that row carries a prefixed name in a field that holds an IRI everywhere
+else. `is_run_level()` recognises both. Collapsing them onto the expanded
+form would be tidier and is deliberately not done here: it changes the
+`focus_node` column in every report mentioning `REA-020`/`REA-022`, including
+committed CSV fixtures in the extension repo, so it belongs in a change of
+its own rather than riding along with a filtering fix.

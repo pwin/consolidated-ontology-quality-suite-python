@@ -50,6 +50,11 @@ from . import fuseki
 
 GraphRole = Literal["ontology", "triplified_data"]
 
+#: The same set at runtime. `Literal` is a promise to a type checker and
+#: nothing more, so `GraphManifest.load` needs its own copy to check
+#: against -- see the comment there for what a typo used to do.
+VALID_GRAPH_ROLES = frozenset({"ontology", "triplified_data"})
+
 
 @dataclass
 class GraphBinding:
@@ -69,7 +74,27 @@ class GraphManifest:
     @classmethod
     def load(cls, path: str | Path) -> "GraphManifest":
         data = json.loads(Path(path).read_text(encoding="utf-8"))
-        return cls(bindings=[GraphBinding(**entry) for entry in data["graphs"]])
+        bindings = [GraphBinding(**entry) for entry in data["graphs"]]
+
+        # `GraphRole` is a typing Literal, which nothing enforces at runtime,
+        # so `"triplifed_data"` loaded happily and then matched neither
+        # `ontology_bindings()` nor `data_bindings()`. The run compared nothing
+        # and exited 0 -- a typo in a config file reading as a clean bill of
+        # health, which is the worst way for a gate to fail.
+        #
+        # Checked here rather than in the dataclass so the message can name the
+        # file and every bad role at once: fixing one typo only to be told
+        # about the next is its own small cruelty.
+        wrong = sorted({
+            b.role for b in bindings if b.role not in VALID_GRAPH_ROLES
+        })
+        if wrong:
+            raise ValueError(
+                f"{path}: unknown graph role(s) {wrong} -- valid roles are "
+                f"{sorted(VALID_GRAPH_ROLES)}. A role that matches neither is "
+                f"never compared, so the run would report nothing and succeed."
+            )
+        return cls(bindings=bindings)
 
     def save(self, path: str | Path) -> None:
         payload = {"graphs": [vars(b) for b in self.bindings]}

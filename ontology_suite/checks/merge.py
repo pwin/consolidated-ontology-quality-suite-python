@@ -44,6 +44,46 @@ SEVERITY_LABEL = {
 }
 
 
+# ---------------------------------------------------------------------------
+# findings about the run rather than about a term
+# ---------------------------------------------------------------------------
+#: The synthetic anchor a graph-wide check reports against.
+#:
+#: Some checks have no natural focus node: a blank-node ratio (EFF-002), a
+#: mixed local-name separator style (STY-005), an ontology with no identifying
+#: IRI at all (QUA-005), "the reasoner could not run" (REA-022), "the ontology
+#: is inconsistent" (REA-020). The convention across
+#: the suite is to anchor those on one synthetic node, documented in the
+#: queries as "the synthetic anchor oq:Graph".
+#:
+#: It matters here because `--own-namespace` keeps findings whose focus node
+#: starts with the project's namespace, and this node starts with nobody's.
+#: Every one of these was dropped from a scoped run -- worst for REA-022,
+#: where the output came back looking complete precisely because the
+#: completeness caveat had been filtered out of it.
+#:
+#: There are two spellings in circulation, both produced today. The SPARQL
+#: queries and SHACL shapes write `oq:Graph` against a declared prefix, so
+#: rdflib hands back the expanded IRI. The Python reasoning backends write the
+#: string `"oq:Graph"` and nothing expands it -- a prefixed name sitting in a
+#: field that holds an IRI everywhere else. Recognising both is the fix for
+#: the filtering; collapsing them onto one spelling would change what the
+#: reports say and is left alone deliberately (see docs/ARCHITECTURE.md).
+RUN_LEVEL_FOCUS = "oq:Graph"
+RUN_LEVEL_FOCUS_IRI = str(OQ.Graph)
+RUN_LEVEL_FOCUS_NODES = frozenset({RUN_LEVEL_FOCUS, RUN_LEVEL_FOCUS_IRI})
+
+
+def is_run_level(focus_node: str) -> bool:
+    """True if ``focus_node`` is the synthetic graph-wide anchor.
+
+    Asked instead of comparing against one constant, because comparing
+    against one constant is exactly the half-fix that kept REA-022 and went
+    on dropping EFF-002, QUA-005 and STY-005.
+    """
+    return focus_node in RUN_LEVEL_FOCUS_NODES
+
+
 @dataclass
 class ResultRow:
     check_id: Optional[str]
@@ -366,6 +406,43 @@ def _anonymous_key(row: ResultRow, seen: Dict[tuple, int]) -> tuple:
     # marker keeps an anonymous finding from ever colliding with a named one
     # that happens to share the rest of the key.
     return (row.check_id, "<anonymous>", row.path, row.value, ordinal)
+
+
+def merge_across_stages(rows: Sequence[ResultRow]) -> List[ResultRow]:
+    """Merge rows that separate stages produced for one finding.
+
+    `build_unified_results` deduplicates within a single call, and a stage that
+    concatenates the output of two of them had nothing deduplicating across the
+    join. The registry suite reads the asserted graph and the reasoning stage
+    reads the owlrl closure, so one contradiction came back as two LOG-001
+    rows -- identical check id, focus node, path and value, differing only in
+    `sources` (`sparql` and `owlrl-closure+sparql`). Reported from `data` and
+    `run`, which are the two subcommands that join stages.
+
+    Merging is what the dedup key already means elsewhere: the same finding
+    reached by two routes is one finding that records both routes. So the
+    sources are unioned and the first row's own message is kept.
+
+    Rows with a blank focus node pass through untouched. Their keys are
+    assigned by ordinal *within* a call -- see `_anonymous_key` -- so
+    re-keying them here would pair up rows that the within-call logic
+    deliberately kept apart. Order is otherwise preserved, since the stage
+    sorts its own output afterwards.
+    """
+    merged: Dict[tuple, ResultRow] = {}
+    out: List[ResultRow] = []
+    for row in rows:
+        if row.focus_is_blank:
+            out.append(row)
+            continue
+        key = (row.check_id, row.focus_node, row.path, row.value)
+        existing = merged.get(key)
+        if existing is None:
+            merged[key] = row
+            out.append(row)
+        else:
+            existing.sources = sorted(set(existing.sources + row.sources))
+    return out
 
 
 def build_unified_results(

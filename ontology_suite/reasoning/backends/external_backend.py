@@ -13,13 +13,20 @@ RL rule fires.
 """
 from __future__ import annotations
 
+import re
 import tempfile
 from pathlib import Path
 from typing import List, Optional
 
 from rdflib import Graph
 
-from ...checks.merge import ResultRow
+# `RUN_LEVEL_FOCUS` is the suite-wide anchor for a finding about the graph
+# as a whole rather than about a term; it is defined next to `ResultRow`
+# because the report layer is what has to recognise it. Imported rather
+# than spelled again here -- these two rows and `cli`'s namespace filter
+# disagreeing about it is the defect that dropped REA-022 from every
+# scoped run.
+from ...checks.merge import RUN_LEVEL_FOCUS, ResultRow
 
 
 def available() -> bool:
@@ -36,7 +43,7 @@ def _inconsistent_ontology_row(reasoner: str) -> ResultRow:
         category="reasoning",
         title="Ontology found inconsistent by an external DL reasoner",
         severity="Violation",
-        focus_node="oq:Graph",
+        focus_node=RUN_LEVEL_FOCUS,
         path=None,
         value=None,
         message=(
@@ -52,13 +59,52 @@ def _inconsistent_ontology_row(reasoner: str) -> ResultRow:
     )
 
 
+def _blame(owl_path: Path, detail: str) -> str:
+    """``detail`` with the offending line of the serialised ontology appended.
+
+    owlready2 reports a parse failure as a position in the file it was handed
+    -- "RDF/XML parsing error in file .../tmp8f3k/ontology.owl, line 36,
+    column 97" -- and that file is a temporary serialisation of the graph,
+    which no longer exists by the time anyone reads the report. The line
+    number refers to a document the user never saw.
+
+    The temporary directory is still alive inside the `except` block that calls
+    this, so the line can be read back and quoted. It names the entity: a
+    reader learns that `ex:thing ex:count "twelve"` is what defeated the
+    reasoner, rather than a column in a vanished file.
+
+    Best-effort by construction. If the message carries no position, or the
+    file cannot be read, the original detail is returned unchanged -- a worse
+    message is better than an exception while building an error report.
+    """
+    match = re.search(r"line ([0-9]+)", detail)
+    if not match:
+        return detail
+    try:
+        lines = owl_path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError):
+        return detail
+
+    number = int(match.group(1))
+    if not (1 <= number <= len(lines)):
+        return detail
+    quoted = lines[number - 1].strip()
+    if not quoted:
+        return detail
+    return (
+        f"{detail}. That line of the serialised ontology reads: {quoted} "
+        f"(the file is a temporary copy of the graph, so the line number alone "
+        f"names nothing you can open)"
+    )
+
+
 def unavailable_row(reasoner: str, detail: str) -> ResultRow:
     return ResultRow(
         check_id="REA-022",
         category="reasoning",
         title="External DL reasoner unavailable -- only owlrl-based checks ran",
         severity="Info",
-        focus_node="oq:Graph",
+        focus_node=RUN_LEVEL_FOCUS,
         path=None,
         value=None,
         message=(
@@ -117,7 +163,10 @@ def run_external_reasoner(graph: Graph, reasoner: str = "hermit") -> Optional[Li
             # can't be queried after this error, so there's nothing more to add).
             return [_inconsistent_ontology_row(reasoner)]
         except Exception as exc:  # noqa: BLE001 - any other failure is genuinely a tooling/environment issue
-            return [unavailable_row(reasoner, str(exc))]
+            # `_blame` while the temp directory is still alive: it reads back
+            # the line owlready2 complained about, which is gone once this
+            # `with` block exits.
+            return [unavailable_row(reasoner, _blame(owl_path, str(exc)))]
 
         rows: List[ResultRow] = []
         try:

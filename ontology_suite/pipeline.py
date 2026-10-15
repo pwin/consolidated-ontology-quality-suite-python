@@ -25,7 +25,7 @@ from rdflib import Graph
 from . import config
 from .checks.literal_typing import SOURCE_LABEL as LITERAL_TYPING_SOURCE
 from .checks.literal_typing import run_literal_typing_check
-from .checks.merge import ResultRow, build_unified_results
+from .checks.merge import ResultRow, build_unified_results, merge_across_stages
 from .checks.registry import Registry
 from .checks.runner import load_graph
 from .checks.shacl_native_runner import rdfs_closure, run_shacl_native_rows
@@ -765,6 +765,12 @@ def run_data_stage(
         rows += consistency.run_consistency_checks(graph_for_reasoning, registry, sparql_root, reasoner=reasoner)
 
     graph_metrics = graph_quality.compute_metrics(aggregate_graph)
+
+    # Joined from two `build_unified_results` calls -- the registry suite over
+    # the asserted graph and the reasoning stage over the owlrl closure -- each
+    # deduplicating only within itself. One contradiction came back as two
+    # LOG-001 rows differing only in `sources`.
+    rows = merge_across_stages(rows)
 
     return StageResult(
         name="data",

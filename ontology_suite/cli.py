@@ -31,7 +31,7 @@ from typing import List, Optional, Sequence, Tuple
 from . import config, io_utils, pipeline
 from . import consistency as consistency_api
 from . import pattern_consistency
-from .checks.merge import ResultRow
+from .checks.merge import ResultRow, is_run_level, merge_across_stages
 from .checks.registry import Registry
 from .dataquality import data_quality
 from .reasoning.consistency import REASONER_CHOICES
@@ -149,8 +149,8 @@ def _resolve_sparql_dirs(values: Optional[List[str]], warnings: List[str]) -> Li
         theirs = len(discover_queries(config.DEFAULT_SPARQL_DIR))
         warnings.append(
             f"--sparql replaced the suite's own query tree: {mine} project check(s) ran and "
-            f"{theirs} built-in check(s) did not. Pass --sparql {config.DEFAULT_SPARQL_DIR} "
-            f"as well to run both."
+            f"{theirs} built-in check(s) did not. Pass --sparql {BUILTIN_QUERIES} as well to "
+            f"run both."
         )
     return values
 
@@ -168,7 +168,22 @@ def _filter_own_namespace(
     stay resolved -- they're just excluded from the shown/written results."""
     if not own_namespace:
         return rows
-    kept = [r for r in rows if r.focus_node.startswith(own_namespace)]
+    # A finding about the *run* rather than about a term survives the filter.
+    # REA-022 says the external DL reasoner could not run, so the findings that
+    # follow are sound but not complete -- and its focus node is the sentinel
+    # `oq:Graph`, which is nobody's namespace. It was therefore dropped by
+    # every scoped run, which is the worst possible case for it: the output
+    # looked complete precisely because the caveat had been removed.
+    matched = [r for r in rows if r.focus_node.startswith(own_namespace)]
+    # Run-level findings are kept but are not *matches*: the near-miss warning
+    # below asks whether anything in the caller's namespace was found, and
+    # counting the caveat as an answer would switch the warning off on exactly
+    # the runs that most need it. Keeping them in `kept` and out of `matched`
+    # is the whole distinction.
+    kept = matched + [
+        r for r in rows
+        if is_run_level(r.focus_node) and not r.focus_node.startswith(own_namespace)
+    ]
 
     # A filter that removes everything is indistinguishable from a clean run,
     # and this one is a literal IRI-prefix string match: a wrong scheme, host
@@ -181,15 +196,25 @@ def _filter_own_namespace(
     # saying otherwise would train people to ignore the message. The nearest
     # real namespaces are named, since the usual cause is a near miss and the
     # answer is nearly always visible in that list.
-    if rows and not kept:
+    if rows and not matched:
         seen = sorted({
             r.focus_node.rsplit("#", 1)[0] + "#" if "#" in r.focus_node
             else r.focus_node.rsplit("/", 1)[0] + "/"
             for r in rows
-            # Blank nodes are not namespaces, and `_:0_b56` sorts to the front
-            # of the list -- so the first thing the hint showed was the one
-            # entry that could never be the answer.
-            if r.focus_node and not r.focus_node.startswith("_:")
+            # Blank nodes are not namespaces, and they sort to the front of the
+            # list -- so the first thing the hint showed was the one entry that
+            # could never be the answer.
+            #
+            # Matching on a `_:` prefix did not work: `str(BNode())` is a bare
+            # label like `N094f676089dd497bbcc34c900805dc6a` with no prefix at
+            # all, and that is what `merge` puts in `focus_node`. The guard
+            # never fired on real data, and the derivation below then turned
+            # the label into `N094f.../` and offered it as a namespace. It was
+            # pinned by a test that fed it `_:0_b56` -- a shape the pipeline
+            # does not produce -- so the test passed while the code did
+            # nothing. A namespace has a scheme; that is the thing worth
+            # testing for.
+            if r.focus_node and "://" in r.focus_node
         })
         if warnings is not None:
             warnings.append(
@@ -472,7 +497,17 @@ def build_arg_parser() -> argparse.ArgumentParser:
                        help="write suggested repairs to their target files in place (default: write .patch files under --out-dir/repairs only)")
     cons.add_argument("--min-confidence", type=float, default=0.5,
                        help="only apply/write repairs at or above this confidence (default: 0.5)")
-    cons.add_argument("--fail-on-misalignment", action="store_true",
+    # One spelling across every subcommand. `consistency` and
+    # `consistency-remote` called this `--fail-on-misalignment` and
+    # `pattern-consistency` called it `--fail-on-mismatch`, while every other
+    # subcommand takes `--fail-on <severity>` -- three names for "make this
+    # fail the build", which is the first flag anyone reaches for in CI.
+    #
+    # The old names are kept as aliases rather than renamed: a committed CI
+    # config or a gate.yml using one must keep working. argparse stores both
+    # spellings in the same `dest`, so the consuming code sees one flag.
+    cons.add_argument("--fail-on-anything", "--fail-on-misalignment",
+                       dest="fail_on_misalignment", action="store_true",
                        help="exit 1 if any TARQL/ontology misalignment is found (default: always exit 0, report-only)")
     _add_verbose_arg(cons)
 
@@ -487,7 +522,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
     consr.add_argument("--manifest", required=True, help="a remote.manifest.GraphManifest JSON file binding named graphs to their role/tarql source/ontology graph")
     consr.add_argument("--sample-limit", type=int, default=None, help="cap how many triples are pulled per named graph (see remote.fuseki.load_named_graph)")
     consr.add_argument("--out-dir", default="out/consistency-remote")
-    consr.add_argument("--fail-on-misalignment", action="store_true")
+    consr.add_argument("--fail-on-anything", "--fail-on-misalignment",
+                        dest="fail_on_misalignment", action="store_true",
+                        help="exit non-zero if any misalignment was found "
+                             "(--fail-on-misalignment is the older spelling)")
 
     patc = sub.add_parser(
         "pattern-consistency",
@@ -515,7 +553,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
                             "docs/MODELLING_PATTERN_CONSISTENCY.md) -- render with e.g. "
                             "'dot -Tsvg file.dot -o file.svg'")
     patc.add_argument("--out-dir", default="out/pattern-consistency")
-    patc.add_argument("--fail-on-mismatch", action="store_true",
+    patc.add_argument("--fail-on-anything", "--fail-on-mismatch",
+                       dest="fail_on_mismatch", action="store_true",
                        help="exit 1 if any modelling-pattern inconsistency is found across ontology, taxonomy, "
                             "transformation, or output data (default: always exit 0, report-only)")
     _add_verbose_arg(patc)
@@ -875,6 +914,9 @@ def cmd_run(args) -> int:
         rows += stage.rows
         warnings += stage.warnings
 
+    # `run` concatenates several stages' rows and each deduplicated only its
+    # own -- same contradiction, two LOG-001 rows. See merge_across_stages.
+    rows = merge_across_stages(rows)
     rows = _filter_own_namespace(rows, args.own_namespace, warnings)
     _write_reports(rows, registry, out_dir, "Consolidated Ontology Suite Report", artifacts,
                    sources=[args.ontology, *data_paths], themes_path=args.themes, reports=args.reports)
