@@ -1,0 +1,70 @@
+name: Lock
+
+# Asserts `uv.lock` agrees with `pyproject.toml`.
+#
+# It exists because the two went out of step and nothing said so directly.
+# 0.23.0 raised the bound to `shacl>=0.3.3` and left the lock recording
+# `>=0.3.0,<0.4` and shacl 0.3.2, so a clean install would have resolved an
+# environment without the function the release depends on. The suite's own
+# tests could not catch it -- they run against an environment that is already
+# built, and nothing in them reads the lock.
+#
+# "Validate notebooks" did catch it, by accident and badly: `uv sync` failed to
+# resolve, three times over in a `fail-fast: false` matrix, reporting
+# `No solution found when resolving dependencies for split (markers:
+# python_full_version >= '3.14' and sys_platform == 'win32')`. That is a true
+# statement about a resolver branch and says nothing about the cause, and it
+# took grepping three notebook logs to find.
+#
+# What this job adds is being one job, named for what it checks, with a hint
+# attached -- not a better message from uv. `uv lock --check` has two failure
+# modes and only the first reads clearly:
+#
+#   lock stale, required version exists -> "The lockfile at `uv.lock` needs to
+#       be updated". Running `uv lock` fixes it.
+#   required version does not exist yet -> the same unhelpful resolver-split
+#       message as above, because there is genuinely no solution. Running
+#       `uv lock` will not help; publishing the dependency will.
+#
+# Measured both, deliberately, because the hint below would otherwise send a
+# maintainer to the wrong fix in the second case -- which is the case this repo
+# actually hit. 0.23.0's bound landed six hours before shacl 0.3.3 was
+# published, so nothing could have resolved it. Publish the dependency first,
+# then push the bound that needs it.
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/lock.yml"
+  pull_request:
+    paths:
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/lock.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      # `--check` resolves and compares without writing, so a failure means the
+      # committed lock does not match what pyproject now asks for. It does not
+      # need the package installed, which is what keeps this job seconds long.
+      #
+      # The hint names both causes rather than only the common one. uv's own
+      # output distinguishes them: "needs to be updated" is a stale lock, a
+      # resolver-split "No solution found" usually means a bound was raised to
+      # a version that is not published yet.
+      - name: uv lock --check
+        run: |
+          uv lock --check || {
+            echo "::error::uv.lock disagrees with pyproject.toml. If uv says the lockfile needs updating, run 'uv lock' and commit it. If uv reports no solution for a resolver split, a dependency bound names a version that is not published yet -- publish it first, then push the bound."
+            exit 1
+          }

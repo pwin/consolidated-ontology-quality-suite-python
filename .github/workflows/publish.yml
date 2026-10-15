@@ -27,6 +27,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
+      # Before the build, because `uv build` reads pyproject.toml and ignores
+      # the lock entirely: a release could ship -- and did -- with a lock that
+      # resolves to an environment the released code does not work in. The
+      # tag is the last point at which that is still cheap to fix.
+      - run: uv lock --check
       - run: uv build
       - uses: actions/upload-artifact@v4
         with:
