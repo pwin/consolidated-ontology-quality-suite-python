@@ -762,7 +762,16 @@ def cmd_consistency_remote(args) -> int:
 
     auth = (args.auth_user, args.auth_password) if args.auth_user else None
     dataset = fuseki.FusekiDataset(query_endpoint=args.query_endpoint, update_endpoint=args.update_endpoint, auth=auth)
-    manifest = graph_manifest.GraphManifest.load(args.manifest)
+    # A manifest that names an unknown graph role is refused rather than
+    # compared (it would compare nothing and exit 0). Caught here so a typo in
+    # a config file reads as a one-line error, not a Python traceback: §7.4 of
+    # the manual rightly complained about that shape when `--inference owlrl`
+    # had it, and this is the same thing -- a user's input, not a bug.
+    try:
+        manifest = graph_manifest.GraphManifest.load(args.manifest)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
 
     reports = graph_manifest.check_manifest_consistency(dataset, manifest, sample_limit=args.sample_limit)
 

@@ -290,3 +290,26 @@ def test_one_spelling_works_everywhere_and_the_old_one_still_does(
     assert getattr(parser.parse_args([command, *required, "--fail-on-anything"]), dest) is True
     assert getattr(parser.parse_args([command, *required, old_spelling]), dest) is True
     assert getattr(parser.parse_args([command, *required]), dest) is False
+
+
+def test_a_bad_role_reads_as_a_usage_error_not_a_traceback(tmp_path, capsys):
+    """Refusing the manifest was right; refusing it with a stack trace was not.
+
+    The first cut raised through `cmd_consistency_remote`, so a typo in a config
+    file arrived as a `ValueError` traceback ending in suite internals. The
+    manual's own §7.4 complains about exactly that shape -- it is what
+    `--inference owlrl` did before 0.23.0 -- so having fixed one and introduced
+    another in the next release would have been poor form. A user's typo is
+    their input, not our bug.
+    """
+    manifest = _manifest(tmp_path, "ontology", "triplifed_data")
+    args = cli.build_arg_parser().parse_args([
+        "consistency-remote", "--manifest", str(manifest),
+        "--query-endpoint", "http://example.invalid/query",
+        "--out-dir", str(tmp_path / "out"),
+    ])
+    assert cli.cmd_consistency_remote(args) == 2
+    err = capsys.readouterr().err
+    assert err.startswith("error: ")
+    assert "unknown graph role" in err
+    assert "Traceback" not in err
