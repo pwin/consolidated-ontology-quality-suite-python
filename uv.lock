@@ -522,7 +522,7 @@ wheels = [
 
 [[package]]
 name = "ontology-quality-suite"
-version = "0.22.0"
+version = "0.23.0"
 source = { editable = "." }
 dependencies = [
     { name = "holosdb" },
@@ -556,7 +556,7 @@ requires-dist = [
     { name = "owlrl", specifier = ">=6.0.2" },
     { name = "pandas", specifier = ">=2.0.0" },
     { name = "rdflib", specifier = ">=7.6.0" },
-    { name = "shacl", specifier = ">=0.3.0,<0.4" },
+    { name = "shacl", specifier = ">=0.3.3,<0.4" },
     { name = "tabulate", specifier = ">=0.9.0" },
 ]
 provides-extras = ["reasoner", "native-shacl"]
@@ -874,13 +874,13 @@ html = [
 
 [[package]]
 name = "shacl"
-version = "0.3.2"
+version = "0.3.3"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/7b/e5/99c43145e1615986bce0b69ded89085c039600345fa2046db9e8fb0fbd0c/shacl-0.3.2.tar.gz", hash = "sha256:500e7136ae7806249d2533d1bb0c3b8c8f042db8a52e766cdbc875e2c0c1f0e8", size = 194717, upload-time = "2026-09-23T08:34:01.347Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/39/47/f65eae9f882d26af53728b1c23d47d960e824cdd23fd8bb7a6b30231fe42/shacl-0.3.3.tar.gz", hash = "sha256:56a7d531ca53b368e24c9528bfe55ef1724d8c46e899b812cb5df8f4bab259da", size = 198552, upload-time = "2026-10-15T04:58:33.174Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/20/51/8fe1a1f539796a2b7b3e5fefe1b8e1e8a5cd753669fd3b74bb86990b5a12/shacl-0.3.2-cp39-abi3-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:d66c37ac1a9de5b11111fb3344eb3943e655a7c3e7e362709b690e3e60e0ee6b", size = 4369250, upload-time = "2026-09-23T08:33:56.692Z" },
-    { url = "https://files.pythonhosted.org/packages/01/79/f9fdcad82b056280e8633b5d8d64190ee175eb536c8b2363b89008ed6878/shacl-0.3.2-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:8de2f89901b09d9d9b1642ac227f17dcf110ad5a2cebca87150bffdf89e3fe6f", size = 2322607, upload-time = "2026-09-23T08:33:58.329Z" },
-    { url = "https://files.pythonhosted.org/packages/d7/6d/33ea1154f5a59bc46fae95bbdcbb9c6254864d3af95b08ace28e0f4900b0/shacl-0.3.2-cp39-abi3-win_amd64.whl", hash = "sha256:af0ddad3b0797e4ff6daf4ea2407675fe0787246ebb3368fcc59ac2ebf39f76b", size = 2370624, upload-time = "2026-09-23T08:33:59.914Z" },
+    { url = "https://files.pythonhosted.org/packages/f8/2d/6b76c0cdf7552431ef43940717c29f980be6307f3895d53d1565099d64de/shacl-0.3.3-cp39-abi3-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:251de6606e4a4406cef8155a43841241cba3141c76167496d1fabadb70074415", size = 4373684, upload-time = "2026-10-15T04:58:26.783Z" },
+    { url = "https://files.pythonhosted.org/packages/31/8a/1158c06a188d968955cc289d1424db5358c66f7bb43f7a51e73be2e8504d/shacl-0.3.3-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:2baf339604df6bc51d2e4f814caac912384b4829331b83d13a861c11628d6d29", size = 2337565, upload-time = "2026-10-15T04:58:28.84Z" },
+    { url = "https://files.pythonhosted.org/packages/39/f2/cc907ee47fe00bc5425323fa4a2bed1f5e425bb6901289c7d25370ce2760/shacl-0.3.3-cp39-abi3-win_amd64.whl", hash = "sha256:7a15c8fd39ac93d816a306261e8512d958cd781fa4179917084a2ccaebb348ec", size = 2392176, upload-time = "2026-10-15T04:58:31.194Z" },
 ]
 
 [[package]]
