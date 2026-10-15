@@ -91,6 +91,32 @@ def default_engine() -> str:
     return "native+sparql"
 
 
+def rdfs_closure_for(graph: Graph, inference: str) -> Graph:
+    """``graph`` closed for ``inference``, or ``graph`` itself for ``"none"``.
+
+    The one place that decides what an inference mode means, so a stage that
+    needs the closed graph in its own hands gets the same graph the checks
+    read rather than a second opinion.
+
+    Blank node identities are not preserved. The closure round-trips through
+    Turtle, so every blank node comes back relabelled -- a finding about one
+    under ``--inference rdfs`` will not name the label the source file used.
+    `checks/locate.py` already declines to place blank nodes, so nothing points
+    at a wrong line because of it, but a reader comparing a focus node against
+    their file will not find it.
+    """
+    if inference == "none":
+        return graph
+    if inference != "rdfs":
+        raise ValueError(
+            f"--inference {inference!r} is not available (none/rdfs are); the "
+            "SHACL engine has no OWL2-RL reasoner, and downgrading to RDFS "
+            "would drop findings that depend on OWL2-RL rules. Run the "
+            "reasoning stage for an OWL2-RL closure."
+        )
+    return rdfs_closure(graph)
+
+
 def run_registry_suite_on_graph(
     working_graph: Graph,
     registry: Registry,
@@ -168,10 +194,10 @@ def run_registry_suite_on_graph(
     # in engine 0.3.3) rather than from owlrl or a handful of rules written
     # here, because a second closure would disagree with the engine's exactly
     # where two graphs did -- the same defect moved one level up.
-    if inference == "rdfs":
-        working_graph = rdfs_closure(working_graph)
-        # Already real triples by now, so the engine must not close it twice.
-        inference = "none"
+    # Same helper a stage uses, so "what does this mode mean" has one answer.
+    working_graph = rdfs_closure_for(working_graph, inference)
+    # Already real triples by now, so the engine must not close it twice.
+    inference = "none"
 
     shacl_results = Graph()
     native_rows: Optional[List[ResultRow]] = None
@@ -484,6 +510,24 @@ def run_checks_stage(
 
     if verbose:
         print(f"[verbose] engine: {engine}")
+    # Closed here rather than inside the suite call, so that the graph this
+    # stage publishes is the graph its findings came from.
+    #
+    # `run_registry_suite_on_graph` closes the graph it is given, but it does
+    # so by rebinding its own local: the caller's graph is untouched, and this
+    # stage was handing out `artifacts["graph"]` as the *unclosed* one while
+    # `rows` described the closed one. Nothing reads that artefact today, which
+    # is the only reason it was not a live bug.
+    #
+    # Merging the closure back into `working_graph` instead would be worse. The
+    # closure round-trips through Turtle, so its blank nodes come back with
+    # fresh identities; adding those triples to the original would leave every
+    # blank-node subject in the graph twice under two labels. Replacing the
+    # graph wholesale keeps it internally consistent, which is why that is what
+    # the suite call does.
+    if inference != "none":
+        working_graph = rdfs_closure_for(working_graph, inference)
+        inference = "none"
     rows = run_registry_suite_on_graph(working_graph, registry, shapes_dir, sparql_dir, inference, engine=engine)
 
     return StageResult(name="checks", rows=rows, artifacts={"graph": working_graph}, warnings=warnings)

@@ -167,3 +167,57 @@ def test_the_cli_no_longer_offers_a_mode_that_cannot_run():
     assert args.inference == "rdfs"
     with pytest.raises(SystemExit):
         parser.parse_args(["checks", "--ontology", "x.ttl", "--inference", "owlrl"])
+
+
+def test_the_stage_publishes_the_graph_its_findings_came_from(tmp_path):
+    """`artifacts["graph"]` used to be the *unclosed* graph while `rows`
+    described the closed one.
+
+    `run_registry_suite_on_graph` closes the graph it is given by rebinding its
+    own local, so the caller's graph stays as it was. Nothing reads that
+    artefact today, which is the only reason it was not a live bug -- and
+    exactly why it would have been a puzzling one later.
+    """
+    source = tmp_path / "o.ttl"
+    source.write_text(SOURCE, encoding="utf-8")
+    registry = Registry.load(str(config.DEFAULT_REGISTRY_PATH))
+
+    stage = pipeline.run_checks_stage(
+        registry, tmp_path / "out", ontology_path=str(source),
+        inference="rdfs", engine="sparql",
+    )
+    published = stage.artifacts["graph"]
+    assert (URIRef(EX + "rex"), None, URIRef(EX + "Animal")) in published, (
+        "the published graph is missing the entailments the findings were based on"
+    )
+
+
+def test_closing_for_none_hands_back_the_same_object():
+    """The ordinary path must not pay for a serialise/parse round trip, which
+    is what `--inference rdfs` costs on a large graph."""
+    graph = _graph()
+    assert pipeline.rdfs_closure_for(graph, "none") is graph
+
+
+def test_blank_node_identities_are_not_preserved_by_the_closure():
+    """Recorded rather than fixed. The closure round-trips through Turtle, so
+    blank nodes come back relabelled: a finding about one under
+    `--inference rdfs` will not name the label the source file used.
+
+    `checks/locate.py` already declines to place blank nodes, so nothing points
+    at a wrong line because of it. Pinned so the behaviour is a known cost
+    rather than a surprise, and so a future fix has something to flip.
+    """
+    from rdflib import BNode
+
+    graph = Graph()
+    node = BNode("keepme")
+    graph.add((node, URIRef(EX + "p"), URIRef(EX + "o")))
+    closed = pipeline.rdfs_closure_for(graph, "rdfs")
+
+    labels = {str(s) for s in closed.subjects() if isinstance(s, BNode)}
+    assert labels, "the blank node should still be there in some form"
+    assert "keepme" not in labels, (
+        "if labels now survive, this cost is gone -- update the docstring on "
+        "pipeline.rdfs_closure_for and delete this test"
+    )
