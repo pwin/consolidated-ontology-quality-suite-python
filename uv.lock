@@ -522,7 +522,7 @@ wheels = [
 
 [[package]]
 name = "ontology-quality-suite"
-version = "0.24.1"
+version = "0.24.2"
 source = { editable = "." }
 dependencies = [
     { name = "holosdb" },
