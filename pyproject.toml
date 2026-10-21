@@ -29,7 +29,22 @@ dependencies = [
     # rather than an option: rdflib's leniency let a check pass here and fail
     # in the field, so there is one engine and it is the conformant one. See
     # checks/holos_sparql.py.
-    "holosdb>=0.15",
+    # >=0.23 because the previous floor, >=0.15, was far below anything this
+    # suite can actually run on and would have let a clean install resolve an
+    # unusable environment. It is not a performance floor: 0.23.0 unified
+    # `Engine::query`, which checks/holos_sparql.py calls, with the
+    # `query_with` pipeline it had drifted from, and on this suite's own
+    # checks against examples/acme_robotics that is a wash -- 1989 ms against
+    # 2025 ms, three runs each, with byte-identical findings.
+    #
+    # One measured caveat for whoever runs this on a large graph. The 0.23
+    # plan uses a filter's constants as bindings, which helps a selective
+    # filter and hurts an unselective one. On 800k triples, counting subjects
+    # with an equality filter: 1 matching row 133 ms -> 114 ms, but 50,000
+    # matching rows 147 ms -> 227 ms. Most checks here scan broadly, so the
+    # second shape is the common one; it does not show on acme_robotics
+    # because that fixture is too small for query time to dominate.
+    "holosdb>=0.23",
     # The SHACL engine. Upper bound deliberate: 0.3.0 changed the default
     # meaning of sh:conforms to the specification's -- warnings and infos break
     # conformance, as they already did in pyshacl -- so a minor bump is not
