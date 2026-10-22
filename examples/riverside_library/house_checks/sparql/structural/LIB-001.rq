@@ -1,0 +1,32 @@
+PREFIX lib: <https://example.org/riverside/>
+PREFIX oq:  <https://semantechs.co.uk/ontology-quality/>
+PREFIX sh:  <http://www.w3.org/ns/shacl#>
+
+# LIB-001: a book with no ISBN.
+#
+# A house rule, not a general truth: plenty of real catalogues hold things
+# with no ISBN. Riverside has decided every Book must carry one, because
+# that is what their ordering system keys on.
+#
+# The shape of this file is the same as every built-in check:
+#   * CONSTRUCT one sh:ValidationResult per problem found;
+#   * sh:resultSeverity says how serious it is. This MUST match
+#     default_severity for LIB-001 in registry-fragment.json;
+#   * sh:sourceConstraintComponent carries the check id. The suite reads the
+#     id from here and looks it up in the registry to get the title and the
+#     remediation text;
+#   * sh:focusNode is the thing at fault, so a report can point at it;
+#   * sh:resultMessage is your own wording, free text.
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Violation ;
+    sh:focusNode ?book ;
+    sh:sourceConstraintComponent oq:LIB-001 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  ?book a lib:Book .
+  FILTER(isIRI(?book))
+  FILTER NOT EXISTS { ?book lib:isbn ?anyIsbn }
+  BIND(CONCAT("Book ", STR(?book), " has no lib:isbn. Riverside cannot reorder a title without one.") AS ?msg)
+}

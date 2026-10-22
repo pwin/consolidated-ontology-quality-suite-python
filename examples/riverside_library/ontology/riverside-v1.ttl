@@ -1,0 +1,63 @@
+# The Riverside Library catalogue: a small, invented model.
+#
+# Everything here is made up, and the namespace is example.org on purpose.
+# It is deliberately imperfect: lib:Shelf has no rdfs:label, so the suite's
+# own QUA-001 fires on it. That gives the walkthrough something real to
+# report before any house rule is added.
+
+@prefix lib:     <https://example.org/riverside/> .
+@prefix owl:     <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:     <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+lib: a owl:Ontology ;
+  rdfs:label "Riverside Library catalogue" ;
+  dcterms:title "Riverside Library catalogue" ;
+  dcterms:description "An invented model of books, borrowers and loans, used to show how to add house rules to the suite." ;
+  owl:versionInfo "1.0.0" .
+
+# --- classes ---------------------------------------------------------------
+
+lib:Book a owl:Class ;
+  rdfs:label "Book" ;
+  rdfs:comment "A title held by the library. Not a physical copy." .
+
+lib:Borrower a owl:Class ;
+  rdfs:label "Borrower" ;
+  rdfs:comment "Someone who may take a book out." .
+
+lib:Loan a owl:Class ;
+  rdfs:label "Loan" ;
+  rdfs:comment "One book, out with one borrower." .
+
+# Left unlabelled on purpose: the suite's QUA-001 reports this.
+lib:Shelf a owl:Class .
+
+# --- properties ------------------------------------------------------------
+
+lib:isbn a owl:DatatypeProperty ;
+  rdfs:label "ISBN" ;
+  rdfs:domain lib:Book ;
+  rdfs:range xsd:string .
+
+lib:shelfMark a owl:DatatypeProperty ;
+  rdfs:label "shelf mark" ;
+  rdfs:comment "Where the book sits, e.g. QA-76.73." ;
+  rdfs:domain lib:Book ;
+  rdfs:range xsd:string .
+
+lib:copies a owl:DatatypeProperty ;
+  rdfs:label "copies held" ;
+  rdfs:domain lib:Book ;
+  rdfs:range xsd:integer .
+
+lib:borrowedBy a owl:ObjectProperty ;
+  rdfs:label "borrowed by" ;
+  rdfs:domain lib:Loan ;
+  rdfs:range lib:Borrower .
+
+lib:onLoan a owl:ObjectProperty ;
+  rdfs:label "on loan" ;
+  rdfs:domain lib:Loan ;
+  rdfs:range lib:Book .

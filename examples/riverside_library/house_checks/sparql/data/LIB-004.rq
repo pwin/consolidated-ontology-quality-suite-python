@@ -1,0 +1,30 @@
+PREFIX lib: <https://example.org/riverside/>
+PREFIX oq:  <https://semantechs.co.uk/ontology-quality/>
+PREFIX sh:  <http://www.w3.org/ns/shacl#>
+
+# LIB-004: a book the library holds no copies of.
+#
+# Info, because nothing is wrong. The catalogue is telling the truth: the
+# title is known and there are none on the shelf. Someone may want to act
+# on it, so it is reported; no build should ever fail because of it.
+#
+# Note this check reads a *value*, not just the presence of a property, and
+# reports it through sh:value. That is what puts the number in the report's
+# "value" column rather than burying it in the message prose, where nothing
+# can sort or filter it.
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Info ;
+    sh:focusNode ?book ;
+    sh:resultPath lib:copies ;
+    sh:value ?count ;
+    sh:sourceConstraintComponent oq:LIB-004 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  ?book a lib:Book ;
+        lib:copies ?count .
+  FILTER(isIRI(?book))
+  FILTER(?count = 0)
+  BIND(CONCAT("Book ", STR(?book), " is catalogued but the library holds no copies.") AS ?msg)
+}

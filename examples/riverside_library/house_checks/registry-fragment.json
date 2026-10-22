@@ -1,0 +1,50 @@
+{
+  "_comment": "Riverside Library's own four checks, and NOTHING ELSE. This is a fragment, not a registry: it is merged with the suite's own registry at run time by merge_registry.py. Do not copy the suite's 61 entries in here -- if you do, they freeze at the version you copied and you will never be told that the suite has improved a check or added one. See README.md, step 3.",
+  "namespace": "https://example.org/riverside/checks/",
+  "checks": [
+    {
+      "id": "LIB-001",
+      "category": "structural",
+      "metric": "catalogue completeness: orderable titles",
+      "default_severity": "Violation",
+      "title": "Book missing an ISBN",
+      "description": "A lib:Book has no lib:isbn value. Riverside's ordering system keys on the ISBN, so a title without one cannot be reordered or matched against a supplier's catalogue.",
+      "remediation": "Add lib:isbn to the book, or correct the import that should have supplied it. If the item genuinely has no ISBN (a pamphlet or local history sheet), record it as a different class than lib:Book.",
+      "cucumber_feature": "Riverside catalogue completeness",
+      "cucumber_scenario": "Every book can be reordered from its ISBN"
+    },
+    {
+      "id": "LIB-002",
+      "category": "structural",
+      "metric": "referential completeness of loan records",
+      "default_severity": "Violation",
+      "title": "Loan does not record a borrower",
+      "description": "A lib:Loan has no lib:borrowedBy value. The book is recorded as out, but nobody is recorded as having it, so it can never be chased or returned.",
+      "remediation": "Add lib:borrowedBy to the loan. If the book was returned, delete the loan record rather than leaving it borrower-less.",
+      "cucumber_feature": "Riverside loan integrity",
+      "cucumber_scenario": "Every loan names the person holding the book"
+    },
+    {
+      "id": "LIB-003",
+      "category": "quality",
+      "metric": "findability of stock",
+      "default_severity": "Warning",
+      "title": "Book has no shelf mark",
+      "description": "A lib:Book has no lib:shelfMark. The record is otherwise usable, but a borrower cannot locate the book on the shelves.",
+      "remediation": "Add lib:shelfMark using Riverside's classification, e.g. \"PR-6013\". If the title is held only as an e-book, give it the electronic-only shelf mark rather than leaving it blank.",
+      "cucumber_feature": "Riverside catalogue quality",
+      "cucumber_scenario": "Every book can be found on a shelf"
+    },
+    {
+      "id": "LIB-004",
+      "category": "data",
+      "metric": "stock levels",
+      "default_severity": "Info",
+      "title": "Book catalogued with no copies held",
+      "description": "A lib:Book has lib:copies 0. Nothing is wrong: the catalogue is correctly reporting that the library holds none. Reported so that acquisitions can see it.",
+      "remediation": "No fix is required. Order a copy, or withdraw the title from the catalogue if it will not be replaced.",
+      "cucumber_feature": "Riverside stock levels",
+      "cucumber_scenario": "Titles held in no copies are visible to acquisitions"
+    }
+  ]
+}

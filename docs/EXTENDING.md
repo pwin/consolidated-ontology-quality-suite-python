@@ -61,6 +61,21 @@ Roots are deduplicated by resolved path, so overlapping trees run each query
 once. Subject-specific directories (`tarql/`) are filtered per root, so adding
 a second root never changes whether the first one's are excluded.
 
+**`--registry` also replaces, and unlike `--sparql` it does not repeat.** It
+takes one file, so project-local entries have to be *merged* with the suite's
+rather than passed instead of them. Merge at run time from
+`config.DEFAULT_REGISTRY_PATH`, keeping your own file holding only the checks
+you own; copying the suite's entries into your file works today and then
+freezes them at the version you copied, silently, for ever.
+
+Passing an unmerged project registry is quiet and costs more than the missing
+titles. Measured on `examples/riverside_library/`, where the correct
+invocation reports 60 findings: passing only the four-entry fragment reports
+**58**, with 54 of them `UNMAPPED`. Two findings disappear outright, because
+once every suite finding carries the same id the dedup key
+`(check_id, focus_node, path, value)` collapses rows that differed only by
+which check produced them. A configuration mistake reduces the count.
+
 The warning exists because a narrow run is sometimes exactly right -- a
 harness that runs one tree at a time on purpose -- and the problem was never
 the behaviour but the silence. A real CI gate was found running eight checks
@@ -283,10 +298,29 @@ print(len(list(result.graph)))
 A query that "looks right" but matches zero triples against a fixture that
 should trigger it is a bug, not a clean bill of health.
 
-## A real worked example
+## Worked examples
 
-`examples/acme_robotics/custom_checks/` is a real, minimal project-local
-registry (one check, `ACM-001`) built following exactly the steps above --
-see `docs/ACME_ROBOTICS_WALKTHROUGH.md` §4 for the full walkthrough,
-including verifying it against real triplified data with zero false
-positives and a deliberately incomplete record that correctly fires it.
+Two, and they differ in what they are for.
+
+**[`examples/riverside_library/`](../examples/riverside_library/README.md) --
+start here if you are adding house rules to a project.** A complete, invented
+example: four checks spanning all three severities, invented catalogue data
+written so each rule fires on exactly one record, a registry fragment, and
+`merge_registry.py` doing the run-time merge described above. Its README is
+written for someone who has not seen this codebase before, gives every command
+in full, and quotes only measured output: the standard checks alone report 56
+findings on the fixture and the same run with the house rules reports 60.
+
+It also demonstrates the two quiet ways to get this wrong -- an unmerged
+`--registry` (58 findings, 54 `UNMAPPED`, two lost) and a forgotten
+`--sparql @builtin` (4 findings and a green-looking run) -- with the real
+output of each, because both look like success.
+
+**`examples/acme_robotics/custom_checks/` -- a minimal single-check variant.**
+One check, `ACM-001`, with a one-entry registry. `docs/ACME_ROBOTICS_WALKTHROUGH.md`
+§4 walks through it, including verification against real triplified data with
+zero false positives and a deliberately incomplete record that correctly fires
+it. Note that its registry is deliberately *not* merged with the suite's, as
+its own header comment says, so pointing `--registry` at it leaves every
+built-in finding `UNMAPPED`. Follow the Riverside example for the merged
+arrangement you want in a real project.

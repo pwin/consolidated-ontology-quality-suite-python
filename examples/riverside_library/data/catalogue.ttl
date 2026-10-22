@@ -1,0 +1,59 @@
+# Invented catalogue data for the Riverside Library example.
+#
+# Each row below is here to make exactly one house rule fire, or to stay
+# clean so you can see that a rule does NOT fire when the data is right.
+#
+#   book-01  complete                      -> nothing fires
+#   book-02  no lib:isbn                   -> LIB-001 (Violation)
+#   book-03  no lib:shelfMark              -> LIB-003 (Warning)
+#   book-04  lib:copies 0                  -> LIB-004 (Info)
+#   loan-01  complete                      -> nothing fires
+#   loan-02  no lib:borrowedBy             -> LIB-002 (Violation)
+
+@prefix lib:  <https://example.org/riverside/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# --- books -----------------------------------------------------------------
+
+lib:book-01 a lib:Book ;
+  rdfs:label "The Wind in the Willows" ;
+  lib:isbn "978-0-000-00001-0" ;
+  lib:shelfMark "PR-6013" ;
+  lib:copies 3 .
+
+# No ISBN. The library cannot order a replacement without one.
+lib:book-02 a lib:Book ;
+  rdfs:label "A Pamphlet With No ISBN" ;
+  lib:shelfMark "PR-9999" ;
+  lib:copies 1 .
+
+# No shelf mark. The book exists but nobody can find it on the shelves.
+lib:book-03 a lib:Book ;
+  rdfs:label "Lost Somewhere In The Stacks" ;
+  lib:isbn "978-0-000-00003-4" ;
+  lib:copies 2 .
+
+# Zero copies held. Worth knowing, but not an error.
+lib:book-04 a lib:Book ;
+  rdfs:label "Out Of Print Entirely" ;
+  lib:isbn "978-0-000-00004-1" ;
+  lib:shelfMark "PR-1234" ;
+  lib:copies 0 .
+
+# --- borrowers -------------------------------------------------------------
+
+lib:borrower-01 a lib:Borrower ;
+  rdfs:label "Ada Example" .
+
+# --- loans -----------------------------------------------------------------
+
+lib:loan-01 a lib:Loan ;
+  rdfs:label "Loan of book-01 to borrower-01" ;
+  lib:onLoan lib:book-01 ;
+  lib:borrowedBy lib:borrower-01 .
+
+# A book is out, but the record does not say who has it.
+lib:loan-02 a lib:Loan ;
+  rdfs:label "Loan of book-03 to nobody recorded" ;
+  lib:onLoan lib:book-03 .

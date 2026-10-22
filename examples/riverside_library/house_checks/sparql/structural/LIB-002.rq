@@ -1,0 +1,24 @@
+PREFIX lib: <https://example.org/riverside/>
+PREFIX oq:  <https://semantechs.co.uk/ontology-quality/>
+PREFIX sh:  <http://www.w3.org/ns/shacl#>
+
+# LIB-002: a loan that does not say who has the book.
+#
+# This is the kind of rule only you can write. Nothing in OWL or SHACL says
+# a loan needs a borrower -- it is true of Riverside's business, not of the
+# world. The ontology could say it with owl:minCardinality, but then the
+# model would refuse to load the data at all; as a check it reports the gap
+# and lets you decide.
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Violation ;
+    sh:focusNode ?loan ;
+    sh:sourceConstraintComponent oq:LIB-002 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  ?loan a lib:Loan .
+  FILTER(isIRI(?loan))
+  FILTER NOT EXISTS { ?loan lib:borrowedBy ?someone }
+  BIND(CONCAT("Loan ", STR(?loan), " has no lib:borrowedBy, so the book is out and nobody is recorded as having it.") AS ?msg)
+}

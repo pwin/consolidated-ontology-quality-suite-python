@@ -520,6 +520,14 @@ cadence, e.g. a nightly cron job or scheduled workflow.
 
 ## 13. Use case: extending the suite with a project-specific check
 
+> **If you would rather follow a complete example than read the mechanics,
+> start at [`examples/riverside_library/README.md`](../examples/riverside_library/README.md).**
+> It adds four invented checks to an invented catalogue, gives every command in
+> full, and quotes only measured output -- 56 findings from the standard checks
+> alone, 60 with the house rules added. It also shows the two quiet ways to get
+> this wrong, which both look like success. This section explains the same
+> machinery; that one is runnable.
+
 ### Where the checks actually live, and how to point at your own
 
 `registry.json`, `shapes/*.ttl`, and `sparql/**/*.rq` (referenced with bare

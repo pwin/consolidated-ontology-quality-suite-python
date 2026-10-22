@@ -1,0 +1,27 @@
+PREFIX lib: <https://example.org/riverside/>
+PREFIX oq:  <https://semantechs.co.uk/ontology-quality/>
+PREFIX sh:  <http://www.w3.org/ns/shacl#>
+
+# LIB-003: a book with no shelf mark.
+#
+# A Warning, not a Violation, and the difference is deliberate. The record
+# is usable -- you can still order the book, lend it, count it -- but a
+# borrower cannot walk up and find it. Riverside wants to know, and does not
+# want the build to stop.
+#
+# This is the severity decision worth taking seriously: use the level that
+# describes the finding honestly, and use --fail-on to decide what blocks a
+# build. Do not mark something a Warning merely to get a green build.
+CONSTRUCT {
+  _:r a sh:ValidationResult ;
+    sh:resultSeverity sh:Warning ;
+    sh:focusNode ?book ;
+    sh:sourceConstraintComponent oq:LIB-003 ;
+    sh:resultMessage ?msg .
+}
+WHERE {
+  ?book a lib:Book .
+  FILTER(isIRI(?book))
+  FILTER NOT EXISTS { ?book lib:shelfMark ?mark }
+  BIND(CONCAT("Book ", STR(?book), " has no lib:shelfMark, so it cannot be found on the shelves.") AS ?msg)
+}
