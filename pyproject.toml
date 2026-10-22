@@ -44,7 +44,20 @@ dependencies = [
     # matching rows 147 ms -> 227 ms. Most checks here scan broadly, so the
     # second shape is the common one; it does not show on acme_robotics
     # because that fixture is too small for query time to dominate.
-    "holosdb>=0.23",
+    #
+    # >=0.24 for a wrong answer, not speed. Before 0.24.0 the index join
+    # treated a value it had bound earlier as if the query had written it,
+    # so a zero-length path between two variables -- `?a :p* ?b`, `?a :p? ?b`
+    # -- matched a term the graph does not contain: `VALUES ?v { 1 } ?v :p? ?v`
+    # answered one row over a graph without 1. No shipped check has that
+    # shape. DAT-004's two `rdfs:subClassOf*` legs each end at a constant,
+    # which keeps its zero-length meaning; a witness graph with a directly
+    # typed unit, a subclass-typed unit, an untyped one, a missing one and the
+    # class itself as the unit gives the same three findings on 0.23, 0.24
+    # and 0.25, and pyoxigraph agrees. The floor is for checks written next.
+    # 0.25's changes are to holosdb's SHACL engine, which this suite does not
+    # use: SHACL is the `shacl` engine's job.
+    "holosdb>=0.24",
     # The SHACL engine. Upper bound deliberate: 0.3.0 changed the default
     # meaning of sh:conforms to the specification's -- warnings and infos break
     # conformance, as they already did in pyshacl -- so a minor bump is not

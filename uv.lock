@@ -165,15 +165,15 @@ wheels = [
 
 [[package]]
 name = "holosdb"
-version = "0.23.0"
+version = "0.25.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/35/b5/e1b001826f841cb6c10dad8838a6a5f000ef0a7c7cf9b3206cab95cdfa32/holosdb-0.23.0.tar.gz", hash = "sha256:532146ced0f7e68864a017269e646680b7dc32a519b735b0a5057f08df0371ef", size = 666924, upload-time = "2026-10-21T19:02:15.828Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a2/02/1b581313b42647741d20ac5fd72d6b0ff938834c6afdb6cda5396dafbf74/holosdb-0.25.0.tar.gz", hash = "sha256:f760193da98636ca0eff536d9e9551a539f1e70428c561e16606bf8a4366d193", size = 675717, upload-time = "2026-10-22T09:59:47.362Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/77/78/b0d5d88ee9e06b313655bb78718761998b17c6fe27851d016126b07ee2aa/holosdb-0.23.0-cp39-abi3-macosx_10_13_x86_64.whl", hash = "sha256:be1348e4a7fac17545fbd58b7818986525f6d78d015bb06ec90b9b2bab73d8aa", size = 5989504, upload-time = "2026-10-21T19:02:05.378Z" },
-    { url = "https://files.pythonhosted.org/packages/fe/32/d7b3d940cbdb72ac653aff9eed49b41dabd661e0b732b61493bc574d5206/holosdb-0.23.0-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:a698621b327cb7e8085ec050d1228e62cfbfe30f53303c2f5f75a095f805f4e1", size = 5442979, upload-time = "2026-10-21T19:02:07.606Z" },
-    { url = "https://files.pythonhosted.org/packages/97/7b/e0d4816198df4b211a2e9e1b188ed229db1fc904d5aa2a4985f33c20c1e9/holosdb-0.23.0-cp39-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:a6e04fde9cf56119706e2cc73a68b6976878a7ea681a7e658d148b85e04c3ef3", size = 6377957, upload-time = "2026-10-21T19:02:09.699Z" },
-    { url = "https://files.pythonhosted.org/packages/ec/c3/e9936368b5e7f08e214db3fe1c3e20f0f51e48a47909e1f3b62e7d736af8/holosdb-0.23.0-cp39-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:376dc8f3cf2f1dfc5eb523c5572dcdcf6d42e42ac5d9be828b90e89edd0283dd", size = 6930902, upload-time = "2026-10-21T19:02:11.784Z" },
-    { url = "https://files.pythonhosted.org/packages/40/8b/87c652c54d00798ed1effaec3b5c415485198b7fd4348c36fbbe59e3cfcf/holosdb-0.23.0-cp39-abi3-win_amd64.whl", hash = "sha256:a871691d1f683b9d2494bddbe14a89f3870c012586c383934cb149df995ef4dc", size = 5646540, upload-time = "2026-10-21T19:02:14.043Z" },
+    { url = "https://files.pythonhosted.org/packages/2e/f6/bf6bde95e7d8f8307d8a4b671be02bb08452f85c17155d99762ea7a34397/holosdb-0.25.0-cp39-abi3-macosx_10_13_x86_64.whl", hash = "sha256:14adbfb91482bf47f05af3237b897b316132f6ae9526215722d0ece817938f95", size = 6017625, upload-time = "2026-10-22T09:59:38.91Z" },
+    { url = "https://files.pythonhosted.org/packages/9b/45/127104645470664a38cdf253c84dc2d9f27142c0ec70c112ebb38e076278/holosdb-0.25.0-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:c98bbf03ce80acaba822b5f8a61ceb4ed95efbdda0fd5b27c8d546858fec15b6", size = 5465633, upload-time = "2026-10-22T09:59:40.566Z" },
+    { url = "https://files.pythonhosted.org/packages/9c/bb/cece5a3c8f22c6b175ae5b8a9aac31e23bc78ed2470967b005eb6f2f9d77/holosdb-0.25.0-cp39-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:46d119d43c52a426154ce387eeb417774fbc33f47449de2481e9ae35da3f2f31", size = 6402221, upload-time = "2026-10-22T09:59:42.414Z" },
+    { url = "https://files.pythonhosted.org/packages/6a/20/b661a3612f555bbb2981b121aa95c64c6e82d36c46bd678ee428131b66e9/holosdb-0.25.0-cp39-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:31ec74fd7a3f0020dd5f40a77bba1cb56f7efda49c18445611c4673458bf7c5b", size = 6958907, upload-time = "2026-10-22T09:59:43.989Z" },
+    { url = "https://files.pythonhosted.org/packages/89/94/7b0e9204a343e8f934f3fb344c52c8732a201105a8ce26fca7d6090ac723/holosdb-0.25.0-cp39-abi3-win_amd64.whl", hash = "sha256:89a2003b9eadec7062b7852bccce0ef3136e4408ebf2fec3d543bf1e5258844d", size = 5675495, upload-time = "2026-10-22T09:59:45.781Z" },
 ]
 
 [[package]]
@@ -549,7 +549,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "holosdb", specifier = ">=0.23" },
+    { name = "holosdb", specifier = ">=0.24" },
     { name = "matplotlib", specifier = ">=3.7.0" },
     { name = "owlready2", specifier = ">=0.51" },
     { name = "owlready2", marker = "extra == 'reasoner'", specifier = ">=0.47" },
