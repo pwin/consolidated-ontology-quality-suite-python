@@ -34,7 +34,7 @@ name: Lock
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
     paths:
       - "pyproject.toml"
       - "uv.lock"
