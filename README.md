@@ -88,6 +88,13 @@ cannot run, marked as such in `docs/CHECKS.md` -- and
 `tests/test_shared_registry_parity.py` fails if the two copies stop agreeing,
 whenever a machine has both checked out.
 
+Want to add checks of your own without editing anything the suite ships?
+`examples/riverside_library/README.md` is a runnable worked example: four
+invented checks over an invented catalogue, keeping the standard 61 and
+adding to them. It gives every command in full and quotes only measured
+output. `docs/EXTENDING.md` has the mechanics behind it, and
+`docs/PRIMER.md` §13 the summary.
+
 Want one continuous, realistic worked example instead of task-by-task
 fixtures? `docs/ACME_ROBOTICS_WALKTHROUGH.md` runs nearly every stage above
 against a single small org chart built on two real external vocabularies
