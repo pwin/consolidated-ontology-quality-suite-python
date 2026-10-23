@@ -57,6 +57,15 @@ def main() -> None:
         "produces, and the "
         f"{len(EXTENSION_ONLY)} the CLI cannot run are marked below.",
         "",
+        "To add a check of your own, see [`EXTENDING.md`](EXTENDING.md) for the "
+        "mechanics and "
+        "[`../examples/riverside_library/README.md`]"
+        "(../examples/riverside_library/README.md) for a runnable worked "
+        "example. Note that the registry declares what a finding is *called*; "
+        "it does not decide which checks run -- discovery is filesystem-based, "
+        "so a query with no entry here still runs and reports `UNMAPPED`, and "
+        "an entry here with no file never fires at all.",
+        "",
     ]
 
     for category, checks in sorted(by_category.items(), key=lambda kv: CATEGORY_TITLES.get(kv[0], kv[0])):

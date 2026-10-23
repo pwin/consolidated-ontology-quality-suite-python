@@ -4,6 +4,8 @@ Generated from `registry.json` by `docs/generate_checks_md.py` -- 61 checks acro
 
 `registry.json` is shared data: the same file ships in the VS Code extension, which loads it at runtime and can be pointed at a checkout of this repo instead. So it declares every check *any* implementation produces, and the 3 the CLI cannot run are marked below.
 
+To add a check of your own, see [`EXTENDING.md`](EXTENDING.md) for the mechanics and [`../examples/riverside_library/README.md`](../examples/riverside_library/README.md) for a runnable worked example. Note that the registry declares what a finding is *called*; it does not decide which checks run -- discovery is filesystem-based, so a query with no entry here still runs and reports `UNMAPPED`, and an entry here with no file never fires at all.
+
 ## Data quality (`data`)
 
 ### `DAT-001` -- Literal lexical form invalid for its datatype

@@ -23,6 +23,14 @@ The repository allows squash merges only; merge commits and rebase merges are
 disabled, and branches are deleted on merge. A pull request lands as one
 commit, titled from the PR title with the PR body as its message.
 
+**Sign commits off: `git commit -s`.** A DCO app is installed on this
+repository and checks every commit in a pull request for a `Signed-off-by`
+trailer. It only runs on pull requests, which is why it went unnoticed while
+everything was pushed straight to a branch -- no commit in the repository's
+history carries a sign-off, and the first PR raised failed on it. Either sign
+off, or uninstall the app under Settings -> GitHub Apps, which is a one-click
+change the API cannot make.
+
 Write the reasoning into the commit message. The history here is used as an
 explanation of why the code is as it is -- several commit messages are cited
 by name from `docs/` and from the SemOps Manual's evidence -- so a squashed

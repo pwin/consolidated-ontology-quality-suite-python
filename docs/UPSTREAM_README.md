@@ -1,5 +1,13 @@
 # Consolidated Ontology Suite
 
+> **This is a historical document.** It is the original README of the
+> upstream pipeline this suite was ported from, kept as a record of what
+> that project described. Its figures were true when it was written and are
+> not maintained: it says 50 checks, and the registry now holds 61. For
+> current documentation start at [`PRIMER.md`](PRIMER.md), and for the
+> current catalogue see [`CHECKS.md`](CHECKS.md), which is generated from
+> `registry.json`.
+
 Describes and assesses the RDF triplification process built on OWL2
 DL/RL/QL ontologies: ontology quality and expressiveness, TARQL/oxi-gen
 `CONSTRUCT`-query graph-shape sketches, real triplified data quality, OWL2

@@ -160,7 +160,7 @@ Running both the SHACL and SPARQL formulation of every check is valuable
 for catching drift between them, but it isn't free: measured against a
 real ~3,300-triple ontology (the `examples/vehicle/` + gist fixture),
 pyshacl takes **~193s** where the portable SPARQL layer alone takes **~27s**
-for the same ~50-check pass -- pyshacl re-derives, via its own Python-level
+for the same ~61-check pass -- pyshacl re-derives, via its own Python-level
 shape traversal and constraint dispatch, findings the SPARQL layer already
 produces directly by running the identical query.
 

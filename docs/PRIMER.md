@@ -44,7 +44,7 @@ Four layers, each building on the one before:
 1. **Ontology-only assessment** (`ontology`) -- is the schema itself
    well-formed, documented, expressive in the way you intend, and logically
    consistent? No data involved.
-2. **Registry-driven checks** (`checks`) -- the full 50-check catalogue
+2. **Registry-driven checks** (`checks`) -- the full 61-check catalogue
    (structural integrity, logical cogency, naming style, documentation,
    efficiency, data quality) against an ontology and/or a data graph.
 3. **Data-pipeline stages** (`sketch`, `triplify`, `data`) -- validate a
@@ -61,12 +61,79 @@ Four layers, each building on the one before:
 into one merged report -- the fast path once you know which stages you
 need; the sections below are about *deciding* that.
 
+### Every way this suite can validate something
+
+Worth reading once, because the suite validates along three independent
+axes and it is easy to assume you have covered a question you have not.
+Choosing a command picks the first axis; `--engine` and `--reasoner` pick
+the other two, and their defaults are not the deepest setting available.
+
+**Axis 1 -- what is being validated.** The command decides this.
+
+| Command | Validates | Needs data? |
+|---|---|---|
+| `ontology` | the schema as authored: metrics, expressivity, OWL2 profile, consistency | no |
+| `checks` | the registry catalogue over an ontology and/or a data graph | optional |
+| `sketch` | a CSV-to-RDF query's *text*, before any data runs through it | no |
+| `data` | what the triplifier actually produced, against the ontology | yes |
+| `version-diff` | two ontology versions, for breaking change and a semver suggestion | no |
+| `consistency` | ontology-versus-query drift, with optional auto-repair | no |
+| `pattern-consistency` | a taxonomy of controlled values against ontology + transform + data | yes |
+| `consistency-remote` | a *live* triplestore's graphs against a manifest | in the store |
+| `run` | whichever of the above apply to the inputs given, merged | optional |
+
+**Axis 2 -- which formulation runs the checks** (`--engine`, on `checks`,
+`data` and `run`). Most registry checks are written twice, once as a SHACL
+shape and once as a portable SPARQL `CONSTRUCT`, and you choose which runs:
+
+| `--engine` | Runs |
+|---|---|
+| `both` (default) | the SHACL shapes *and* the portable queries, cross-checking the two |
+| `sparql` | the portable `.rq` queries only, on holosdb. Fastest; the usual CI choice |
+| `shacl` / `native` | the SHACL shapes only, on the native `shacl` engine |
+| `native+sparql` | a spelling of `both` |
+
+`both` is worth more than it looks: a finding reported by only one of the
+two formulations is recorded as such, which is a standing regression test on
+the checks themselves rather than on your ontology. Only 21 of the 61 checks
+have both formulations; `ARCHITECTURE.md` has the engine details and why the
+SHACL arm runs on the native engine rather than pyshacl.
+
+**Axis 3 -- how much reasoning happens first.** Two separate controls, and
+this is the axis most often left on a shallower setting than intended.
+
+| Control | Options | What it does |
+|---|---|---|
+| `--reasoner` | `auto` (default), `owlrl-only`, `hermit`, `pellet`, `none` | `auto` runs the always-on owlrl RDFS/OWL2-RL closure *and* an external DL reasoner if one is installed. `owlrl-only` skips the external one deliberately -- faster and fully deterministic, which is why gates use it |
+| `--inference` | `none` (default), `rdfs` | materialises an RDFS closure before the checks run, so entailed triples are visible to them. Applied once to the graph both formulations read |
+| `--profile` | `EL`, `QL`, `RL` (repeatable) | **off by default.** No OWL2 profile violation is reported (`REA-010/011/012`) unless you ask for a profile explicitly |
+
+The owlrl closure and its pattern checks (`REA-001..004`, `LOG-001..007`)
+are sound but *not complete* for OWL2 DL: a class can be genuinely
+unsatisfiable without any of them firing. That is what the external DL
+reasoner adds, and when it cannot run you get `REA-022` saying so
+explicitly, rather than a silently shallower result. Never filter `REA-022`
+away -- see §4. `REASONING.md` covers the backends, what each tier can and
+cannot conclude, and `--sample` for large graphs.
+
+**And orthogonal to all three:** `--fail-on {Violation,Warning,Info,never}`
+decides what makes the command exit non-zero. It changes the *exit code*,
+never the findings. Set each check's severity to what is true and use this
+to decide what blocks a build -- §13 covers where severity is declared and
+why relabelling a finding to get a green build is the wrong lever.
+
+Two more report-layer flags worth knowing, neither of which changes what is
+checked: `--own-namespace` restricts the report to findings about your own
+terms (§4 has the trap it carries), and `--themes` groups findings under
+questions in your own words (`REPORTS.md`). For which report files each run
+writes, and what is in them, see `REPORTS.md`.
+
 ## 2. Decision table: "I want to..." -> command
 
 | You want to... | Run | Docs |
 |---|---|---|
 | Assess an ontology's own quality/expressivity/consistency | `ontology` | this doc §4 |
-| Run the full registry (56 of its 59 checks; the other three are the VS Code extension's) against ontology and/or data | `checks` | `CHECKS.md` |
+| Run the full registry (58 of its 61 checks; the other three -- `VOC-001`, `REA-005`, `REA-006` -- are the VS Code extension's) against ontology and/or data | `checks` | `CHECKS.md` |
 | Check TARQL/oxi-gen queries against the ontology, no CSV needed | `sketch` | `TESTING_TARQL.md` |
 | Review a query folder for BIND drift and unbound variables, no ontology or CSV needed | `sketch` | `TESTING_TARQL.md` |
 | Actually produce RDF from CSV | `triplify` | this doc §5 |
@@ -113,7 +180,7 @@ Open `out/review/report.html`. This alone gets you OntoQA/OQuaRE metrics,
 lint flags, documentation-coverage checks, and (always-on) owlrl-based
 consistency checking -- no data, no CSVs, nothing else needed.
 
-Want the full 50-check registry too (structural/style/data-quality checks
+Want the full 61-check registry too (structural/style/data-quality checks
 `ontology` alone doesn't run)?
 
 ```bash
@@ -546,8 +613,17 @@ print(config.DEFAULT_SPARQL_DIR)  # .../resources/sparql
 You do **not** need a local checkout of this repo, or to edit files inside
 `site-packages`, to customize checks -- `checks`/`data`/`run` each take
 `--registry`/`--shapes`/`--sparql`, independently overridable, defaulting
-to exactly the installed package paths above. Point them at your own copy
-instead:
+to exactly the installed package paths above.
+
+**They do not all behave the same way, and the difference matters.**
+`--sparql` is repeatable and *composes*: pass it twice to run your queries
+alongside the suite's, with `@builtin` naming the installed tree. `--shapes`
+and `--registry` each take one value and *replace*. So adding your own
+checks is additive on the query side and a merge on the registry side --
+which is what the next subsection is about.
+
+To **remove or edit** a built-in check, copying the tree is the right
+approach:
 
 ```bash
 # once: find and copy the installed defaults somewhere you can edit
@@ -573,7 +649,92 @@ removal works the same way, except shapes are one file per *category*, so
 removing a single check means editing that category's `.ttl` file rather
 than deleting a whole file).
 
+### Using `registry.json`
+
+The registry is a JSON list of check descriptions. One entry per check, nine
+fields each:
+
+```json
+{
+  "id": "LIB-001",
+  "category": "structural",
+  "metric": "catalogue completeness: orderable titles",
+  "default_severity": "Violation",
+  "title": "Book missing an ISBN",
+  "description": "A lib:Book has no lib:isbn value. ...",
+  "remediation": "Add lib:isbn to the book, or correct the import ...",
+  "cucumber_feature": "Riverside catalogue completeness",
+  "cucumber_scenario": "Every book can be reordered from its ISBN"
+}
+```
+
+**The registry declares; the directories decide.** This catches people out,
+so it is worth stating plainly. The registry does *not* choose which checks
+run. Discovery is filesystem-based -- every `.rq` under `--sparql` runs and
+every `.ttl` in `--shapes` loads -- and the registry is consulted afterwards
+to map each result back to an entry. Two consequences:
+
+- a `.rq` file with **no registry entry still runs**, and its findings come
+  out `UNMAPPED`, with no title and no remediation;
+- a registry entry with **no file never fires**, silently. You cannot
+  enable, disable or select a check from the registry.
+
+**What each field is for.** `title`, `description`, `remediation` and
+`category` are read at report time, so a project can re-word a built-in
+check's title and advice in its own language by supplying its own entry for
+that id -- without touching the check. The two `cucumber_*` fields become
+the scenario names in `cucumber.json`, which most CI systems render
+alongside unit tests.
+
+**`default_severity` is the subtle one.** Severity is declared twice: here,
+and in the check itself (`sh:resultSeverity` in a `.rq`, `sh:severity` in a
+`.ttl`). The check's copy drives behaviour -- the Violation/Warning/Info
+tallies and `--fail-on`. The registry's copy drives the HTML badge and the
+cucumber tags. They are *required to agree*, and
+`tests/test_shacl_native_runner.py` asserts it for every built-in, but
+nothing validates it at runtime. So editing `default_severity` alone changes
+the label and not the behaviour: your badge says `Warning` while your exit
+code still says `Violation`. Change both, or neither.
+
+**Adding entries: merge, do not copy.** Because `--registry` replaces, your
+own entries have to be merged with the suite's. Keep a fragment holding only
+the checks you own, and merge at run time:
+
+```python
+import json
+from pathlib import Path
+from ontology_suite import config
+
+shipped = json.loads(Path(config.DEFAULT_REGISTRY_PATH).read_text(encoding="utf-8"))
+local = json.loads(Path("my-checks/registry-fragment.json").read_text(encoding="utf-8"))
+shipped["checks"] = shipped["checks"] + local["checks"]
+Path("out/merged-registry.json").write_text(json.dumps(shipped, indent=2), encoding="utf-8")
+```
+
+Reading `config.DEFAULT_REGISTRY_PATH` at run time means an upgrade that
+adds a check or improves a piece of advice reaches you automatically. Copy
+the suite's entries into your own file instead and they freeze at the
+version you copied, silently and for ever.
+
+Passing an unmerged fragment is quiet and costs more than the missing
+titles. Measured on `examples/riverside_library/`, where the correct
+invocation reports 60 findings, passing only the four-entry fragment reports
+**58** -- 54 of them `UNMAPPED`, and two gone altogether, because once every
+suite finding carries the same id the deduplication key collapses findings
+that differed only by which check produced them. A configuration mistake
+reduces the count.
+
+After any change to the suite's own registry, regenerate the catalogue:
+`python docs/generate_checks_md.py`.
+
 ### Adding a new check
+
+**A complete worked example is at
+[`examples/riverside_library/README.md`](../examples/riverside_library/README.md)**
+-- four invented checks spanning all three severities, with the data,
+the registry fragment, the merge script and every command in full. Follow
+that if you are adding house rules to a project; the rest of this subsection
+is the summary.
 
 Three ways, cheapest first -- pick the lightest one that
 fits (`docs/EXTENDING.md` has the full walkthrough, including the
