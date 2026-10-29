@@ -22,7 +22,8 @@ from ..checks.registry import Registry
 
 
 _FULL_RESULTS_COLUMNS = [
-    "check_id", "category", "title", "severity", "focus_node", "path", "value",
+    "check_id", "category", "title", "severity", "declared_severity",
+    "focus_node", "path", "value",
     "message", "remediation", "sources", "source_file", "line",
 ]
 
@@ -43,6 +44,10 @@ def rows_to_dataframe(rows: List[ResultRow]) -> pd.DataFrame:
                 "category": r.category or "unmapped",
                 "title": r.title or "",
                 "severity": r.severity,
+                # Empty unless a severity policy moved this row, so a reader
+                # can tell a stage's reading from the check's own without
+                # having to know which stage ran. See checks/severity_policy.
+                "declared_severity": r.declared_severity or "",
                 "focus_node": r.focus_node,
                 "path": r.path or "",
                 "value": r.value or "",

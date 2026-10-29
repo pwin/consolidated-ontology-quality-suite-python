@@ -33,6 +33,7 @@ from . import consistency as consistency_api
 from . import pattern_consistency
 from .checks.merge import ResultRow, is_run_level, merge_across_stages
 from .checks.registry import Registry
+from .checks import severity_policy
 from .dataquality import data_quality
 from .reasoning.consistency import REASONER_CHOICES
 from .remote import fuseki
@@ -241,6 +242,71 @@ def _add_common_reasoning_args(p: argparse.ArgumentParser) -> None:
         help="reasoning backend: auto (owlrl + external if available), owlrl-only, hermit, pellet, or none",
     )
     p.add_argument("--fail-on", default="Violation", choices=["Violation", "Warning", "Info", "never"])
+    _add_severity_policy_args(p)
+
+
+_SEVERITY_POLICY_HELP = (
+    "a JSON file mapping check ids to the severity this project wants them "
+    "reported at, optionally per named stage. Applied to finished findings, so "
+    "it needs no copy of the suite's checks and works for project-local checks "
+    "merged into --registry as well as the suite's own. Every re-mapping is "
+    "printed and recorded in full_results.csv's declared_severity column, so "
+    "nothing is relabelled quietly. See docs/SEVERITY_POLICY.md."
+)
+
+_STRINGENCY_HELP = (
+    "which stage of --severity-policy to apply. Stage names come from the "
+    "file; the suite has no opinion about them. Optional when the policy "
+    "declares exactly one stage."
+)
+
+
+def _add_severity_policy_args(p: argparse.ArgumentParser) -> None:
+    p.add_argument("--severity-policy", default=None, help=_SEVERITY_POLICY_HELP)
+    p.add_argument("--stringency", default=None, help=_STRINGENCY_HELP)
+
+
+def _apply_severity_policy(rows, args, registry, warnings: List[str]):
+    """Re-map finished rows per the policy, before reports, counts or exit.
+
+    Here rather than inside a stage for two reasons. The policy has to see one
+    row per finding, which is only true after the stage join dedups a check
+    that ran as both a shape and a query -- apply it earlier and a dual
+    formulation could be half re-mapped. And counts, reports and `--fail-on`
+    all read these rows, so a single application point is what keeps the
+    printed summary, the CSV and the exit code telling the same story.
+    """
+    policy_path = getattr(args, "severity_policy", None)
+    stringency = getattr(args, "stringency", None)
+    if not policy_path:
+        if stringency:
+            raise SystemExit(
+                "error: --stringency needs --severity-policy; there is no "
+                "default policy to take a stage from"
+            )
+        return rows
+
+    policy = severity_policy.SeverityPolicy.load(policy_path)
+    stage, resolved = policy.resolve(stringency)
+    severity_policy.SeverityPolicy.validate(resolved, registry.all_ids())
+    rows, changes = severity_policy.SeverityPolicy.apply(rows, resolved)
+
+    # Printed, always, on the run that did it. A policy that silently changed
+    # what blocks a build would be exactly the thing CLAUDE.md warns against;
+    # this is the line that makes it an audit trail instead.
+    print(f"Severity policy '{stage}' from {Path(policy_path).name}: "
+          f"{len(changes)} check(s) re-mapped")
+    for change in changes:
+        print(f"  {change.describe()}")
+    if not changes:
+        # A policy that matched nothing is usually a wrong stage or a stale
+        # id list, and it is indistinguishable from a correct run otherwise.
+        warnings.append(
+            f"severity policy stage '{stage}' changed nothing: none of its "
+            f"{len(resolved)} check(s) produced a finding whose severity "
+            f"differed. Check the stage name if that is a surprise."
+        )
+    return rows
 
 
 def _add_reports_arg(p: argparse.ArgumentParser) -> None:
@@ -349,6 +415,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     chk.add_argument("--out-dir", default="out/checks")
     _add_reports_arg(chk)
     chk.add_argument("--fail-on", default="Violation", choices=["Violation", "Warning", "Info", "never"])
+    _add_severity_policy_args(chk)
     _add_own_namespace_arg(chk)
     _add_verbose_arg(chk)
 
@@ -373,6 +440,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     skt.add_argument("--out-dir", default="out/sketch")
     _add_reports_arg(skt)
     skt.add_argument("--fail-on", default="never", choices=["Violation", "Warning", "Info", "never"])
+    _add_severity_policy_args(skt)
     _add_verbose_arg(skt)
 
     trp = sub.add_parser("triplify", help="Run CSV files through oxi-gen to produce real RDF data")
@@ -577,9 +645,10 @@ def cmd_ontology(args) -> int:
     artifacts = [("ontology_evaluation.txt", out_dir / "ontology_evaluation.txt"),
                  ("ontology_evaluation.json", out_dir / "ontology_evaluation.json")]
     stage.warnings[:0] = warnings
-    _write_reports(stage.rows, registry, out_dir, "Ontology Evaluation Report", artifacts,
+    rows = _apply_severity_policy(stage.rows, args, registry, stage.warnings)
+    _write_reports(rows, registry, out_dir, "Ontology Evaluation Report", artifacts,
                    sources=[args.ontology], themes_path=args.themes, reports=args.reports)
-    counts = _print_summary(stage.rows, out_dir, stage.warnings)
+    counts = _print_summary(rows, out_dir, stage.warnings)
     return _exit_code(counts, args.fail_on)
 
 
@@ -599,6 +668,7 @@ def cmd_checks(args) -> int:
     )
     stage.warnings[:0] = warnings
     rows = _filter_own_namespace(stage.rows, args.own_namespace, stage.warnings)
+    rows = _apply_severity_policy(rows, args, registry, stage.warnings)
     _write_reports(rows, registry, out_dir, "Registry Checks Report",
                    sources=[args.ontology, args.data], themes_path=args.themes, reports=args.reports)
     counts = _print_summary(rows, out_dir, stage.warnings)
@@ -621,9 +691,10 @@ def cmd_sketch(args) -> int:
         ("bind-facts.ttl", stage.artifacts["bind_facts_path"]),
     ]
     stage.warnings[:0] = warnings
-    _write_reports(stage.rows, registry, out_dir, "TARQL/oxi-gen Sketch Report", artifacts,
+    rows = _apply_severity_policy(stage.rows, args, registry, stage.warnings)
+    _write_reports(rows, registry, out_dir, "TARQL/oxi-gen Sketch Report", artifacts,
                    sources=[args.ontology], themes_path=args.themes, reports=args.reports)
-    counts = _print_summary(stage.rows, out_dir, stage.warnings)
+    counts = _print_summary(rows, out_dir, stage.warnings)
     gm = stage.artifacts["graph_metrics"]
     print(f"Sketch used {len(stage.artifacts['used_queries'])} query file(s); "
           f"{gm['sizes']['triple_count']} triples, {gm['sizes']['entity_count']} entities.")
@@ -660,6 +731,7 @@ def cmd_data(args) -> int:
     )
     stage.warnings[:0] = warnings
     rows = _filter_own_namespace(stage.rows, args.own_namespace, stage.warnings)
+    rows = _apply_severity_policy(rows, args, registry, stage.warnings)
     _write_reports(rows, registry, out_dir, "Data Quality & Conformance Report",
                    sources=[args.ontology], themes_path=args.themes, reports=args.reports)
     counts = _print_summary(rows, out_dir, stage.warnings)
@@ -927,6 +999,7 @@ def cmd_run(args) -> int:
     # own -- same contradiction, two LOG-001 rows. See merge_across_stages.
     rows = merge_across_stages(rows)
     rows = _filter_own_namespace(rows, args.own_namespace, warnings)
+    rows = _apply_severity_policy(rows, args, registry, warnings)
     _write_reports(rows, registry, out_dir, "Consolidated Ontology Suite Report", artifacts,
                    sources=[args.ontology, *data_paths], themes_path=args.themes, reports=args.reports)
     counts = _print_summary(rows, out_dir, warnings)
@@ -949,7 +1022,16 @@ def main(argv=None) -> int:
         "consistency-remote": cmd_consistency_remote,
         "pattern-consistency": cmd_pattern_consistency,
     }
-    return handlers[args.command](args)
+    try:
+        return handlers[args.command](args)
+    except severity_policy.PolicyError as exc:
+        # A bad policy is a usage error, not a crash: the message already says
+        # which file, which stage and which ids, and a traceback on top of it
+        # only buries that. Exit 2, as argparse does for a bad invocation,
+        # which also keeps it distinguishable from 1 ("findings reached
+        # --fail-on") in a CI script.
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":
