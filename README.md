@@ -95,6 +95,15 @@ adding to them. It gives every command in full and quotes only measured
 output. `docs/EXTENDING.md` has the mechanics behind it, and
 `docs/PRIMER.md` §13 the summary.
 
+Need the same checks read differently at different points in a project --
+permissive while sketching, strict at a release? `--severity-policy` takes a
+JSON file of check ids and the severity your project wants them reported at,
+optionally per named stage selected with `--stringency`. The stage names are
+yours, it covers your own checks as well as the shipped ones, and because it
+is applied to finished findings rather than to any check file, every
+re-mapping is printed and recorded rather than quietly baked in.
+See `docs/SEVERITY_POLICY.md`.
+
 Want one continuous, realistic worked example instead of task-by-task
 fixtures? `docs/ACME_ROBOTICS_WALKTHROUGH.md` runs nearly every stage above
 against a single small org chart built on two real external vocabularies

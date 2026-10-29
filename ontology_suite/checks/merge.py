@@ -113,6 +113,13 @@ class ResultRow:
     # by inspection. ``build_unified_results`` needs it because a blank node's
     # label is not comparable between the engines -- see there.
     focus_is_blank: bool = False
+    # What the check itself declared, kept only when a severity policy moved
+    # it (see `checks/severity_policy.py`). `None` therefore means "nobody
+    # re-mapped this", not "unknown": filling it in unconditionally would make
+    # every row look overridden and lose the one distinction worth having.
+    # The check's own reading is never discarded -- `severity` is what the
+    # stage asked for and what gates the build, this is what was true.
+    declared_severity: Optional[str] = None
 
 
 def _path_expression(graph: Graph, node, _depth: int = 0) -> str:

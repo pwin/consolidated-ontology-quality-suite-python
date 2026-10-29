@@ -68,6 +68,19 @@ agreement at runtime -- `tests/test_shacl_native_runner.py` does it at test
 time. Set severity to what is true and use `--fail-on` to decide what blocks a
 build; do not relabel a finding to get a green build.
 
+That rule governs the *check's* declared severity, which is a claim about the
+world and should not move to suit a deadline. A project reading the same
+finding differently at different points in its own life is a separate thing,
+and has its own mechanism: `--severity-policy` with `--stringency`, applied to
+finished findings and never to a check file. It exists because the alternative
+people reach for -- copying `sparql/` and `shapes/` and rewriting the
+severities in place -- silently discards the policy whenever it reaches only
+one of a dual-formulated check's two arms: the shape wins, in both directions,
+and `sources` still reads `shacl+sparql` so nothing reports the disagreement.
+Every re-mapping is printed on the run that did it and recorded in
+`full_results.csv`'s `declared_severity`, so a policy can change what blocks a
+build but cannot do it quietly. See `docs/SEVERITY_POLICY.md`.
+
 See `docs/EXTENDING.md` for adding checks, and
 `examples/riverside_library/README.md` for a worked example of adding
 project-local ones.

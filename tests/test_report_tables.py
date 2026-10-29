@@ -24,7 +24,10 @@ def test_rows_to_dataframe_empty_has_the_full_column_set():
     df = rows_to_dataframe([])
     assert df.empty
     assert list(df.columns) == [
-        "check_id", "category", "title", "severity", "focus_node", "path", "value",
+        # declared_severity sits next to severity because it qualifies it:
+        # what the check said, when a severity policy reported something else.
+        "check_id", "category", "title", "severity", "declared_severity",
+        "focus_node", "path", "value",
         "message", "remediation", "sources", "source_file", "line",
     ]
 
