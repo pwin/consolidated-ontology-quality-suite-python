@@ -28,6 +28,8 @@ from typing import Iterable
 
 from rdflib import Graph
 
+from .registry import OQ
+
 try:
     from pyshacl import validate as _pyshacl_validate
 except ImportError as exc:  # pragma: no cover
@@ -44,6 +46,32 @@ def load_shapes_graph(shapes_dir: str | Path) -> Graph:
     for path in sorted(shapes_dir.glob("*.ttl")):
         g.parse(path, format="turtle")
     return g
+
+
+def declared_check_ids(shapes_dir: str | Path) -> set[str]:
+    """The distinct check ids the shapes in ``shapes_dir`` declare.
+
+    Counted the way `Registry.resolve_check_id` resolves them, so the answer
+    matches what a run will actually report: a shape's id is its local name,
+    unless it carries an ``oq:checkId`` annotation naming the check it belongs
+    to. That annotation is what collapses split shapes -- `STY-002-data` and
+    `STY-002-obj` are two shapes for one check, and counting the subjects
+    alone would say 23 where a run says 21.
+
+    Used by the CLI to say how many checks a replaced shapes directory stopped
+    running. Deliberately does not consult the registry: a project's own
+    shapes name ids the shipped registry has never heard of, and they should
+    be counted too.
+    """
+    graph = load_shapes_graph(shapes_dir)
+    ids: set[str] = set()
+    for subject in set(graph.subjects()):
+        text = str(subject)
+        if not text.startswith(str(OQ)):
+            continue
+        annotated = graph.value(subject, OQ.checkId)
+        ids.add(str(annotated) if annotated else text[len(str(OQ)):])
+    return ids
 
 
 def run_shacl(

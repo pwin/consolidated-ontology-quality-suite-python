@@ -110,6 +110,14 @@ def _print_summary(rows: List[ResultRow], out_dir: Path, warnings: List[str]) ->
 
 BUILTIN_QUERIES = "@builtin"
 
+_SHAPES_HELP = (
+    "a directory of SHACL shape files, or @builtin for the suite's own wherever this "
+    "install put it. NOT repeatable: the engine loads every *.ttl in one directory into "
+    "one shapes graph, so naming your own replaces the suite's rather than adding to it. "
+    "To run both, copy the installed shapes alongside yours into one directory -- the run "
+    "warns when built-in shapes are dropped. See docs/EXTENDING.md."
+)
+
 _SPARQL_HELP = (
     "a directory of .rq check queries, or @builtin for the suite's own tree wherever this "
     "install put it. Repeatable: pass it more than once to run a project's "
@@ -117,6 +125,70 @@ _SPARQL_HELP = (
     "replaces the built-in tree, so `--sparql mine` runs only yours -- the run warns when that "
     "happens. See docs/EXTENDING.md."
 )
+
+
+def _resolve_shapes_dir(value: Optional[str], warnings: List[str]) -> str:
+    """The shapes directory to load, and a warning if it is not the suite's own.
+
+    `--shapes` is not `--sparql`. It takes one directory and is not
+    repeatable, because the engine loads every `*.ttl` in that directory into
+    a single shapes graph -- so naming your own replaces the suite's six files
+    outright rather than adding to them.
+
+    That made it the one remaining flag with the failure `--sparql` was given
+    a warning for in 0.18.0: pointing it at a project's own shapes drops the
+    SHACL arm of every dual-formulated check and says nothing. Measured on
+    `examples/riverside_library` with `--engine shacl`: 37 findings with the
+    built-in shapes, 1 with a house directory holding a single shape, and no
+    warning either way.
+
+    The remedy is a merged directory rather than a second flag, so the warning
+    names the copy instead of telling the reader to pass the built-ins as well
+    -- there is no second flag to pass them in. `@builtin` is accepted for
+    symmetry with `--sparql`, so a config file can name the installed tree
+    without hard-coding a path that is wrong on every other machine.
+
+    Counting shapes rather than files, because files are not the unit anyone
+    cares about: the suite's 21 shape-backed checks live in 6 files, and a
+    project's may live in one.
+    """
+    if value is None or value == BUILTIN_QUERIES:
+        return str(config.DEFAULT_SHAPES_DIR)
+
+    default = config.DEFAULT_SHAPES_DIR.resolve()
+    if Path(value).resolve() == default:
+        return value
+
+    # A path that is not there loads no shapes at all, and the generic
+    # "replaced the suite's shapes" message below would send the reader off to
+    # copy files into a directory that does not exist. Name the actual fault.
+    if not Path(value).is_dir():
+        warnings.append(
+            f"--shapes {value} is not a directory, so no SHACL shapes will load and "
+            f"the SHACL formulation will report nothing. Check the path."
+        )
+        return value
+
+    from .checks.shacl_runner import declared_check_ids
+
+    try:
+        mine = len(declared_check_ids(value))
+        theirs = len(declared_check_ids(config.DEFAULT_SHAPES_DIR))
+    except Exception:  # noqa: BLE001 - a warning must never break the run
+        return value
+
+    lost = theirs - mine
+    if lost > 0:
+        warnings.append(
+            f"--shapes replaced the suite's own shapes: {mine} project shape-backed "
+            f"check(s) will run and {theirs} built-in one(s) will not. --shapes is not "
+            f"repeatable -- the engine reads one directory -- so to run both, copy the "
+            f"installed shapes alongside yours into one directory and point --shapes at "
+            f"that. The installed ones are at {config.DEFAULT_SHAPES_DIR}, which "
+            f"`python -c \"from ontology_suite import config; print(config.DEFAULT_SHAPES_DIR)\"` "
+            f"prints on any install. See docs/EXTENDING.md."
+        )
+    return value
 
 
 def _resolve_sparql_dirs(values: Optional[List[str]], warnings: List[str]) -> List[str]:
@@ -396,7 +468,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     chk.add_argument("--ontology", default=None)
     chk.add_argument("--data", default=None)
     _add_import_args(chk)
-    chk.add_argument("--shapes", default=str(config.DEFAULT_SHAPES_DIR))
+    chk.add_argument("--shapes", default=str(config.DEFAULT_SHAPES_DIR), help=_SHAPES_HELP)
     chk.add_argument("--sparql", action="append", default=None, help=_SPARQL_HELP)
     chk.add_argument("--registry", default=str(config.DEFAULT_REGISTRY_PATH))
     chk.add_argument("--themes", default=None,
@@ -469,7 +541,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     dat.add_argument("--themes", default=None,
                        help="a JSON or CSV map of check id to a question in your own words, used to add a \"by question\" index to findings.txt -- see docs/REPORTS.md")
     dat.add_argument("--sparql", action="append", default=None, help=_SPARQL_HELP)
-    dat.add_argument("--shapes", default=str(config.DEFAULT_SHAPES_DIR))
+    dat.add_argument("--shapes", default=str(config.DEFAULT_SHAPES_DIR), help=_SHAPES_HELP)
     dat.add_argument("--sample", type=int, default=None, help="cap the reasoning pass to a CBD sample of this many named subjects")
     _add_engine_arg(dat)
     dat.add_argument("--out-dir", default="out/data-eval")
@@ -514,7 +586,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     run.add_argument("--registry", default=str(config.DEFAULT_REGISTRY_PATH))
     run.add_argument("--themes", default=None,
                        help="a JSON or CSV map of check id to a question in your own words, used to add a \"by question\" index to findings.txt -- see docs/REPORTS.md")
-    run.add_argument("--shapes", default=str(config.DEFAULT_SHAPES_DIR))
+    run.add_argument("--shapes", default=str(config.DEFAULT_SHAPES_DIR), help=_SHAPES_HELP)
     run.add_argument("--sparql", action="append", default=None, help=_SPARQL_HELP)
     run.add_argument("--oxi-gen-bin", default=None)
     run.add_argument("--sample", type=int, default=None)
@@ -659,10 +731,11 @@ def cmd_checks(args) -> int:
         return 2
     warnings: List[str] = []
     sparql_dirs = _resolve_sparql_dirs(args.sparql, warnings)
+    shapes_dir = _resolve_shapes_dir(args.shapes, warnings)
     registry = Registry.load(args.registry)
     stage = pipeline.run_checks_stage(
         registry, out_dir, ontology_path=args.ontology, data_path=args.data,
-        shapes_dir=args.shapes, sparql_dir=sparql_dirs, inference=args.inference, engine=args.engine,
+        shapes_dir=shapes_dir, sparql_dir=sparql_dirs, inference=args.inference, engine=args.engine,
         import_dir=args.import_dir, exclude_imports=args.exclude_imports, allow_network=args.allow_network,
         verbose=args.verbose,
     )
@@ -721,10 +794,11 @@ def cmd_data(args) -> int:
     out_dir = Path(args.out_dir)
     warnings: List[str] = []
     sparql_dirs = _resolve_sparql_dirs(args.sparql, warnings)
+    shapes_dir = _resolve_shapes_dir(args.shapes, warnings)
     registry = Registry.load(args.registry)
     stage = pipeline.run_data_stage(
         args.data, out_dir, ontology_path=args.ontology, registry=registry,
-        sparql_root=sparql_dirs, shapes_dir=args.shapes, sample=args.sample, reasoner=args.reasoner,
+        sparql_root=sparql_dirs, shapes_dir=shapes_dir, sample=args.sample, reasoner=args.reasoner,
         engine=args.engine, data_pattern=args.data_pattern,
         import_dir=args.import_dir, exclude_imports=args.exclude_imports, allow_network=args.allow_network,
         verbose=args.verbose,
@@ -925,6 +999,7 @@ def cmd_run(args) -> int:
     warnings: List[str] = []
     artifacts: List[Tuple[str, Path]] = []
     sparql_dirs = _resolve_sparql_dirs(args.sparql, warnings)
+    shapes_dir = _resolve_shapes_dir(args.shapes, warnings)
 
     if args.ontology:
         stage = pipeline.run_ontology_stage(
@@ -954,7 +1029,7 @@ def cmd_run(args) -> int:
         stage = pipeline.run_checks_stage(
             registry, out_dir / "checks", ontology_path=args.ontology,
             data_path=(args.data[0] if args.data and len(args.data) == 1 else None),
-            shapes_dir=args.shapes, sparql_dir=sparql_dirs, engine=args.engine,
+            shapes_dir=shapes_dir, sparql_dir=sparql_dirs, engine=args.engine,
             import_dir=args.import_dir, exclude_imports=args.exclude_imports, allow_network=args.allow_network,
             verbose=args.verbose,
         )
@@ -986,7 +1061,7 @@ def cmd_run(args) -> int:
     if data_paths:
         stage = pipeline.run_data_stage(
             data_paths, out_dir / "data-eval", ontology_path=args.ontology, registry=registry,
-            sparql_root=sparql_dirs, shapes_dir=args.shapes, sample=args.sample, reasoner=args.reasoner,
+            sparql_root=sparql_dirs, shapes_dir=shapes_dir, sample=args.sample, reasoner=args.reasoner,
             engine=args.engine,
             data_pattern=args.data_pattern,
             import_dir=args.import_dir, exclude_imports=args.exclude_imports, allow_network=args.allow_network,
