@@ -1,0 +1,26 @@
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix oq:   <https://semantechs.co.uk/ontology-quality/> .
+@prefix lib:  <https://example.org/riverside/> .
+
+# LIB-001 as SHACL-SPARQL, mirroring house_checks/sparql/structural/LIB-001.rq.
+# Written this way -- rather than as a sh:property shape with sh:path -- so
+# that both arms report the SAME focus node, path and value. That tuple is the
+# dedup key, so a property shape (which reports sh:resultPath) would split one
+# defect into two rows.
+oq:LIB-001
+  a sh:NodeShape ;
+  rdfs:label "LIB-001: book missing an ISBN" ;
+  sh:targetClass lib:Book ;
+  sh:severity sh:Violation ;
+  sh:sparql [
+    a sh:SPARQLConstraint ;
+    sh:message "Book {$this} has no lib:isbn. Riverside cannot reorder a title without one." ;
+    sh:select """
+      PREFIX lib: <https://example.org/riverside/>
+      SELECT $this
+      WHERE {
+        FILTER NOT EXISTS { $this lib:isbn ?anyIsbn }
+      }
+    """ ;
+  ] .

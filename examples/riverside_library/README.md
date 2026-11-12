@@ -251,6 +251,122 @@ this example:
 
 ---
 
+## Step 6 — the same check as a SHACL shape (optional)
+
+Everything so far used SPARQL. You can write a house check as a **SHACL
+shape** instead, or as well. Doing it as well is the only reason that is
+interesting: when a check has both formulations, the report records which
+found it, so `sources` reading `shacl+sparql` means two independent
+implementations agreed.
+
+`house_checks/shapes/house.ttl` is `LIB-001` written the second way.
+
+**`--shapes` does not work like `--sparql`, and this is the thing to get
+right.** It takes one directory and is *not* repeatable, because the engine
+loads every `*.ttl` in that directory into a single shapes graph. So naming
+your own directory **replaces** the suite's six files rather than adding to
+them. Measured here with `--engine shacl`:
+
+| `--shapes` | findings |
+|---|---|
+| default (the installed shapes) | 37 |
+| `house_checks/shapes` alone | **1** |
+| the merged directory | 38 |
+
+Thirty-six findings gone. From suite 0.26.0 the run warns about it; before
+that it said nothing at all.
+
+Since no flag composes, the merge is a **directory**:
+
+```bash
+uv run python examples/riverside_library/merge_shapes.py
+```
+
+```
+wrote out/riverside/shapes
+  6 shape file(s) from the installed suite, declaring 21 checks
+  1 from house_checks/shapes, declaring 1: LIB-001
+  22 shape-backed checks in total -- pass this directory to --shapes
+```
+
+Then run with both merged inputs:
+
+```bash
+uv run python -m ontology_suite.cli checks \
+  --ontology examples/riverside_library/ontology/riverside-v1.ttl \
+  --data examples/riverside_library/data/catalogue.ttl \
+  --registry out/riverside/merged-registry.json \
+  --shapes out/riverside/shapes \
+  --sparql examples/riverside_library/house_checks/sparql \
+  --sparql @builtin \
+  --engine both --fail-on never \
+  --out-dir out/riverside/both
+```
+
+```
+Findings: 60 total (6 Violation, 36 Warning, 18 Info)
+```
+
+Still 60 — the shape found the same single defect the query did, so nothing
+was added. What changed is the evidence:
+
+```
+LIB-001  sources=shacl+sparql     <- both formulations agreed
+LIB-002  sources=sparql
+LIB-003  sources=sparql
+LIB-004  sources=sparql
+```
+
+### What a shape looks like, and the trap in writing one
+
+```turtle
+oq:LIB-001                                  # the node IRI IS the check id
+  a sh:NodeShape ;
+  rdfs:label "LIB-001: book missing an ISBN" ;
+  sh:targetClass lib:Book ;
+  sh:severity sh:Violation ;                # must match the .rq and the registry
+  sh:sparql [
+    a sh:SPARQLConstraint ;
+    sh:message "Book {$this} has no lib:isbn." ;
+    sh:select """
+      PREFIX lib: <https://example.org/riverside/>
+      SELECT $this WHERE { FILTER NOT EXISTS { $this lib:isbn ?i } }
+    """ ;
+  ] .
+```
+
+Three things to know:
+
+1. **Severity is now declared in three places** and all three must agree:
+   `sh:severity` here, `sh:resultSeverity` in the `.rq`, and
+   `default_severity` in the registry fragment.
+
+2. **The two arms must agree on focus node, path and value** — that tuple is
+   the deduplication key. The first version of this file used `sh:property`
+   with `sh:path lib:isbn`, which makes the engine report `sh:resultPath`,
+   while `LIB-001.rq` reports none. `LIB-001` came back **twice**:
+
+   ```
+   LIB-001  sources=shacl    path=lib:isbn
+   LIB-001  sources=sparql   path=(none)
+   ```
+
+   One defect, two rows, and the total read 61 instead of 60. Written as
+   SHACL-SPARQL with `SELECT $this`, the shape reports no path either, the
+   two arms line up and merge.
+
+   Either direction works — what matters is that they match. Where the suite
+   *does* use a `sh:property` shape, its `.rq` twin emits the matching
+   `sh:resultPath`; `DAT-001` and `LOG-003` are examples. So use core SHACL
+   constraints freely, and make the query agree.
+
+3. **The shapes glob is not recursive.** `load_shapes_graph` reads `*.ttl` at
+   the top level of the directory only. A `shapes/house/` subdirectory is
+   silently ignored.
+
+If you only want the rule enforced, the `.rq` on its own is enough — 21 of
+the suite's 61 checks are dual-formulated, not all of them.
+
 ## Two mistakes that are easy to make
 
 Both were run for real, and both are quiet, which is what makes them worth

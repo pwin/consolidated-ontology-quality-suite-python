@@ -61,6 +61,24 @@ Roots are deduplicated by resolved path, so overlapping trees run each query
 once. Subject-specific directories (`tarql/`) are filtered per root, so adding
 a second root never changes whether the first one's are excluded.
 
+**`--shapes` replaces too, and cannot be made to compose at all.** It takes
+one directory, and `shacl_runner.load_shapes_graph` reads every `*.ttl` at the
+top level of it into a single shapes graph. So naming your own directory
+replaces the suite's six files outright, and there is no second flag to pass
+the built-ins in with. Two consequences:
+
+- the glob is **not recursive**: a `shapes/house/` subdirectory is silently
+  ignored;
+- adding a project shape means building **one merged directory** -- copy the
+  installed shapes in alongside yours, from `config.DEFAULT_SHAPES_DIR`, at
+  run time rather than committing a copy that freezes.
+
+Measured on `examples/riverside_library` with `--engine shacl`: 37 findings
+with the installed shapes, 1 with a house directory holding a single shape.
+From 0.26.0 the run warns, naming both counts and the installed path;
+`_resolve_shapes_dir` in `cli.py` is the warning, and
+`examples/riverside_library/merge_shapes.py` builds the directory.
+
 **`--registry` also replaces, and unlike `--sparql` it does not repeat.** It
 takes one file, so project-local entries have to be *merged* with the suite's
 rather than passed instead of them. Merge at run time from
@@ -149,6 +167,18 @@ undefined terms, structural patterns, contradiction patterns, etc.
    same shape yields different severities under different `--engine` values.
    `tests/test_shape_severity.py` fails on both mistakes -- wrong placement,
    and a severity that disagrees with `registry.json`.
+
+   **The two arms must agree on focus node, path and value.** Findings
+   deduplicate on `(check_id, focus_node, path, value)`, so if the shape and
+   the `.rq` disagree about any of them, one real defect comes back as two
+   rows under one id, differing only in `sources`. Either both report a path
+   or neither does: a `sh:property` shape reports `sh:resultPath`
+   automatically, so its twin must emit `sh:resultPath` too -- which is why
+   `DAT-001`'s and `LOG-003`'s `.rq` files do. Where the `.rq` reports no
+   path, write the shape as `sh:sparql` with `SELECT $this` so it reports
+   none either. Measured on `examples/riverside_library`: a property shape
+   against a path-less twin gave 61 findings where the corrected pair gives
+   60, with `LIB-001` listed twice.
 
 5. **Regenerate `docs/CHECKS.md`:** `python docs/generate_checks_md.py`.
 
