@@ -1,6 +1,6 @@
 """
-High-level entry point tying together shacl_runner, sparql_runner,
-merge and registry.
+High-level entry point tying together shapes, shacl_native_runner,
+sparql_runner, merge and registry.
 """
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from .merge import ResultRow, build_unified_results
 from .registry import Registry
 from .shacl_native_runner import available as native_shacl_available
 from .shacl_native_runner import run_shacl_native
-from .shacl_runner import load_shapes_graph
+from .shapes import load_shapes_graph
 from .sparql_runner import SparqlCheckOutcome, run_sparql_checks
 
 

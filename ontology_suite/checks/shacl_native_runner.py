@@ -232,6 +232,25 @@ def available() -> bool:
     return _native_shacl is not None
 
 
+def compile_shapes(shapes_graph: Graph):
+    """Hand the shapes graph to the engine and return its compiled ``Shapes``.
+
+    Both run functions below start here, and so does
+    `shapes.engine_rejection`. That sharing is the point: "will the engine
+    load this shapes directory" has to be answered by the same call a run
+    makes, or it answers a slightly different question and is worth less than
+    nothing. The Turtle round-trip is part of that -- the engine reads text,
+    so what it actually compiles is rdflib's *serialisation* of the shapes,
+    not the files on disk.
+    """
+    if _native_shacl is None:
+        raise RuntimeError(
+            "the native `shacl` package is not installed -- run `uv sync --extra "
+            "native-shacl` (see this module's docstring)"
+        ) from _IMPORT_ERROR
+    return _native_shacl.Shapes.from_turtle(shapes_graph.serialize(format="turtle"))  # type: ignore[attr-defined]
+
+
 def _message_index(shapes_graph: Graph) -> Dict[str, Node]:
     """``sh:message`` text -> the exact `shapes_graph` node (URIRef or BNode)
     that carries it -- see module docstring."""
@@ -308,13 +327,7 @@ def run_shacl_native(data_graph: Graph, shapes_graph: Graph, *, inference: str =
     act on; nothing to lose by not exposing an inference mode with no
     shape in this suite that uses it.
     """
-    if _native_shacl is None:
-        raise RuntimeError(
-            "the native `shacl` package is not installed -- run `uv sync --extra "
-            "native-shacl` (see this module's docstring)"
-        ) from _IMPORT_ERROR
-
-    shapes = _native_shacl.Shapes.from_turtle(shapes_graph.serialize(format="turtle"))  # type: ignore[attr-defined]
+    shapes = compile_shapes(shapes_graph)
     report = shapes.validate_turtle(data_graph.serialize(format="turtle"), inference=inference)
 
     results_graph = Graph()
@@ -380,13 +393,7 @@ def run_shacl_native_rows(
       and rendered by `_path_expression`, which also makes this route
       independent of how any engine chooses to print a path.
     """
-    if _native_shacl is None:
-        raise RuntimeError(
-            "the native `shacl` package is not installed -- run `uv sync --extra "
-            "native-shacl` (see this module's docstring)"
-        ) from _IMPORT_ERROR
-
-    shapes = _native_shacl.Shapes.from_turtle(shapes_graph.serialize(format="turtle"))  # type: ignore[attr-defined]
+    shapes = compile_shapes(shapes_graph)
     report = shapes.validate_turtle(data_graph.serialize(format="turtle"), inference=inference)
 
     rows: List[ResultRow] = []

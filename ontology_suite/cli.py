@@ -33,6 +33,7 @@ from . import consistency as consistency_api
 from . import pattern_consistency
 from .checks.merge import ResultRow, is_run_level, merge_across_stages
 from .checks.registry import Registry
+from .checks.shapes import ShapesRejected
 from .checks import severity_policy
 from .dataquality import data_quality
 from .reasoning.consistency import REASONER_CHOICES
@@ -169,13 +170,29 @@ def _resolve_shapes_dir(value: Optional[str], warnings: List[str]) -> str:
         )
         return value
 
-    from .checks.shacl_runner import declared_check_ids
+    from .checks.shapes import declared_check_ids, engine_rejection
 
     try:
         mine = len(declared_check_ids(value))
         theirs = len(declared_check_ids(config.DEFAULT_SHAPES_DIR))
     except Exception:  # noqa: BLE001 - a warning must never break the run
         return value
+
+    # A directory rdflib parses is not necessarily one the engine compiles, and
+    # the counts above are computed from the parse. This cannot be a warning:
+    # warnings print from `_print_summary` at the end of a run, and this run
+    # ends in the engine raising the same refusal out of `compile_shapes` as a
+    # traceback several frames deep, with nothing in it naming --shapes. So it
+    # is a refusal, in the shape the manifest's got in 0.24.1 -- one line, the
+    # engine's own words, exit 2.
+    rejection = engine_rejection(value)
+    if rejection is not None:
+        raise ShapesRejected(
+            f"--shapes {value} parses as Turtle, but the SHACL engine will not "
+            f"compile it, so no shape in it can run: {rejection}\n"
+            f"       Nothing else about the run is at fault; fix the shape file "
+            f"and the same command will work."
+        )
 
     lost = theirs - mine
     if lost > 0:
@@ -1099,12 +1116,13 @@ def main(argv=None) -> int:
     }
     try:
         return handlers[args.command](args)
-    except severity_policy.PolicyError as exc:
-        # A bad policy is a usage error, not a crash: the message already says
-        # which file, which stage and which ids, and a traceback on top of it
-        # only buries that. Exit 2, as argparse does for a bad invocation,
-        # which also keeps it distinguishable from 1 ("findings reached
-        # --fail-on") in a CI script.
+    except (severity_policy.PolicyError, ShapesRejected) as exc:
+        # Both are usage errors, not crashes: the message already says which
+        # file, which stage and which ids -- or, for the shapes, what the
+        # engine objected to -- and a traceback on top of it only buries that.
+        # Exit 2, as argparse does for a bad invocation, which also keeps it
+        # distinguishable from 1 ("findings reached --fail-on") in a CI
+        # script.
         print(f"error: {exc}", file=sys.stderr)
         return 2
 

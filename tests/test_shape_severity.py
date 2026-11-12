@@ -36,7 +36,7 @@ from rdflib import Graph, Namespace
 from rdflib.namespace import RDF
 
 from ontology_suite import config
-from ontology_suite.checks.shacl_runner import load_shapes_graph
+from ontology_suite.checks.shapes import load_shapes_graph
 
 SH = Namespace("http://www.w3.org/ns/shacl#")
 OQ = Namespace("https://semantechs.co.uk/ontology-quality/")

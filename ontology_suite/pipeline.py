@@ -30,7 +30,7 @@ from .checks.registry import Registry
 from .checks.runner import load_graph
 from .checks.shacl_native_runner import rdfs_closure, run_shacl_native_rows
 from .checks.shacl_native_runner import available as native_shacl_available
-from .checks.shacl_runner import load_shapes_graph
+from .checks.shapes import load_shapes_graph
 from .checks.sparql_runner import as_dirs, run_sparql_checks
 from .dataquality import data_quality
 from .docgen import build_documentation, extract_ontology_data

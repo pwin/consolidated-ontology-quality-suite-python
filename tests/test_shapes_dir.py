@@ -12,12 +12,26 @@ Measured on `examples/riverside_library` with `--engine shacl` before the
 warning existed: 37 findings with the built-in shapes, 1 with a house
 directory holding a single shape, and nothing said either way.
 """
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 from ontology_suite import cli, config
-from ontology_suite.checks.shacl_runner import declared_check_ids
+from ontology_suite.checks.shacl_native_runner import available as engine_available
+from ontology_suite.checks.shapes import (
+    declared_check_ids,
+    engine_rejection,
+    load_shapes_graph,
+)
+
+
+@pytest.fixture
+def verify_engine_available():
+    """The `shacl` engine is a runtime dependency, so its absence is a broken
+    install rather than a skip -- but say which it is."""
+    assert engine_available(), "the `shacl` engine is not installed"
 
 HOUSE_SHAPE = """
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
@@ -162,3 +176,104 @@ def test_a_missing_shapes_directory_is_named_as_the_fault_it_is(tmp_path):
     assert len(warnings) == 1
     assert "is not a directory" in warnings[0]
     assert "built-in" not in warnings[0], "the generic message would misdirect here"
+
+
+# ---------------------------------------------------------------------------
+# which engine answers which question
+# ---------------------------------------------------------------------------
+# A shapes file can be perfectly good Turtle and still be something the SHACL
+# engine will not compile. rdflib sees a string literal where the engine sees
+# a SPARQL query, so this one parses to seven triples and `declared_check_ids`
+# reports `BAD-001` -- and then the engine refuses the whole directory.
+#
+# Before `engine_rejection` existed that gap was reached the long way round:
+# `merge_shapes.py` printed "22 shape-backed checks in total", and the run
+# that followed died several frames deep inside `compile_shapes` with a
+# `ValueError` naming neither `--shapes` nor the file.
+ENGINE_HOSTILE_SHAPE = """
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix oq:   <https://semantechs.co.uk/ontology-quality/> .
+@prefix lib:  <https://example.org/riverside/> .
+
+oq:BAD-001
+  a sh:NodeShape ;
+  sh:targetClass lib:Book ;
+  sh:severity sh:Violation ;
+  sh:sparql [
+    a sh:SPARQLConstraint ;
+    sh:message "this never runs" ;
+    sh:select "SELECT $this WHERE { THIS IS NOT SPARQL (((" ;
+  ] .
+"""
+
+
+@pytest.fixture
+def engine_hostile(tmp_path):
+    d = tmp_path / "engine-hostile"
+    d.mkdir()
+    (d / "broken.ttl").write_text(ENGINE_HOSTILE_SHAPE, encoding="utf-8")
+    return d
+
+
+def test_the_suite_s_own_shapes_compile(verify_engine_available):
+    """The baseline. If this ever fails, the release is broken and every
+    rejection message below is noise."""
+    assert engine_rejection(config.DEFAULT_SHAPES_DIR) is None
+
+
+def test_rdflib_parsing_a_shapes_directory_does_not_mean_the_engine_accepts_it(engine_hostile):
+    """The whole reason `engine_rejection` is a separate question: the parse
+    route is content with this directory and reports a check in it."""
+    assert len(load_shapes_graph(engine_hostile)) == 7
+    assert declared_check_ids(engine_hostile) == {"BAD-001"}
+
+    rejection = engine_rejection(engine_hostile)
+    assert rejection is not None
+    assert "SPARQL" in rejection, rejection
+
+
+def test_the_engine_s_refusal_reaches_the_user_as_a_line_not_a_stack(engine_hostile, tmp_path, capsys):
+    """Exit 2 and one `error:` line, the shape the manifest refusal took in
+    0.24.1. It cannot be a warning: warnings print from `_print_summary` at
+    the end of a run, and this run does not get there."""
+    data = tmp_path / "data.ttl"
+    data.write_text(
+        "@prefix lib: <https://example.org/riverside/> . "
+        "lib:book-01 a lib:Book .", encoding="utf-8")
+
+    code = cli.main(["checks", "--data", str(data), "--shapes", str(engine_hostile),
+                     "--engine", "shacl", "--out-dir", str(tmp_path / "out")])
+
+    assert code == 2
+    err = capsys.readouterr().err
+    assert err.startswith("error: ")
+    assert "--shapes" in err, "the message must name the flag that caused it"
+    assert "Traceback" not in err
+    assert "SPARQL" in err, "the engine's own words, not a paraphrase"
+
+
+def test_a_run_does_not_import_pyshacl(verify_engine_available):
+    """The regression guard for why `shapes.py` exists at all.
+
+    `load_shapes_graph` used to live in `shacl_runner.py`, so importing the
+    CLI imported the module that opens with `from pyshacl import validate`.
+    On a released install the guard caught the ImportError and nothing was
+    visibly wrong; on any machine with the dev group installed -- every
+    developer's, and CI's -- every single run loaded a second, unused SHACL
+    implementation into the process.
+
+    Measured in a subprocess because this test session has pyshacl imported
+    already: the parity tests import it on purpose, and `sys.modules` here
+    says nothing about what a run loads.
+    """
+    probe = (
+        "import sys;"
+        " import ontology_suite.cli, ontology_suite.pipeline;"
+        " loaded = [m for m in ('pyshacl', 'ontology_suite.checks.shacl_runner')"
+        " if m in sys.modules];"
+        " print(','.join(loaded))"
+    )
+    out = subprocess.run([sys.executable, "-c", probe], capture_output=True,
+                         text=True, check=True)
+    assert out.stdout.strip() == "", (
+        f"a run imported the pyshacl side of the suite: {out.stdout.strip()}")

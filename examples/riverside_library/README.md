@@ -287,7 +287,38 @@ wrote out/riverside/shapes
   6 shape file(s) from the installed suite, declaring 21 checks
   1 from house_checks/shapes, declaring 1: LIB-001
   22 shape-backed checks in total -- pass this directory to --shapes
+  the `shacl` engine compiles it (checked, not assumed)
 ```
+
+That last line is not decoration. Three different components look at a shapes
+directory and they answer different questions:
+
+- **rdflib parses** the `*.ttl` files.
+- **holosdb answers the query** "which check ids does this directory declare",
+  which is where the counts above come from. The suite moved its checks off
+  rdflib's graph API because rdflib is lenient where the specification is not
+  (see `docs/ARCHITECTURE.md`), and a number printed to you gets the same
+  engine the checks get.
+- **the `shacl` engine confirms it will compile the directory**, which the
+  other two cannot. A `sh:sparql` body is a string literal to a Turtle parser
+  and a SPARQL query to the engine, so a shape can parse cleanly and still be
+  one the engine refuses. Without this, the script would print "22
+  shape-backed checks" for a directory that validates nothing, and the run
+  three commands later would fail with an error naming neither `--shapes` nor
+  the file.
+
+The same check now runs inside the CLI, so `--shapes` at a directory the
+engine will not compile is refused up front:
+
+```
+error: --shapes my_shapes parses as Turtle, but the SHACL engine will not compile it, so no shape in it can run: SPARQL error: error at 1:30: expected OPTIONAL
+       Nothing else about the run is at fault; fix the shape file and the same command will work.
+```
+
+Exit 2 — the code a bad invocation gets, not 1 (“findings reached
+`--fail-on`”), so a CI script can still tell the two apart. It has to be a
+refusal rather than a warning: warnings are printed at the end of a run, and
+this run does not reach the end.
 
 Then run with both merged inputs:
 

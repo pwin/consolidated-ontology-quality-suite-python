@@ -83,7 +83,8 @@ from ontology_suite import config, pipeline
 from ontology_suite.checks import shacl_native_runner as native_runner
 from ontology_suite.checks.merge import build_unified_results
 from ontology_suite.checks.registry import Registry
-from ontology_suite.checks.shacl_runner import load_shapes_graph, run_shacl
+from ontology_suite.checks.shacl_runner import run_shacl
+from ontology_suite.checks.shapes import load_shapes_graph
 
 pytestmark = pytest.mark.skipif(
     not native_runner.available(), reason="native `shacl` package not installed (see shacl_native_runner.py docstring)"

@@ -36,6 +36,27 @@ deduplication key. A `sh:property` shape reports `sh:resultPath`, and the
 `house_checks/shapes/house.ttl` is therefore written as SHACL-SPARQL, which is
 why the suite's own dual-formulated shapes are too.
 
+WHICH ENGINE ANSWERS WHAT
+-------------------------
+The counts this script prints come from `ontology_suite.checks.shapes`, and
+they are not all computed the same way, on purpose:
+
+* rdflib **parses** the `*.ttl` files, which is the job `holos_sparql.py`
+  keeps it for.
+* holosdb **answers the query** "which check ids does this directory
+  declare". The suite moved its checks off rdflib's graph API for the reason
+  recorded in that module -- rdflib is lenient where the specification is not
+  -- and a number printed to you deserves the same engine the checks get.
+* the `shacl` engine **confirms it will compile the merged directory**. That
+  is the question the other two cannot answer: a file rdflib parses happily
+  may still be one the engine refuses, and then this script would print "22
+  shape-backed checks" for a directory that validates nothing. It is checked
+  here, at the merge, rather than discovered three commands later.
+
+pyshacl is not involved anywhere. It is a development dependency of the
+suite, for the engine-parity tests, and a released `pip install` does not
+have it.
+
 USAGE
 -----
     uv run python examples/riverside_library/merge_shapes.py
@@ -48,7 +69,7 @@ import shutil
 from pathlib import Path
 
 from ontology_suite import config
-from ontology_suite.checks.shacl_runner import declared_check_ids
+from ontology_suite.checks.shapes import declared_check_ids, engine_rejection
 
 HERE = Path(__file__).parent
 HOUSE = HERE / "house_checks" / "shapes"
@@ -81,6 +102,18 @@ def merge() -> Path:
 
 if __name__ == "__main__":
     path = merge()
+
+    # Asked first. Every count below is read off the parse, so printing them
+    # for a directory the engine rejects would be worse than printing nothing.
+    rejection = engine_rejection(path)
+    if rejection is not None:
+        raise SystemExit(
+            f"{path} parses, but the SHACL engine will not compile it:\n"
+            f"  {rejection}\n"
+            "The merged directory is on disk; the fault is in one of the files "
+            "copied into it."
+        )
+
     theirs = declared_check_ids(config.DEFAULT_SHAPES_DIR)
     mine = declared_check_ids(HOUSE)
     print(f"wrote {path}")
@@ -89,3 +122,4 @@ if __name__ == "__main__":
     print(f"  {len(list(HOUSE.glob('*.ttl')))} from house_checks/shapes, "
           f"declaring {len(mine)}: {', '.join(sorted(mine))}")
     print(f"  {len(theirs | mine)} shape-backed checks in total -- pass this directory to --shapes")
+    print("  the `shacl` engine compiles it (checked, not assumed)")

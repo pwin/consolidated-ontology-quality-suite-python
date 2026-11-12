@@ -62,7 +62,7 @@ once. Subject-specific directories (`tarql/`) are filtered per root, so adding
 a second root never changes whether the first one's are excluded.
 
 **`--shapes` replaces too, and cannot be made to compose at all.** It takes
-one directory, and `shacl_runner.load_shapes_graph` reads every `*.ttl` at the
+one directory, and `checks/shapes.py`'s `load_shapes_graph` reads every `*.ttl` at the
 top level of it into a single shapes graph. So naming your own directory
 replaces the suite's six files outright, and there is no second flag to pass
 the built-ins in with. Two consequences:
@@ -183,7 +183,7 @@ undefined terms, structural patterns, contradiction patterns, etc.
 5. **Regenerate `docs/CHECKS.md`:** `python docs/generate_checks_md.py`.
 
 6. **Nothing else to touch.** `ontology_suite/checks/sparql_runner.py`
-   walks `sparql/**/*.rq` and `shacl_runner.py` loads every `shapes/*.ttl`
+   walks `sparql/**/*.rq` and `checks/shapes.py` loads every `shapes/*.ttl`
    file generically; `registry.py` resolves ids on the fly. The new check
    automatically appears in every table, plot, and Cucumber feature/scenario.
 

@@ -288,6 +288,8 @@ Two engines evaluate, and both are ours:
 |---|---|---|
 | The portable `.rq` checks (SPARQL) | **holosdb** | `checks/holos_sparql.py` |
 | The SHACL shapes | **`shacl`** ([pwin/SHACL_Engine](https://github.com/pwin/SHACL_Engine)) | `checks/shacl_native_runner.py` |
+| "Which check ids does this shapes directory declare?" | **holosdb** | `checks/shapes.py` |
+| "Will the engine compile this shapes directory?" | **`shacl`** | `checks/shapes.py` |
 
 rdflib is still a runtime dependency, and still does three things: it parses
 input, it holds graphs, and it holds results. It no longer *evaluates*
@@ -295,6 +297,24 @@ anything. **The direction of travel is for holosdb and the `shacl` engine to
 take the remaining jobs too**, and rdflib to become a parsing and term-model
 facade that can eventually be dropped. Nothing new should route evaluation
 through rdflib.
+
+The last two rows are the most recent step on that road, and the smaller one
+is the more instructive. `declared_check_ids` is a *query* -- it is the number
+the `--shapes` warning quotes and the number
+`examples/riverside_library/merge_shapes.py` prints -- and it was answered
+with rdflib's graph API, so it was an answer about rdflib. It now runs as a
+CONSTRUCT on holosdb and returns the same 21 for the suite's own shapes, which
+is the result worth having: the move was made because the engine should be the
+same one the checks use, not because the old answer was wrong.
+
+The other row is a question neither of the first two can answer. A shapes
+directory rdflib parses is not necessarily one the engine compiles: a
+`sh:sparql` body is a string literal to a Turtle parser and a query to the
+engine. So `engine_rejection` asks the engine, through the same
+`compile_shapes` call a run makes -- not a lookalike, because a lookalike
+answers a slightly different question. `--shapes` at a directory the engine
+refuses is now a one-line refusal naming the flag and exit 2, where it used to
+be a `ValueError` several frames inside `compile_shapes` that named neither.
 
 ### Why, concretely
 

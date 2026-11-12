@@ -494,7 +494,7 @@ or a comparison against a <em>separate</em> ontology.</td></tr>
 </div>
 
 <p>Discovery is by directory walk, not by manifest. <code>sparql_runner</code> globs
-<code>sparql/**/*.rq</code> and <code>shacl_runner</code> loads every <code>shapes/*.ttl</code>, so
+<code>sparql/**/*.rq</code> and <code>checks/shapes.py</code> loads every <code>shapes/*.ttl</code>, so
 adding a file is enough to add a check and deleting one is enough to remove it. The registry entry
 supplies the prose; a query with no matching entry, or an entry with no implementation, is the kind
 of drift the coverage tests exist to catch.</p>
