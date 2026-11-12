@@ -874,13 +874,13 @@ html = [
 
 [[package]]
 name = "shacl"
-version = "0.3.4"
+version = "0.3.5"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/24/dc/1c58b487f293388c01f88d480636587f2f72f19661e23b633b8ec1cd59b2/shacl-0.3.4.tar.gz", hash = "sha256:c139493a94a12b1a0745df902e558883694c3c980ac4b169fe39eb97890c4004", size = 198554, upload-time = "2026-10-21T07:40:25.437Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/66/2d/68891801c96c717d30ac36ca0c0e779c13c5fb142401a1247e4ec817ab24/shacl-0.3.5.tar.gz", hash = "sha256:22bd7da7e5bbd5378efd233eabd9fafb11c6e5d09c607c86a74d723e1499ae95", size = 198534, upload-time = "2026-11-12T18:28:45.098Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/36/c6/e05d1efd27545c6faf5e36f5bad8fbc7b5b3eb9b6a396f31441fb1fdf839/shacl-0.3.4-cp39-abi3-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:25a0e775c1d8630d89b222adb58e456092c5cf37286ee5341f62eee9b498a805", size = 4376680, upload-time = "2026-10-21T07:40:19.588Z" },
-    { url = "https://files.pythonhosted.org/packages/a0/88/a2c2557ba5c2f25bff3601e5c31816f4063b42defbabeaece126b0493621/shacl-0.3.4-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:6662a9049b2111b9bb0c34a6f015104d25a59b35b2bacc7a788e41974ec5a42b", size = 2338037, upload-time = "2026-10-21T07:40:21.547Z" },
-    { url = "https://files.pythonhosted.org/packages/38/60/e827a3a86218d300b72563e41f3081cc7d026baed7fa83203c54c9d61301/shacl-0.3.4-cp39-abi3-win_amd64.whl", hash = "sha256:8b523ced814b9efadbfb5694bd8007a1ec756745286b730ab6f5f95f46316da7", size = 2391934, upload-time = "2026-10-21T07:40:23.743Z" },
+    { url = "https://files.pythonhosted.org/packages/aa/02/d4c0c4a06921b279f523a66892673be13a7e844cdd228a08ebbe3bfea938/shacl-0.3.5-cp39-abi3-macosx_10_12_universal2.macosx_10_12_x86_64.macosx_11_0_arm64.whl", hash = "sha256:2d424166d7021c87a7cac5d6333a8b0418b75089bdbc06369c670ffcefc3acff", size = 4376959, upload-time = "2026-11-12T18:28:40.653Z" },
+    { url = "https://files.pythonhosted.org/packages/51/b3/34d01cc162010d3ee1530ffba912ddc64c4d4cb4905d08ba9fe251561178/shacl-0.3.5-cp39-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:37ad79e7987cf4f0e39f3aadc7a6c9a6e282fa6c02884a547c7c3c09a797fe15", size = 2336663, upload-time = "2026-11-12T18:28:42.228Z" },
+    { url = "https://files.pythonhosted.org/packages/f2/d0/bc3ed1234fba847ae574204d7efd0b5e45e790616bd1cd4d063f4aace101/shacl-0.3.5-cp39-abi3-win_amd64.whl", hash = "sha256:2ae0240ff8ece39d5f0a5ca205b6816bdfa3d1e2e7679867c8e7d9f706b047df", size = 2391143, upload-time = "2026-11-12T18:28:43.689Z" },
 ]
 
 [[package]]
