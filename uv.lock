@@ -165,15 +165,15 @@ wheels = [
 
 [[package]]
 name = "holosdb"
-version = "0.26.1"
+version = "0.26.2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/ce/db/e4b96d952fedbd38a1f0270c456c2c86f699f2fe0a612aefa95f60582152/holosdb-0.26.1.tar.gz", hash = "sha256:3fdf44d00d357d467b01e52fa02a944be73de215df8ca6a0ccc49e6e5f9d851f", size = 681491, upload-time = "2026-11-03T13:59:46.791Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/23/f4/d24a54efe142841f126a816c4256809eda8bf9cfa68a7225e6b4b2fe91bb/holosdb-0.26.2.tar.gz", hash = "sha256:a4863166a2087e77d71d63824caba3086dcbe538e34cc9adcccd860486efac86", size = 684841, upload-time = "2026-11-13T13:11:01.048Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c1/5d/d8caa1aef3ec3a03f9e042c30fe2277ca5ba248747fc2b29b72a2ae6bdd5/holosdb-0.26.1-cp311-abi3-macosx_10_13_x86_64.whl", hash = "sha256:c8a5a86a45caf81c5dbbcee35eda7df220e62794194331e0f8c0f95f73c81ce1", size = 6105118, upload-time = "2026-11-03T13:59:36.811Z" },
-    { url = "https://files.pythonhosted.org/packages/92/06/69011ab9bbfa2811bb0bc6cffe5141ad786bae613af0812664be186eef58/holosdb-0.26.1-cp311-abi3-macosx_11_0_arm64.whl", hash = "sha256:e0e90c4997c45953dd2ebc6f658965f03545469dc74387f3e23a348b47c24d64", size = 5538103, upload-time = "2026-11-03T13:59:39.003Z" },
-    { url = "https://files.pythonhosted.org/packages/7e/63/6b8bd2de85b7169447f643964733a0798abdd5091a106b3811ddfa2091b1/holosdb-0.26.1-cp311-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:58c76e41460c6a8b5ed1a665c9c67bd9db899a988a7f8cd23221a1a9afd1f269", size = 6484024, upload-time = "2026-11-03T13:59:40.848Z" },
-    { url = "https://files.pythonhosted.org/packages/9b/e8/ed1f988fb1b5831ed5fe2af6f34dee85df3f4504205b749d10f9562650c0/holosdb-0.26.1-cp311-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:4fcebd704401c50e480ecdedb80a3110ddb8dfdaf5e79e721886a98b3e93c6f9", size = 7047732, upload-time = "2026-11-03T13:59:43.071Z" },
-    { url = "https://files.pythonhosted.org/packages/b0/7e/82db729c3b635702ff57b0575563f3a50aaa0e450f37f284410846fd0811/holosdb-0.26.1-cp311-abi3-win_amd64.whl", hash = "sha256:555365306d508fd971abf2eab19d4fed32e3dde01fab93417919315ec9e6ed40", size = 5752369, upload-time = "2026-11-03T13:59:44.923Z" },
+    { url = "https://files.pythonhosted.org/packages/b9/87/52d63f70a841d5f4320f67d99808331591de84f3c2d92e618663dbede098/holosdb-0.26.2-cp311-abi3-macosx_10_13_x86_64.whl", hash = "sha256:cf2a6767cb8ff203df86500f399d3f5e84e753cc9a40abe358d6d3a8a75007f8", size = 6058877, upload-time = "2026-11-13T13:10:46.509Z" },
+    { url = "https://files.pythonhosted.org/packages/fc/78/f0340e9f349923e8921f49c93b6f206ca2ef9c841be46be17c886dde2df3/holosdb-0.26.2-cp311-abi3-macosx_11_0_arm64.whl", hash = "sha256:201193f8fd102b6745ee7d785479a1c6eb84c8beff5c9417a34cfa84b02ee7f5", size = 5496234, upload-time = "2026-11-13T13:10:48.648Z" },
+    { url = "https://files.pythonhosted.org/packages/8b/f1/b6af582a7070625065be57eedeebf8948a5e416dca610ace28b33672ac85/holosdb-0.26.2-cp311-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:de293dfbe77c3b5d012c65995e58c31a397c9b8a30fd89a8d4767fa0890c1596", size = 6445042, upload-time = "2026-11-13T13:10:50.794Z" },
+    { url = "https://files.pythonhosted.org/packages/27/72/42aa3e5a6817e699fe5f18b1fa5dc06acbee63350e4d965e4ddd87b4f7e3/holosdb-0.26.2-cp311-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:f009e7838a6b8b4f7ee1168ecae7c781dbe0c1a3903f2e0993393d154ec93f9d", size = 7006723, upload-time = "2026-11-13T13:10:52.855Z" },
+    { url = "https://files.pythonhosted.org/packages/0b/01/42d8a3745b7a48c92025d1e96411e6ff572fd6c055ccf57d43907b3df6bd/holosdb-0.26.2-cp311-abi3-win_amd64.whl", hash = "sha256:707198d040b10434ff369eb681705ae2cf511aa27841bc9a9742622612ab54db", size = 5708345, upload-time = "2026-11-13T13:10:59.169Z" },
 ]
 
 [[package]]
@@ -874,13 +874,13 @@ html = [
 
 [[package]]
 name = "shacl"
-version = "0.3.5"
+version = "0.3.6"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/66/2d/68891801c96c717d30ac36ca0c0e779c13c5fb142401a1247e4ec817ab24/shacl-0.3.5.tar.gz", hash = "sha256:22bd7da7e5bbd5378efd233eabd9fafb11c6e5d09c607c86a74d723e1499ae95", size = 198534, upload-time = "2026-11-12T18:28:45.098Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/08/40/482972410d9bb6c8021c5a408bb15e33e8027b881c6980e1803a68607ea6/shacl-0.3.6.tar.gz", hash = "sha256:53903feb1256f967fd799708338741de2c1d9c3877fbd8edfcfd5a71d6935cf6", size = 200433, upload-time = "2026-11-13T14:18:25.667Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/aa/02/d4c0c4a06921b279f523a66892673be13a7e844cdd228a08ebbe3bfea938/shacl-0.3.5-cp39-abi3-macosx_10_12_universal2.macosx_10_12_x86_64.macosx_11_0_arm64.whl", hash = "sha256:2d424166d7021c87a7cac5d6333a8b0418b75089bdbc06369c670ffcefc3acff", size = 4376959, upload-time = "2026-11-12T18:28:40.653Z" },
-    { url = "https://files.pythonhosted.org/packages/51/b3/34d01cc162010d3ee1530ffba912ddc64c4d4cb4905d08ba9fe251561178/shacl-0.3.5-cp39-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:37ad79e7987cf4f0e39f3aadc7a6c9a6e282fa6c02884a547c7c3c09a797fe15", size = 2336663, upload-time = "2026-11-12T18:28:42.228Z" },
-    { url = "https://files.pythonhosted.org/packages/f2/d0/bc3ed1234fba847ae574204d7efd0b5e45e790616bd1cd4d063f4aace101/shacl-0.3.5-cp39-abi3-win_amd64.whl", hash = "sha256:2ae0240ff8ece39d5f0a5ca205b6816bdfa3d1e2e7679867c8e7d9f706b047df", size = 2391143, upload-time = "2026-11-12T18:28:43.689Z" },
+    { url = "https://files.pythonhosted.org/packages/60/80/080dafc11fdaa304011038bb7c7ae4c74b14b19564ddaf3ae2be3375c1ce/shacl-0.3.6-cp39-abi3-macosx_10_12_universal2.macosx_10_12_x86_64.macosx_11_0_arm64.whl", hash = "sha256:ea18f332c4a7283ccce445c4a14a210aa4571c517a62392a871aa46be95533d6", size = 4375659, upload-time = "2026-11-13T14:18:20.72Z" },
+    { url = "https://files.pythonhosted.org/packages/a5/ea/199a27bbe9f6aeab28d10decc6fdb09ee6064d88fbf8898434bfe7be5716/shacl-0.3.6-cp39-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:4b816d58fc2170203bf3ccde8a346b1b9b8c07c197e3822d0ba27f4f790aad5a", size = 2336483, upload-time = "2026-11-13T14:18:22.51Z" },
+    { url = "https://files.pythonhosted.org/packages/77/b4/12163547a49a8acac3caff4aa4d36a9762378ae65569f4d24596e2da354f/shacl-0.3.6-cp39-abi3-win_amd64.whl", hash = "sha256:d1296f63682351b6524897d845c6782d07d99943cdd0efc419b53ec7e47143d6", size = 2392401, upload-time = "2026-11-13T14:18:24.211Z" },
 ]
 
 [[package]]
