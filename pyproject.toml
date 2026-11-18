@@ -95,9 +95,9 @@ dev = [
     # dependency: the suite runs on holosdb and `shacl`, and these exist to
     # disagree with them when they are wrong.
     #
-    #   pyoxigraph  a second SPARQL engine (tests/test_sparql_engine_parity.py)
-    #               -- also what the VS Code extension ships, as oxigraph for
-    #               JS, so it speaks for those users here.
+    #   pyoxigraph  a second SPARQL engine (tests/test_sparql_engine_parity.py).
+    #               The VS Code extension does not ship it: since its 0.13.11
+    #               the extension runs holosdb too, as holos-wasm-node.
     #   pyshacl     a second SHACL engine (tests/test_engine_parity_stress.py,
     #               tests/test_shacl_native_runner.py) -- it has caught real
     #               native-engine bugs, see checks/shacl_runner.py.
