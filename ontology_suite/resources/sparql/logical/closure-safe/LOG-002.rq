@@ -7,6 +7,48 @@ PREFIX dcterms: <http://purl.org/dc/terms/>
 PREFIX oq: <https://semantechs.co.uk/ontology-quality/>
 
 # LOG-002: owl:FunctionalProperty violated by data
+#
+# A functional property is violated when a subject has two values that are
+# two *things*, not two ways of writing one thing. The three filters below
+# say what "one thing" covers; each replaced a measured defect in the single
+# `FILTER(STR(?o1) < STR(?o2))` this check used to carry, which compared
+# lexical forms and so counted any two spellings as two values.
+#
+#   1. sameTerm   -- the trivial self-pair.
+#   2. ?o1 = ?o2  -- value equality, wrapped in COALESCE. Two literals of
+#      the same value and different lexical form ("80" and "80.0"^^xsd:decimal)
+#      are one value. COALESCE is load-bearing: `=` raises a type error on
+#      two literals of datatypes the engine cannot compare, and an error in
+#      a FILTER drops the row, which would turn a real violation into
+#      silence. COALESCE returns the first expression that evaluates without
+#      error, so the comparison answers "not known equal" instead of
+#      vanishing.
+#   3. owl:sameAs -- two names for one individual. Traversed in both
+#      directions and transitively, `(owl:sameAs|^owl:sameAs)+`, because
+#      owl:sameAs is symmetric and transitive and an ontology may assert it
+#      either way round.
+#
+# The old filter also caused a false *negative*, which is the worse half:
+# SPARQL 1.1 17.4.2.5 defines STR() for literals and IRIs, so STR() of a
+# blank node is a type error, the FILTER dropped the row, and a functional
+# property with two distinct blank-node values was reported as clean. That
+# is the same way STY-003 shipped broken: a check that passes every test and
+# reports nothing looks exactly like a correct graph.
+#
+# Measured on nine cases: the old filter was wrong on four of them, three
+# false positives and that false negative.
+#
+# The join is symmetric, so an offending pair matches twice, once in each
+# order. There is no portable way to order two arbitrary RDF terms -- STR()
+# is exactly the trap above -- so no tie-break is attempted, and the two
+# solutions carry identical focus node, path and value and collapse under
+# the (check_id, focus_node, path, value) dedup key. `shapes/logical.ttl`'s
+# SHACL twin is written the same way for the same reason, and the two must
+# keep reporting the same focus node and path to merge with each other.
+#
+# This file is shared data: the same bytes ship in the VS Code extension's
+# `resources/checks-registry/`. Edit both copies or neither -- see
+# tests/test_shared_registry_parity.py.
 CONSTRUCT {
   _:r a sh:ValidationResult ;
     sh:resultSeverity sh:Violation ;
@@ -19,7 +61,9 @@ WHERE {
   ?p a owl:FunctionalProperty .
   ?s ?p ?o1 .
   ?s ?p ?o2 .
-  FILTER(STR(?o1) < STR(?o2))
+  FILTER(!sameTerm(?o1, ?o2))
+  FILTER(!COALESCE(?o1 = ?o2, false))
+  FILTER NOT EXISTS { ?o1 (owl:sameAs|^owl:sameAs)+ ?o2 }
   BIND(CONCAT("Subject ", STR(?s), " has more than one distinct value for functional property ",
               STR(?p), ", violating its functional-property axiom.") AS ?msg)
 }

@@ -26,6 +26,12 @@ oq:LOG-001
 # LOG-002: owl:FunctionalProperty violated by data.
 # The property path is only known at data-load time (whichever property is
 # declared owl:FunctionalProperty), so this is expressed with SHACL-SPARQL.
+#
+# The three filters match `sparql/logical/closure-safe/LOG-002.rq` line for
+# line, and its header carries the reasoning: two values are one thing if
+# they are the same term, equal in value, or two names for one individual
+# via owl:sameAs. The twins have to agree on focus node and path or the same
+# defect arrives twice under one id, so neither is edited alone.
 # ---------------------------------------------------------------------------
 oq:LOG-002
   a sh:NodeShape ;
@@ -48,7 +54,9 @@ oq:LOG-002
         ?path a owl:FunctionalProperty .
         $this ?path ?o1 .
         $this ?path ?o2 .
-        FILTER(STR(?o1) < STR(?o2))
+        FILTER(!sameTerm(?o1, ?o2))
+        FILTER(!COALESCE(?o1 = ?o2, false))
+        FILTER NOT EXISTS { ?o1 (owl:sameAs|^owl:sameAs)+ ?o2 }
       }
     """ ;
   ] .

@@ -54,7 +54,7 @@ from collections import defaultdict
 import rdflib
 from rdflib import OWL, RDF, RDFS, XSD
 from rdflib.namespace import SKOS
-from rdflib.term import Literal
+from rdflib.term import BNode, Literal
 
 from .. import hierarchy
 from ..sketch.graph_quality import (
@@ -176,6 +176,70 @@ def load_ontology_graph(path):
     return graph
 
 
+def _rdf_list(graph, head):
+    """The members of an ``rdf:first``/``rdf:rest`` list, in order.
+
+    Guards against a cyclic ``rdf:rest`` chain, which is not legal RDF but is
+    cheap to survive and would otherwise hang the data stage on a malformed
+    input file.
+    """
+    seen = set()
+    while head is not None and head != RDF.nil and head not in seen:
+        seen.add(head)
+        item = graph.value(head, RDF.first)
+        if item is not None:
+            yield item
+        head = graph.value(head, RDF.rest)
+
+
+def _class_expression_members(graph, cls, _seen=None):
+    """``cls`` flattened to the classes a term may be one of to satisfy it.
+
+    An ``owl:unionOf`` is expanded into its members, recursively, because a
+    union is exactly "any one of these" and that is what a domain or range
+    declared as one means.
+
+    Why this is needed: a union is written as an anonymous class node --
+    ``rdfs:domain [ a owl:Class ; owl:unionOf ( ex:A ex:B ) ]`` -- and
+    `check_conformance` matched a subject's asserted types against the
+    declared set by walking ``rdfs:subClassOf``. No asserted type can ever
+    reach a blank node that way, so *every* use of a union-domained property
+    was reported as a CNF-003 violation, and every value of a union-ranged
+    one as CNF-004. Measured on a three-triple graph with two such
+    properties: 5 violations, all of them false.
+
+    This is not a corner case. gist -- the reference vocabulary this suite
+    ships several versions of -- declares 13 anonymous domains and ranges and
+    every one is a union; so are all three in `examples/acme_robotics`'s
+    copy of the W3C org vocabulary (`org:reportsTo`, `org:role`). The bug was
+    invisible there only because the acme data happens not to use those two
+    properties.
+
+    Anything that is not a union is returned unchanged, including an
+    ``owl:intersectionOf`` or an ``owl:Restriction``. Those are deliberately
+    *not* expanded: an intersection means "all of these", so treating its
+    members as alternatives would make the check unsound in the opposite
+    direction -- it would start accepting data the ontology forbids. They
+    stay anonymous and `satisfies` declines to judge them, which is the
+    honest answer. Neither appears as a domain or range in any vocabulary
+    this suite ships.
+    """
+    if _seen is None:
+        _seen = set()
+    if cls in _seen:
+        return set()
+    _seen.add(cls)
+
+    members = set()
+    for head in graph.objects(cls, OWL.unionOf):
+        for member in _rdf_list(graph, head):
+            members |= _class_expression_members(graph, member, _seen)
+    # The fallback covers a named class (the common case) and a malformed
+    # union with no readable list: better to keep the node and let it go
+    # unverified than to return nothing and silently drop the declaration.
+    return members or {cls}
+
+
 def ontology_declarations(ontology_graph):
     """The ground-truth schema straight from the ontology file: no induction, no fallback."""
     declared_classes = set(ontology_graph.subjects(RDF.type, OWL.Class)) | set(
@@ -187,11 +251,11 @@ def ontology_declarations(ontology_graph):
 
     domain = defaultdict(set)
     for prop, cls in ontology_graph.subject_objects(RDFS.domain):
-        domain[prop].add(cls)
+        domain[prop] |= _class_expression_members(ontology_graph, cls)
         declared_properties.add(prop)
     range_ = defaultdict(set)
     for prop, cls in ontology_graph.subject_objects(RDFS.range):
-        range_[prop].add(cls)
+        range_[prop] |= _class_expression_members(ontology_graph, cls)
         declared_properties.add(prop)
 
     # gist-style domainIncludes/rangeIncludes count as a declared domain/range
@@ -222,10 +286,10 @@ def ontology_declarations(ontology_graph):
         name = local_name(predicate)
         if name == "domainIncludes":
             for prop, cls in ontology_graph.subject_objects(predicate):
-                domain[prop].add(cls)
+                domain[prop] |= _class_expression_members(ontology_graph, cls)
         elif name == "rangeIncludes":
             for prop, cls in ontology_graph.subject_objects(predicate):
-                range_[prop].add(cls)
+                range_[prop] |= _class_expression_members(ontology_graph, cls)
 
     parents_of = defaultdict(set)
     for child, parent in ontology_graph.subject_objects(RDFS.subClassOf):
@@ -312,12 +376,22 @@ def check_conformance(declarations, data_graph):
         # domain/range violation on every single use of such a property.
         if OWL.Thing in declared_classes or RDFS.Resource in declared_classes:
             return True
+        # Anything still anonymous here is a class expression
+        # `_class_expression_members` could not flatten -- an
+        # owl:intersectionOf or an owl:Restriction. An asserted type can
+        # never reach one by walking rdfs:subClassOf, so comparing against it
+        # could only ever return "violation", which is the bug unions used to
+        # hit. No verdict is the honest answer, and `None` already routes to
+        # the unverifiable counters rather than to a finding.
+        named = {c for c in declared_classes if not isinstance(c, BNode)}
+        if not named:
+            return None
         types = entity_types.get(term)
         if not types:
             return None
         for t in types:
             covered = {t} | _ancestors(t, declarations["parents_of"], ancestor_memo)
-            if covered & declared_classes:
+            if covered & named:
                 return True
         return False
 
