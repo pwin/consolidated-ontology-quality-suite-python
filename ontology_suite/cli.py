@@ -437,7 +437,7 @@ def _add_engine_arg(p: argparse.ArgumentParser) -> None:
              "portable layer alone -- every check has a SPARQL form, so it finds the same real "
              "findings without the drift signal; 'shacl' runs the shapes alone. 'native' and "
              "'native+sparql' are older spellings of 'shacl' and 'both', kept because scripts pass "
-             "them. Every SHACL spelling runs the `shacl` engine, which is a runtime dependency: "
+             "them. Every SHACL spelling runs the SHACL engine from semops-system, a runtime dependency: "
              "pyshacl is now a test-only second opinion (tests/test_engine_parity_stress.py) and no "
              "engine choice selects it.",
     )

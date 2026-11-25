@@ -1,12 +1,16 @@
-"""The SPARQL engine the portable checks run on: holosdb.
+"""The SPARQL engine the portable checks run on: HOLOS.
 
 The `.rq` checks are the *portable* formulation -- self-contained CONSTRUCT
 queries producing standard ``sh:ValidationResult`` triples, needing a SPARQL
 engine and no SHACL processor. They used to run on rdflib, because rdflib was
-already in the process for parsing. They now run on holosdb (the HOLOS
-triplestore's Python bindings), which is a conformant SPARQL 1.2 engine, and
-rdflib keeps the jobs it is actually needed for: parsing, pyshacl, and holding
-the results graph the rest of the suite consumes.
+already in the process for parsing. They now run on HOLOS, a conformant SPARQL
+1.2 engine, and rdflib keeps the jobs it is actually needed for: parsing and
+holding the results graph the rest of the suite consumes.
+
+The bindings come from ``semops-system`` as ``semops_system.holos``: the same
+module the ``holosdb`` wheel carries, built from the same SemOps System commit
+as the SHACL engine (see ``pyproject.toml``). "holosdb" below names that
+module, whichever wheel delivered it.
 
 # Why move off rdflib
 
@@ -49,8 +53,7 @@ from pathlib import Path
 from typing import List
 
 from rdflib import BNode, Graph, URIRef
-
-import holosdb
+from semops_system import holos as holosdb
 
 
 def _is_rdf(triple) -> bool:

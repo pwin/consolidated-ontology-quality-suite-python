@@ -131,9 +131,10 @@ def run_registry_suite_on_graph(
     aggregate data(+ontology) graph in memory).
 
     ``engine`` picks which of the two cross-validated formulations to run.
-    Both are now served by pwin's own engines -- the SHACL formulation by the
-    native Rust engine (`shacl`, https://github.com/pwin/SHACL_Engine) and the
-    portable formulation by holosdb (`checks/holos_sparql.py`). pyshacl is no
+    Both are now served by pwin's own engines, from one `semops-system` wheel
+    (https://github.com/pwin/SemopsSystem) -- the SHACL formulation by the
+    native Rust SHACL engine (`checks/shacl_native_runner.py`) and the
+    portable formulation by HOLOS (`checks/holos_sparql.py`). pyshacl is no
     longer in the runtime path; see "Which engine does the work" in
     docs/ARCHITECTURE.md.
 
@@ -204,10 +205,10 @@ def run_registry_suite_on_graph(
     if uses_shacl:
         if not native_shacl_available():
             raise RuntimeError(
-                f"--engine {engine} needs the `shacl` engine package "
-                "(https://github.com/pwin/SHACL_Engine) -- it is a runtime "
-                "dependency, so `uv sync` installs it; pass --engine sparql to "
-                "run the portable formulation alone. See "
+                f"--engine {engine} needs the SHACL engine, which comes from "
+                "`semops-system` (https://github.com/pwin/SemopsSystem) -- it "
+                "is a runtime dependency, so `uv sync` installs it; pass "
+                "--engine sparql to run the portable formulation alone. See "
                 "checks/shacl_native_runner.py's module docstring."
             )
         # Structured results, not a report graph: the round-trip through 180 MB

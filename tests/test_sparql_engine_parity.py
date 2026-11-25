@@ -78,9 +78,9 @@ import re
 import warnings
 from pathlib import Path
 
-import holosdb
 import pytest
 from rdflib import Graph
+from semops_system import holos as holosdb
 
 from ontology_suite import config
 

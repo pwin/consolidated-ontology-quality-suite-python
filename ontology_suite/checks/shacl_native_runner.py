@@ -1,27 +1,34 @@
 """Runs the SHACL half of the suite using the native (Rust) SHACL engine's
-Python bindings (``shacl``, https://github.com/pwin/SHACL_Engine) instead of
-pyshacl -- typically dramatically faster for the same findings (that repo's
-own benchmarks: 58-104x on synthetic data against plain constraint
-components; this suite's own shapes lean heavily on SHACL-SPARQL, where the
-gap narrows since both engines then spend their time inside a query
-evaluator -- see docs/ARCHITECTURE.md's pyshacl-vs-portable-SPARQL note for
-the equivalent caveat). Verified to find the exact same findings pyshacl
-does by identity -- ``(check_id, focus_node, value)``, both on
-``examples/ontology/domain.ttl`` (18/18) and the ~3,300-triple
-vehicle-ontology fixture (38/38) -- see ``tests/test_shacl_native_runner.py``.
-A larger, denser fixture built specifically to stress multi-instance/
-multi-focus-node scenarios (``examples/checks_stress_test/``,
-``tests/test_engine_parity_stress.py``) confirms the same full parity for
-all 18 checks that have both a SHACL and SPARQL formulation, including two
-cases (``STY-003``, many blank-node focus nodes at once; ``STY-001``/
-``STY-002``, blank-node-typed anonymous class/property expressions) that
-each found a real, since-fixed native-engine bug -- see that test module's
-own docstring for the history; requires ``shacl>=0.1.10``, re-verified at
-full parity at that version too (0.1.6-0.1.10 added SHACL-AF ``sh:rule``
-support and a recursion-guard performance fix, neither of which touches
-the ``sh:sparql``/SELECT constraint path this suite's own checks use --
-see the ``inference`` parameter's docstring below for the one visible,
-unused-by-this-suite surface change).
+Python bindings instead of pyshacl -- typically dramatically faster for the
+same findings (the engine's own benchmarks: 58-104x on synthetic data
+against plain constraint components; this suite's own shapes lean heavily on
+SHACL-SPARQL, where the gap narrows since both engines then spend their time
+inside a query evaluator -- see docs/ARCHITECTURE.md's
+pyshacl-vs-portable-SPARQL note for the equivalent caveat). Verified to find
+the exact same findings pyshacl does by identity -- ``(check_id, focus_node,
+value)``, both on ``examples/ontology/domain.ttl`` (18/18) and the
+~3,300-triple vehicle-ontology fixture (38/38) -- see
+``tests/test_shacl_native_runner.py``. A larger, denser fixture built
+specifically to stress multi-instance/multi-focus-node scenarios
+(``examples/checks_stress_test/``, ``tests/test_engine_parity_stress.py``)
+confirms the same full parity for all 18 checks that have both a SHACL and
+SPARQL formulation, including two cases (``STY-003``, many blank-node focus
+nodes at once; ``STY-001``/``STY-002``, blank-node-typed anonymous
+class/property expressions) that each found a real, since-fixed
+native-engine bug -- see that test module's own docstring for the history;
+requires ``shacl>=0.1.10``, re-verified at full parity at that version too
+(0.1.6-0.1.10 added SHACL-AF ``sh:rule`` support and a recursion-guard
+performance fix, neither of which touches the ``sh:sparql``/SELECT
+constraint path this suite's own checks use -- see the ``inference``
+parameter's docstring below for the one visible, unused-by-this-suite
+surface change).
+
+The engine began as https://github.com/pwin/SHACL_Engine and is now built
+in SemOps System (https://github.com/pwin/SemopsSystem). This suite takes
+it from the ``semops-system`` wheel as ``semops_system.shacl``, the same
+module the separate ``shacl`` wheel carries. The ``shacl`` 0.1.x and 0.3.x
+versions below are the engine's own, from before the workspace, when it
+shipped on its own.
 
 **Fixed history: the two engines used to disagree on severity, because
 the shapes declared it in a place only one of them reads.** SHACL defines
@@ -87,28 +94,13 @@ gist data, 56/56 full parity) -- see
 which still carry regression tests for this (they would fail loudly again
 if a pre-0.1.5 wheel ever got reinstalled).
 
-``shacl`` is on PyPI as of 0.1.4 (0.1.5 for the fix above) -- install with
-``uv sync --extra native-shacl`` (an opt-in extra, same convention as this
-package's own ``reasoner`` extra; see ``pyproject.toml``, pinned
-``shacl>=0.1.12``). Not a hard dependency of this package proper -- still
-imported lazily here (same convention as ``shacl_runner.py``'s own
-pyshacl import), so ``--engine shacl``/``sparql``
-and everything else works fine without it. Requires ``shacl>=0.1.12``
-(pinned in ``pyproject.toml``'s ``native-shacl`` extra, kept current with
-upstream rather than pinned at the 0.1.5 floor that would technically
-still work): 0.1.3/0.1.4 had the two blank-node focus-node bugs documented
-above (N² cross-product, then ``isIRI($this)`` no longer excluding blank
-nodes), and 0.1.3 specifically predates PyPI publication and this
-package's ``Report.turtle``-based result-graph consumption
-(``sh:ValidationReport``, not a hand-reconstructed flat list of
-``Result`` objects -- see git history for the older, more manual approach
-this replaced). 0.1.6-0.1.10 are feature/perf/robustness additions
-(SHACL-AF rules, a recursion-guard speedup, and in 0.1.10 the property
-descent moving off the Rust call stack) with no behavior change to
-anything this suite's own checks exercise -- re-verified at each, not
-assumed from the changelog.
+Where it comes from now: ``semops-system`` (``pyproject.toml``), a runtime
+dependency, so ``uv sync`` and ``pip install`` both install it and there is
+no extra to remember. Each engine release was re-verified here rather than
+assumed from its changelog; the paragraphs below keep the ones that changed
+something this module reads.
 
-0.1.12 is the floor because `run_shacl_native_rows` reads three fields
+0.1.12 became the floor because `run_shacl_native_rows` reads three fields
 added in 0.1.11 -- ``root_shape``, ``value_plain`` and a rendered ``path``.
 The floor names 0.1.12 rather than 0.1.11 because 0.1.11 was tagged but
 never published: the releases on PyPI go 0.1.10, 0.1.12, 0.2.0. A floor
@@ -141,20 +133,11 @@ does not apply to this suite's flat shape set: compiling a shapes graph
 still recurses per nested shape reference, so a shapes file nesting
 ``sh:node`` some hundreds deep overflows at compile time.
 
-**Plain ``uv sync`` (no ``--extra native-shacl``) still uninstalls it** --
-standard behavior for any opt-in extra, not special to this package, but
-easy to trip over: running bare ``uv sync`` after having it installed
-removes it again, with no warning beyond the routine ``- shacl==0.1.10``
-line in ``uv sync``'s own output. ``--engine native``/``native+sparql``
-then fail with a clear ``RuntimeError`` (see ``run_shacl_native`` below --
-not silent corruption), but the CLI's own default engine
-(``pipeline.default_engine()``) auto-selects ``native+sparql`` *whenever the
-package is importable*, so losing it after a routine ``uv sync`` silently
-changes which engine every subcommand runs by default -- a wall-clock and
-cross-validation change now, rather than the severity change it also used
-to be before the fix documented above. Always include the extra:
-``uv sync --extra native-shacl`` (add ``--extra reasoner`` too if you also
-want the optional DL-reasoner path).
+Until the suite's 0.27.0 the engine was an opt-in extra, and a plain
+``uv sync`` uninstalled it and silently moved the default engine back to
+pyshacl. It has been a runtime dependency since, and the empty
+``native-shacl`` extra is kept only so old invocations stay valid -- see
+docs/ARCHITECTURE.md.
 
 Blank-node sourceShape resolution
 ----------------------------------
@@ -218,7 +201,7 @@ from .merge import ResultRow, _path_expression, substitute_message_placeholders
 from .registry import Registry
 
 try:
-    import shacl as _native_shacl  # type: ignore[import-not-found]  # not a PyPI package; see module docstring
+    from semops_system import shacl as _native_shacl
 except ImportError as exc:  # pragma: no cover
     _native_shacl = None
     _IMPORT_ERROR = exc
@@ -245,8 +228,8 @@ def compile_shapes(shapes_graph: Graph):
     """
     if _native_shacl is None:
         raise RuntimeError(
-            "the native `shacl` package is not installed -- run `uv sync --extra "
-            "native-shacl` (see this module's docstring)"
+            "the SHACL engine is not installed: it comes from `semops-system`, "
+            "a runtime dependency -- run `uv sync` or `pip install semops-system`"
         ) from _IMPORT_ERROR
     return _native_shacl.Shapes.from_turtle(shapes_graph.serialize(format="turtle"))  # type: ignore[attr-defined]
 
@@ -292,13 +275,15 @@ def rdfs_closure(graph: Graph) -> Graph:
     document into twelve and no shape acts on any of it.
 
     Added to the engine's Python surface as `shacl.rdfs_closure` for this
-    (engine 0.3.3); `crates/shacl/src/inference.rs` documents the six rules it
-    applies and why the axiomatic ones are left out.
+    (engine 0.3.3); `shacl/crates/shacl/src/inference.rs` in SemOps System
+    documents the six rules it applies and why the axiomatic ones are left
+    out.
     """
     if _native_shacl is None:
         raise RuntimeError(
-            "the native `shacl` package is not installed, so no RDFS closure is "
-            "available -- run `uv sync` (see this module's docstring)"
+            "the SHACL engine is not installed, so no RDFS closure is available: "
+            "it comes from `semops-system` -- run `uv sync` or `pip install "
+            "semops-system`"
         ) from _IMPORT_ERROR
     closed = _native_shacl.rdfs_closure(graph.serialize(format="turtle"))  # type: ignore[attr-defined]
     out = Graph()

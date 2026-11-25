@@ -154,9 +154,8 @@ writes, and what is in them, see `REPORTS.md`.
 ```bash
 pip install ontology-quality-suite          # from PyPI
 # or, working in this repo:
-uv sync                                     # base
+uv sync                                     # base: includes HOLOS and the SHACL engine (semops-system)
 uv sync --extra reasoner                    # + owlready2, real OWL2 DL reasoning (needs Java)
-uv sync --extra native-shacl                # + the native (Rust) SHACL engine -- much faster --engine native/native+sparql
 ```
 
 Every subcommand takes `-v`/`--verbose` to show exactly what it resolved
@@ -188,14 +187,13 @@ ontology-quality-suite checks --ontology examples/ontology/domain.ttl --out-dir 
 ```
 
 `checks`/`data`/`run` all take `--engine`, choosing which formulation of
-the registry actually runs: pyshacl, the portable SPARQL layer, the
-optional native (Rust) SHACL engine, or a cross-validating pair of two of
-those (default: `native+sparql` if the optional `shacl` package is
-installed, else `both` -- `pipeline.default_engine()`). Every engine reports
-the same findings at the same severities, so this is purely a speed and
-cross-validation choice: pyshacl alone can be ~100x slower than the
-alternatives on a large ontology, and the paired engines add a drift signal
-(a check that fires under one formulation and not the other). See
+the registry actually runs: the SHACL shapes on the SHACL engine (`shacl`,
+or its older spelling `native`), the portable SPARQL queries on HOLOS
+(`sparql`), or both, cross-validated (`both`, or `native+sparql`; the
+default). Both engines come from `semops-system`, a runtime dependency.
+Every formulation reports the same findings at the same severities, so this
+is a speed and cross-validation choice: the pair adds a drift signal (a
+check that fires under one formulation and not the other). See
 `docs/ARCHITECTURE.md`'s "Choosing which engine actually runs" for the full
 comparison and benchmarks.
 

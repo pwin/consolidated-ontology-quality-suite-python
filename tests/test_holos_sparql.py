@@ -212,7 +212,7 @@ def test_holosdb_sees_a_boolean_lexical_form_rdflib_has_already_lost(tmp_path: P
     )
 
     # Straight from the file: the authored form survives.
-    import holosdb
+    from semops_system import holos as holosdb
 
     store = holosdb.Store()
     store.load(str(source))

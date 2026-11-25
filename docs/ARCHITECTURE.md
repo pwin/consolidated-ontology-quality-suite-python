@@ -282,14 +282,26 @@ pure-Python OWL2-RL closure remains the way to get one, as its own stage.
 
 ## Which engine does the work
 
-Two engines evaluate, and both are ours:
+Two engines evaluate, and both are ours. Both come from one wheel,
+[`semops-system`](https://github.com/pwin/SemopsSystem), built from one
+commit of the SemOps System workspace at one version:
 
 | Job | Engine | Where |
 |---|---|---|
-| The portable `.rq` checks (SPARQL) | **holosdb** | `checks/holos_sparql.py` |
-| The SHACL shapes | **`shacl`** ([pwin/SHACL_Engine](https://github.com/pwin/SHACL_Engine)) | `checks/shacl_native_runner.py` |
-| "Which check ids does this shapes directory declare?" | **holosdb** | `checks/shapes.py` |
-| "Will the engine compile this shapes directory?" | **`shacl`** | `checks/shapes.py` |
+| The portable `.rq` checks (SPARQL) | **HOLOS** (`semops_system.holos`) | `checks/holos_sparql.py` |
+| The SHACL shapes | **SHACL engine** (`semops_system.shacl`) | `checks/shacl_native_runner.py` |
+| "Which check ids does this shapes directory declare?" | **HOLOS** | `checks/shapes.py` |
+| "Will the engine compile this shapes directory?" | **SHACL engine** | `checks/shapes.py` |
+
+They used to arrive as two wheels, `holosdb` and `shacl`, each from its own
+repository and release train. Those wheels still exist and carry the same
+modules -- SemOps System publishes them from the same commit -- but taking
+both engines from one package means one version to pin, and it is the
+version SemOps System's `versions.toml` names for every consumer: the
+browser editor, the VS Code extension and this suite. That is the point of
+it: a graph should not pass in the editor and fail in CI because the two ran
+different engine releases. The text below still says holosdb and `shacl`
+where it describes history measured under those names.
 
 rdflib is still a runtime dependency, and still does three things: it parses
 input, it holds graphs, and it holds results. It no longer *evaluates*
@@ -344,8 +356,8 @@ disagree with ours when ours are wrong:
 
 | Cross-check | Against | Test |
 |---|---|---|
-| holosdb | rdflib, pyoxigraph | `tests/test_sparql_engine_parity.py` |
-| `shacl` | pyshacl | `tests/test_engine_parity_stress.py`, `tests/test_shacl_native_runner.py` |
+| HOLOS | rdflib, pyoxigraph | `tests/test_sparql_engine_parity.py` |
+| SHACL engine | pyshacl | `tests/test_engine_parity_stress.py`, `tests/test_shacl_native_runner.py` |
 
 pyoxigraph is also what the VS Code extension ships (as oxigraph for JS), so it
 speaks for those users here. Keeping pyshacl is deliberate for the same reason:
