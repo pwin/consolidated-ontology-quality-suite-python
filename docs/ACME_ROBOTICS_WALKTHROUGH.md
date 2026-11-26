@@ -255,7 +255,7 @@ ontology-quality-suite sketch --queries examples/acme_robotics \
   --ontology examples/acme_robotics/acme-org-v1.ttl \
   --import-dir examples/acme_robotics/reference_vocab --out-dir out/acme-sketch
 
-# 2. Actually triplify (needs a built oxi-gen binary -- see config.find_oxi_gen_binary).
+# 2. Actually triplify (on tarka, which comes with semops-system -- nothing to build).
 ontology-quality-suite triplify --csv-dir examples/acme_robotics --queries examples/acme_robotics \
   --out-dir out/acme-triplify
 

@@ -6,11 +6,11 @@ Three sibling projects each solved one slice of "triplify CSV via
 TARQL/oxi-gen-style SPARQL `CONSTRUCT` queries, against an OWL2 ontology,
 then assess the result":
 
-- **`oxi-gen`** (Rust, referenced as a sibling repo, not vendored) -- the
-  actual triplifier. CSV + a SPARQL `CONSTRUCT` query (tarql-compatible
-  syntax) -> Turtle/N-Triples. Invoked as an external process by
-  `ontology_suite/triplify/oxigen.py`; see "Why oxi-gen isn't vendored"
-  below.
+- **`oxi-gen`** (Rust) -- the triplifier the suite was built around. CSV +
+  a SPARQL `CONSTRUCT` query (tarql-compatible syntax) -> Turtle/N-Triples.
+  Since 0.29.0 the suite runs those same queries on **tarka** instead, which
+  takes oxi-gen's dialect and options and ships in `semops-system`; see
+  "Triplifying: from oxi-gen to tarka" below.
 - **`ontology-quality-suite`** -- a registry-driven SHACL+SPARQL check
   suite (`registry.json`, `shapes/`, `sparql/<category>/*.rq`), ported here
   as `ontology_suite/checks/` and `ontology_suite/report/`.
@@ -429,9 +429,9 @@ the engine doing the work is right.
    from one that has quietly stopped working. `TQL-001`..`TQL-003` predate
    the facts graph and remain native, because skeletonisation is a parse and
    SPARQL cannot do it. See `docs/TESTING_TARQL.md`.
-4. **`triplify`** -- `triplify/oxigen.py` shells out to a built `oxi-gen`
-   binary per CSV/query pair (paired by `triplify/discovery.py`'s naming
-   convention) to produce real Turtle data.
+4. **`triplify`** -- `triplify/tarka.py` runs tarka (`semops map run`,
+   from `semops-system`) per CSV/query pair (paired by
+   `triplify/discovery.py`'s naming convention) to produce real Turtle data.
 5. **`data`** -- `data_quality.py`'s real-data-vs-ontology conformance
    report (same `check_conformance` as above, tagged `"data"` instead of
    `"sketch"`), the registry suite, and the reasoning layer -- optionally
@@ -601,21 +601,41 @@ gist 14.1.0 (96 classes / 66 object properties / 50 datatype properties,
 matching `docgen3`'s own documented benchmark exactly --
 `tests/test_docgen.py`).
 
-## Why oxi-gen isn't vendored
+## Triplifying: from oxi-gen to tarka
 
-`oxi-gen` is a mature, independently-versioned Rust binary with its own
-build (`cargo build --release`) and test suite. Vendoring its source here
-would mean tracking a second copy that drifts from the original. Instead,
-`ontology_suite/config.py::find_oxi_gen_binary` looks for a built binary at
-the sibling `../oxi-gen/target/release/oxi_gen(.exe)`, an
-`ONTOLOGY_SUITE_OXI_GEN_BIN` env var, an explicit `--oxi-gen-bin` flag, or
-`PATH` -- in that order -- and `triplify/oxigen.py` shells out to whichever
-it finds. The same pattern applies to `turtle-editor-viewer` (a companion
-React/TypeScript Turtle editor and SPARQL-in-browser tool): it's referenced,
-not vendored, and the hosted instance at
-`https://semantechs.co.uk/turtle-editor-viewer-new/` is linked directly from
-`report/html_report.py`'s "Artifacts" section next to every `.ttl` file a
-stage produced, with no local build step required to use it.
+Until 0.29.0 `triplify` shelled out to a built `oxi-gen` binary, found
+through `--oxi-gen-bin`, `ONTOLOGY_SUITE_OXI_GEN_BIN`, a sibling
+`../oxi-gen` checkout or `PATH`, and produced nothing without one -- which
+on CI was always, so every notebook cell that read triplified data skipped
+there. oxi-gen was referenced rather than vendored because it was an
+independently versioned Rust project with its own build.
+
+tarka replaced it. It runs TARQL as written for oxi-gen, takes oxi-gen's
+options under the same names, and ships in `semops-system`, the wheel HOLOS
+and the SHACL engine already come from -- so triplifying needs nothing
+installed beyond `uv sync`. `triplify/tarka.py` runs it as
+`python -m semops_system map run` with the suite's own interpreter, which
+pins it to the locked `semops-system` rather than whatever `semops` is on
+`PATH`. That module's docstring says why a subprocess rather than the
+in-process `semops_system.tarka` API (two options the API lacks), what that
+costs (about 200 ms per CSV), and what changed for a caller.
+
+Measured before the switch, oxi-gen against tarka: the same RDF graph on 25
+real CSV + query pairs from this repository and the testing repository, and
+for each option the suite passes. The differences found were all oxi-gen
+failing where tarka does not: a missing CSV made it panic and leave an
+empty output file, and `FILTER(BOUND(?column))` made it panic outright.
+`tests/test_triplify_tarka.py` keeps oxi-gen as a second opinion, the way
+pyshacl and pyoxigraph are kept for the other two engines, wherever a build
+is on the machine. `--oxi-gen-bin` is still accepted, because scripts pass
+it, and is ignored with a warning.
+
+`turtle-editor-viewer` (a companion React/TypeScript Turtle editor and
+SPARQL-in-browser tool) is still referenced rather than vendored: the
+hosted instance at `https://semantechs.co.uk/turtle-editor-viewer-new/` is
+linked directly from `report/html_report.py`'s "Artifacts" section next to
+every `.ttl` file a stage produced, with no local build step required to
+use it.
 
 ## Why the Rust check-runner (`oq-lint`) was dropped
 

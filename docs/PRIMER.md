@@ -251,8 +251,8 @@ check first:
 #    No CSV needed -- this is static analysis of the query text.
 ontology-quality-suite sketch --queries examples/queries --ontology examples/ontology/domain.ttl --out-dir out/sketch
 
-# 2. Actually run the CSVs through oxi-gen (needs a built oxi-gen binary --
-#    see config.find_oxi_gen_binary; pass --oxi-gen-bin if it isn't auto-found).
+# 2. Actually run the CSVs through their queries, on tarka (it comes with
+#    semops-system, so there is nothing to build or point at).
 ontology-quality-suite triplify --csv-dir examples/csv --queries examples/queries --out-dir out/data
 
 # 3. Assess what it actually produced -- structure, conformance to the
@@ -282,15 +282,13 @@ Want to check real triplified *output*, not just the query template, from
 Python directly (no CLI flag for this one yet)?
 
 ```python
-from ontology_suite import config
-from ontology_suite.triplify import oxigen
+from ontology_suite.triplify import tarka
 from ontology_suite.triplify.discovery import TriplifyJob
 from ontology_suite.dataquality import data_quality
 import rdflib
 
-binary = config.find_oxi_gen_binary()
-oxigen.run_oxi_gen(
-    binary, TriplifyJob(csv_path="examples/csv/animals.csv", query_path="examples/queries/animals.rq"),
+tarka.run_tarka(
+    TriplifyJob(csv_path="examples/csv/animals.csv", query_path="examples/queries/animals.rq"),
     "output.ttl",
 )
 

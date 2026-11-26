@@ -2,8 +2,8 @@
 
 ## Quick start
 
-Run just this feature's test suite (fast -- no `oxi-gen` binary or network
-required, a few hundred milliseconds):
+Run just this feature's test suite (fast -- no network required, a few
+hundred milliseconds):
 
 ```
 uv run pytest tests/test_pattern_consistency.py -v

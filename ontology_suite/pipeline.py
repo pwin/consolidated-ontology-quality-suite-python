@@ -39,7 +39,7 @@ from .ontologyeval import ontology_evaluation
 from .reasoning import consistency, profile
 from .reasoning.sampling import sample_graph
 from .sketch import bind_analysis, graph_quality, ontology_quality, prefix_alignment, tarql_visualiser
-from .triplify import discovery, oxigen
+from .triplify import discovery, tarka
 
 
 @dataclass
@@ -647,7 +647,7 @@ def run_sketch_stage(
 
 
 # --------------------------------------------------------------------------
-# Stage 4: triplify -- run real CSV data through oxi-gen.
+# Stage 4: triplify -- run real CSV data through tarka.
 # --------------------------------------------------------------------------
 def run_triplify_stage(
     csv_dir: str | Path,
@@ -655,28 +655,41 @@ def run_triplify_stage(
     out_dir: str | Path,
     *,
     oxi_gen_bin: Optional[str | Path] = None,
-    **oxi_gen_kwargs,
+    **tarka_kwargs,
 ) -> StageResult:
+    """Pair each CSV with its TARQL query and triplify it with tarka.
+
+    tarka comes with `semops-system`, so there is no binary to find; see
+    `triplify/tarka.py` for why it replaced oxi-gen and what changed.
+    ``oxi_gen_bin`` is still accepted, because scripts pass it, and is
+    ignored with a warning rather than silently -- a caller naming a binary
+    should learn that it is no longer the thing running their queries.
+    """
     out_dir = Path(out_dir)
-    binary = config.find_oxi_gen_binary(oxi_gen_bin)
-    if binary is None:
+    warnings: List[str] = []
+    if oxi_gen_bin is not None:
+        warnings.append(
+            f"--oxi-gen-bin ({oxi_gen_bin}) is ignored: triplify runs on tarka, "
+            "from semops-system, since 0.29.0 -- see triplify/tarka.py"
+        )
+    if not tarka.available():
         return StageResult(
             name="triplify",
-            warnings=[
-                "oxi-gen binary not found. Build it with `cargo build --release` in the sibling "
-                f"{config.DEFAULT_OXI_GEN_REPO} checkout, or pass --oxi-gen-bin."
+            warnings=warnings + [
+                "tarka is not available: it comes from `semops-system`, a runtime "
+                "dependency -- run `uv sync` or `pip install semops-system`"
             ],
         )
 
     jobs, discovery_warnings = discovery.discover_jobs_verbose(csv_dir, queries_dir)
-    results, errors = oxigen.run_oxi_gen_batch(binary, jobs, out_dir, **oxi_gen_kwargs)
+    results, errors = tarka.run_tarka_batch(jobs, out_dir, **tarka_kwargs)
 
-    warnings = list(discovery_warnings) + [str(e) for e in errors]
+    warnings += list(discovery_warnings) + [str(e) for e in errors]
 
     return StageResult(
         name="triplify",
         artifacts={
-            "binary": binary,
+            "engine": f"tarka (semops-system {tarka.engine_version() or 'unknown'})",
             "jobs": jobs,
             "results": results,
             "output_paths": [r.output_path for r in results],

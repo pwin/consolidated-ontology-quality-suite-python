@@ -111,6 +111,11 @@ def _print_summary(rows: List[ResultRow], out_dir: Path, warnings: List[str]) ->
 
 BUILTIN_QUERIES = "@builtin"
 
+_OXI_GEN_BIN_HELP = (
+    "ignored since 0.29.0, and kept because scripts pass it: triplify runs on tarka, which comes "
+    "with semops-system, so there is no binary to name. Passing it prints a warning."
+)
+
 _SHAPES_HELP = (
     "a directory of SHACL shape files, or @builtin for the suite's own wherever this "
     "install put it. NOT repeatable: the engine loads every *.ttl in one directory into "
@@ -532,10 +537,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
     _add_severity_policy_args(skt)
     _add_verbose_arg(skt)
 
-    trp = sub.add_parser("triplify", help="Run CSV files through oxi-gen to produce real RDF data")
+    trp = sub.add_parser("triplify", help="Run CSV files through their TARQL queries with tarka to produce real RDF data")
     trp.add_argument("--csv-dir", required=True)
     trp.add_argument("--queries", required=True)
-    trp.add_argument("--oxi-gen-bin", default=None)
+    trp.add_argument("--oxi-gen-bin", default=None, help=_OXI_GEN_BIN_HELP)
     trp.add_argument("--delimiter", default=None)
     trp.add_argument("--tab", action="store_true")
     trp.add_argument("--no-header-row", action="store_true")
@@ -605,7 +610,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
                        help="a JSON or CSV map of check id to a question in your own words, used to add a \"by question\" index to findings.txt -- see docs/REPORTS.md")
     run.add_argument("--shapes", default=str(config.DEFAULT_SHAPES_DIR), help=_SHAPES_HELP)
     run.add_argument("--sparql", action="append", default=None, help=_SPARQL_HELP)
-    run.add_argument("--oxi-gen-bin", default=None)
+    run.add_argument("--oxi-gen-bin", default=None, help=_OXI_GEN_BIN_HELP)
     run.add_argument("--sample", type=int, default=None)
     _add_engine_arg(run)
     run.add_argument("--out-dir", default="out")
