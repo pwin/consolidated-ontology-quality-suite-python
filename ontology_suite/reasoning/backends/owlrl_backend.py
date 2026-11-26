@@ -9,6 +9,28 @@ full OWL2 DL: owlrl implements the OWL2 RL rule set, which is deliberately a
 tractable fragment (see ``reasoning/profile.py``) -- a class can be genuinely
 unsatisfiable in full OWL2 DL without any RL rule ever firing. Pair with
 ``external_backend.py`` for a real DL reasoner when that matters.
+
+WHY THIS IS STILL ``owlrl`` AND NOT SEMOPS
+------------------------------------------
+Everything else in this suite has moved onto ``semops-system``: SPARQL to
+HOLOS, SHACL to the SHACL engine, tabular input to tarka. This backend has
+not, because there is nothing to move it to yet.
+
+HOLOS's own design documents RDFS and OWL-RL profiles in its rule engine, so
+this looks like it should already be available. Checked against the installed
+``semops-system`` 0.31.1 rather than taken on trust: the SHACL engine's
+``inference`` parameter accepts ``none``, ``rdfs``, ``rules`` and
+``rules-iterated``, and anything else raises ``ValueError: unknown
+inference``. There is no ``owlrl`` symbol anywhere in the package.
+
+``rules`` is not a substitute. It materialises SHACL-AF ``sh:rule`` -- it runs
+whatever rules a shapes graph happens to declare -- which is a different thing
+from entailing the OWL-RL rule set over an arbitrary ontology. ``rdfs`` is a
+real but much weaker closure: it would lose every finding that depends on an
+OWL axiom, which is most of what this backend exists to catch.
+
+So this stays on ``owlrl`` until SemOps exposes OWL-RL from Python, and the
+gap is recorded in docs/ARCHITECTURE.md rather than left to be rediscovered.
 """
 from __future__ import annotations
 

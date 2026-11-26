@@ -359,11 +359,89 @@ disagree with ours when ours are wrong:
 | HOLOS | rdflib, pyoxigraph | `tests/test_sparql_engine_parity.py` |
 | SHACL engine | pyshacl | `tests/test_engine_parity_stress.py`, `tests/test_shacl_native_runner.py` |
 
-pyoxigraph is also what the VS Code extension ships (as oxigraph for JS), so it
-speaks for those users here. Keeping pyshacl is deliberate for the same reason:
-it has caught real native-engine bugs, including the `isIRI($this)` blank-node
-regression fixed in `shacl` 0.1.5. Removing it would remove the evidence that
-the engine doing the work is right.
+Both are kept deliberately, and the reason is not symmetry. pyshacl has caught
+real engine bugs, including the `isIRI($this)` blank-node regression fixed in
+`shacl` 0.1.5; removing it would remove the evidence that the engine doing the
+work is right. pyoxigraph plays the same part for SPARQL. Neither is a runtime
+dependency, neither is in the wheel, and no `--engine` value selects either:
+`shacl_runner.run_shacl` exists for the parity tests and nothing else, which is
+why a released install never imports pyshacl at all.
+
+pyoxigraph used to earn its place twice over, as the engine the VS Code
+extension shipped for JavaScript. It no longer does: since the extension's
+0.13.11 it runs HOLOS too, as `holos-wasm-node`. So pyoxigraph now speaks only
+as an independent implementation, which is still the reason to keep it.
+
+### What rdflib still does, and what the engines cannot take over
+
+The paragraph above says the direction of travel is for rdflib to become a
+parsing and term-model facade. This is where that stands, measured against
+`semops-system` 0.31.1 rather than estimated. rdflib is imported by 35 files
+in the package and 45 in the tests.
+
+`holos.Store` offers `add`, `load`, `dump`, `query`, `update`, `validate`,
+`explain`, `named_graphs`, `predicate_counts`, `dictionary_size`, `close`,
+`is_closed` and `is_persistent`. That is a store, not a graph library, and the
+gap between those two is what rdflib still fills.
+
+**What the engines can take, and have:** evaluation. SPARQL is HOLOS's and
+SHACL is the SHACL engine's, which is the table at the top of this section.
+`Store.load` also decompresses `.gz` by extension, which is one of the reasons
+`io_utils.py` exists at all -- see its docstring, point 2.
+
+**What stays on rdflib, and why.** Each of these was checked against the
+installed 0.31.1, not assumed:
+
+| Job | Why it stays |
+|---|---|
+| The term model | `URIRef`, `BNode`, `Literal` and `Identifier` are this suite's internal vocabulary -- `ResultRow`, `merge.py`, every check. HOLOS answers in `QuerySolution` objects and N-Triples strings, so replacing the model is not a swap but a new type threaded through everything that reports a finding. |
+| Graph traversal | 118 call sites across the package: `.subjects()` 40, `.subject_objects()` 31, `.objects()` 24, `.value()` 20, `.triples()` 3. `Store` has `query` but no accessor API, so each of these becomes a SPARQL query. Some sit in per-shape or per-result loops (`registry.resolve_check_id`, `merge._path_expression`), where a query per call is the wrong shape. |
+| Parsing from text | `Store.load` is path-only: given Turtle as a string it raises `ValueError: cannot infer an RDF format`. Every test fixture, and `docgen/turtle_parser.py`, parse from strings. `check_text()` does take text, but it runs the whole check suite rather than loading a graph. |
+| Parsing over HTTP | `ontologyeval/ontology_evaluation.py` resolves a vocabulary by IRI. `Store.load` treats a URL as a filename and raises `OSError`. |
+| Reading another engine's results | `remote/fuseki.py` parses a remote endpoint's SPARQL JSON with rdflib's `Result.parse`. HOLOS produces results; it does not read a foreign engine's result format. |
+| Holding results | Both engines hand back Turtle or N-Triples, which the suite parses into an rdflib results graph for `merge.py` to read. |
+
+So the facade is real but not yet thin, and the thing standing in the way is
+the term model rather than any missing engine feature. Nothing new should
+route *evaluation* through rdflib; that rule has not changed and is not what
+the list above is about.
+
+### OWL-RL has no SemOps equivalent yet
+
+`reasoning/backends/owlrl_backend.py` still uses the `owlrl` package, and
+should. HOLOS's design documents RDFS and OWL-RL profiles in its rule engine,
+but `semops-system` 0.31.1 does not expose OWL-RL from Python: the SHACL
+engine's `inference` parameter accepts `none`, `rdfs`, `rules` and
+`rules-iterated`, and anything else raises `ValueError: unknown inference`.
+`rules` is SHACL-AF `sh:rule` materialisation -- it runs whatever rules a
+shapes graph declares -- which is a different thing from entailing the OWL-RL
+rule set over an ontology. There is no `owlrl` symbol anywhere in the
+installed package.
+
+`owlready2` and HermiT stay for the same kind of reason and a firmer one:
+SemOps has no OWL 2 DL reasoner at all, and OWL-RL is deliberately a tractable
+fragment -- a class can be unsatisfiable in full DL without any RL rule firing.
+That backend stays an optional extra, because it needs a Java runtime.
+
+### The check registry has three copies and they agree
+
+`resources/registry.json` here, `resources/checks-registry/registry.json` in
+the VS Code extension, and a copy embedded in SemOps System's `semops-checks`
+crate, reachable from Python as `semops_system.list_checks()`.
+
+Measured on 0.31.1: all three hold the same 61 checks with the same ids, and
+comparing `category`, `metric`, `default_severity`, `title`, `description` and
+`remediation` across this repo's copy and the embedded one gives **zero**
+differences.
+
+The suite's copy and the extension's are held character-for-character
+identical by `tests/test_shared_registry_parity.py`, which is a test in this
+repo. Nothing yet compares either against the embedded copy, so that third
+copy can drift without any test noticing -- the same gap `registry.json` had
+between this repo and the extension before that parity test existed, which was
+found by diffing rather than by failing. SemOps System is the natural source
+of truth now that it publishes the engines, but it is not the source of truth
+until something checks it.
 
 ### Consequences worth knowing
 

@@ -509,7 +509,7 @@ wheels = [
 
 [[package]]
 name = "ontology-quality-suite"
-version = "0.29.0"
+version = "0.29.1"
 source = { editable = "." }
 dependencies = [
     { name = "matplotlib" },
@@ -541,7 +541,7 @@ requires-dist = [
     { name = "owlrl", specifier = ">=6.0.2" },
     { name = "pandas", specifier = ">=2.0.0" },
     { name = "rdflib", specifier = ">=7.6.0" },
-    { name = "semops-system", specifier = ">=0.31.0,<0.32" },
+    { name = "semops-system", specifier = ">=0.31.1,<0.32" },
     { name = "tabulate", specifier = ">=0.9.0" },
 ]
 provides-extras = ["reasoner", "native-shacl"]
@@ -859,15 +859,15 @@ html = [
 
 [[package]]
 name = "semops-system"
-version = "0.31.0"
+version = "0.31.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/1a/74/9a81567c82348edea2e462d0dc131838d979bd763d7084fe6cc6c22605b0/semops_system-0.31.0.tar.gz", hash = "sha256:cea00cff6857d033d0db16ece2a83f397fef840fd6f62c5ad05118b5c7492208", size = 1464950, upload-time = "2026-11-25T09:13:29.661Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/49/89/6850a66a6d95c41f503bfa0ddb51f6e11d2b371e237f08e332b46e1ef06d/semops_system-0.31.1.tar.gz", hash = "sha256:b1d1132ba0f19a8ca19313af06d6145eb64a12fdd115aa36d6396e10c1f5d70e", size = 1470816, upload-time = "2026-11-26T16:04:52.824Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a2/53/3dc40f49f30bc91a9ee4e5b000862d6041a4306a82389858c3674d5fb868/semops_system-0.31.0-cp39-abi3-macosx_10_13_x86_64.whl", hash = "sha256:3657287f2209a8bc9ae6be127e11442a30b0e2d8cf2ff6cdd2b4fa6ecc0e340e", size = 21979392, upload-time = "2026-11-25T09:13:15.267Z" },
-    { url = "https://files.pythonhosted.org/packages/a2/a0/67014d3be4b8d4c480f1f625029fbcefabf9740ad1541ab6bf99f2bd7766/semops_system-0.31.0-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:a3d736bf40e5ef4d2a4d847310d286badd0fee6492e7544087836c56a3562442", size = 20554267, upload-time = "2026-11-25T09:13:17.671Z" },
-    { url = "https://files.pythonhosted.org/packages/f8/f6/9a1e18511d07494e188164d94b8cadc56b4bdfaa5b7a51aaba58c48fc0db/semops_system-0.31.0-cp39-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:f97f226cfff6120d06098389f291d13567f671fd5156d99f236cb82103fba950", size = 22342476, upload-time = "2026-11-25T09:13:20.296Z" },
-    { url = "https://files.pythonhosted.org/packages/b7/25/3ed6d4b6b4f62a2f45a83934e192f0a6406d46e079caa1a75953dc99574d/semops_system-0.31.0-cp39-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:cf2b586486d89b46e9237cbcc39035abc21a339bfbd9fbd4762388095c76e8d9", size = 23363625, upload-time = "2026-11-25T09:13:24.147Z" },
-    { url = "https://files.pythonhosted.org/packages/89/1f/88f3587a63d11598387c83224c1c72b8385169cbad25035e10cd77822643/semops_system-0.31.0-cp39-abi3-win_amd64.whl", hash = "sha256:7bb67ef4c711877ea794447a6c02330ad67d4d8f6c0aa89b1b8f049bd6f861a9", size = 22060568, upload-time = "2026-11-25T09:13:27.291Z" },
+    { url = "https://files.pythonhosted.org/packages/8d/9a/9894906ce6430eed2bfb63b48ae03a3d2346673a133eb1818639d7fbc214/semops_system-0.31.1-cp39-abi3-macosx_10_13_x86_64.whl", hash = "sha256:3ff9147a851eda3158aeed863a12c890e6c95b9f5dc980102257b8325211066a", size = 21979950, upload-time = "2026-11-26T16:04:39.027Z" },
+    { url = "https://files.pythonhosted.org/packages/34/a0/f7714f90d30635d33827e8572de98d30d28f76c323800769b9db352e251a/semops_system-0.31.1-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:8074c5703c264e7c54b3c61387c00aa30e2d223cd443ed44f7c9bf69673ccccb", size = 20553153, upload-time = "2026-11-26T16:04:41.786Z" },
+    { url = "https://files.pythonhosted.org/packages/f5/1a/474cf6209d70b44e7cae5384315fc545fb43e6fdcf4cd4c1edd1041eff1e/semops_system-0.31.1-cp39-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:ba87ef1e01caff972b15d21f896878716d9593aee2df645738492455460a8c26", size = 22344818, upload-time = "2026-11-26T16:04:44.498Z" },
+    { url = "https://files.pythonhosted.org/packages/95/05/c3b6f54fa29f74dbfa686ddb00d2d0cdc9f01e9d5e938ebec665b97f2497/semops_system-0.31.1-cp39-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:c36cbeb59c7bb61a842dc2282fcd65efd6269adebd8f509f81b744d110d32e38", size = 23363704, upload-time = "2026-11-26T16:04:47.66Z" },
+    { url = "https://files.pythonhosted.org/packages/23/c9/eae2006ed59cd6c925de65250563c83fd7fa7863166e116530718f82eb2c/semops_system-0.31.1-cp39-abi3-win_amd64.whl", hash = "sha256:c2c6c1326f9dd5cb238d42bdad045746d06b8d02f4b6260fc822ffb6e8de6a90", size = 22060170, upload-time = "2026-11-26T16:04:50.68Z" },
 ]
 
 [[package]]
