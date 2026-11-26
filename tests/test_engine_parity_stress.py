@@ -46,10 +46,9 @@ now-fixed reproduction). Fixed upstream in `shacl>=0.1.4`
 (https://github.com/pwin/SHACL_Engine) -- confirmed here by re-running the
 exact same reproductions that originally found it. If any test below
 starts failing with a native/pyshacl count mismatch again, check
-`shacl.__version__` before assuming a regression in this repo -- it may
-mean an older, pre-fix wheel got reinstalled (`uv sync` silently drops
-`shacl` since it isn't a `pyproject.toml` dependency; see
-`shacl_native_runner.py`'s module docstring).
+`semops_system.shacl.__version__` before assuming a regression in this
+repo -- it may mean the engine changed under a new semops-system release,
+which is what these tests are for.
 
 Installing `shacl==0.1.4` (the fix above) and re-running this exact test
 module immediately found a **fifth** bug, apparently introduced by (or
@@ -75,7 +74,7 @@ from rdflib.collection import Collection
 from rdflib.namespace import OWL, RDF, RDFS
 
 try:
-    import shacl as _native_shacl_pkg  # type: ignore[import-not-found]
+    from semops_system import shacl as _native_shacl_pkg
 except ImportError:
     _native_shacl_pkg = None
 
@@ -87,7 +86,7 @@ from ontology_suite.checks.shacl_runner import run_shacl
 from ontology_suite.checks.shapes import load_shapes_graph
 
 pytestmark = pytest.mark.skipif(
-    not native_runner.available(), reason="native `shacl` package not installed (see shacl_native_runner.py docstring)"
+    not native_runner.available(), reason="the SHACL engine (semops-system) is not installed -- see shacl_native_runner.py's docstring"
 )
 
 STRESS_DIR = config.REPO_ROOT / "examples" / "checks_stress_test"

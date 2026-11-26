@@ -154,9 +154,8 @@ writes, and what is in them, see `REPORTS.md`.
 ```bash
 pip install ontology-quality-suite          # from PyPI
 # or, working in this repo:
-uv sync                                     # base
+uv sync                                     # base: includes HOLOS and the SHACL engine (semops-system)
 uv sync --extra reasoner                    # + owlready2, real OWL2 DL reasoning (needs Java)
-uv sync --extra native-shacl                # + the native (Rust) SHACL engine -- much faster --engine native/native+sparql
 ```
 
 Every subcommand takes `-v`/`--verbose` to show exactly what it resolved
@@ -188,14 +187,13 @@ ontology-quality-suite checks --ontology examples/ontology/domain.ttl --out-dir 
 ```
 
 `checks`/`data`/`run` all take `--engine`, choosing which formulation of
-the registry actually runs: pyshacl, the portable SPARQL layer, the
-optional native (Rust) SHACL engine, or a cross-validating pair of two of
-those (default: `native+sparql` if the optional `shacl` package is
-installed, else `both` -- `pipeline.default_engine()`). Every engine reports
-the same findings at the same severities, so this is purely a speed and
-cross-validation choice: pyshacl alone can be ~100x slower than the
-alternatives on a large ontology, and the paired engines add a drift signal
-(a check that fires under one formulation and not the other). See
+the registry actually runs: the SHACL shapes on the SHACL engine (`shacl`,
+or its older spelling `native`), the portable SPARQL queries on HOLOS
+(`sparql`), or both, cross-validated (`both`, or `native+sparql`; the
+default). Both engines come from `semops-system`, a runtime dependency.
+Every formulation reports the same findings at the same severities, so this
+is a speed and cross-validation choice: the pair adds a drift signal (a
+check that fires under one formulation and not the other). See
 `docs/ARCHITECTURE.md`'s "Choosing which engine actually runs" for the full
 comparison and benchmarks.
 
@@ -253,8 +251,8 @@ check first:
 #    No CSV needed -- this is static analysis of the query text.
 ontology-quality-suite sketch --queries examples/queries --ontology examples/ontology/domain.ttl --out-dir out/sketch
 
-# 2. Actually run the CSVs through oxi-gen (needs a built oxi-gen binary --
-#    see config.find_oxi_gen_binary; pass --oxi-gen-bin if it isn't auto-found).
+# 2. Actually run the CSVs through their queries, on tarka (it comes with
+#    semops-system, so there is nothing to build or point at).
 ontology-quality-suite triplify --csv-dir examples/csv --queries examples/queries --out-dir out/data
 
 # 3. Assess what it actually produced -- structure, conformance to the
@@ -284,15 +282,13 @@ Want to check real triplified *output*, not just the query template, from
 Python directly (no CLI flag for this one yet)?
 
 ```python
-from ontology_suite import config
-from ontology_suite.triplify import oxigen
+from ontology_suite.triplify import tarka
 from ontology_suite.triplify.discovery import TriplifyJob
 from ontology_suite.dataquality import data_quality
 import rdflib
 
-binary = config.find_oxi_gen_binary()
-oxigen.run_oxi_gen(
-    binary, TriplifyJob(csv_path="examples/csv/animals.csv", query_path="examples/queries/animals.rq"),
+tarka.run_tarka(
+    TriplifyJob(csv_path="examples/csv/animals.csv", query_path="examples/queries/animals.rq"),
     "output.ttl",
 )
 

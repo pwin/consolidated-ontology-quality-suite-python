@@ -92,19 +92,17 @@ rather than just print them. The two checks are also callable individually:
 
 Neither command above executes anything -- they read text/RDF. To check
 what a transform *actually produces* (real literal values, real CSV data),
-run it through `oxi-gen` and check the genuine output instead of the query
+run it through tarka and check the genuine output instead of the query
 template. There's no CLI flag for this yet; it's a few lines of Python
 against building blocks this suite already has:
 
 ```python
-from ontology_suite import config
-from ontology_suite.triplify import oxigen
+from ontology_suite.triplify import tarka
 from ontology_suite.triplify.discovery import TriplifyJob
 from ontology_suite.dataquality import data_quality
 import rdflib
 
-binary = config.find_oxi_gen_binary()  # None if not built -- see below
-oxigen.run_oxi_gen(binary, TriplifyJob(csv_path="data.csv", query_path="transform.rq"), "output.ttl")
+tarka.run_tarka(TriplifyJob(csv_path="data.csv", query_path="transform.rq"), "output.ttl")
 
 output_graph = rdflib.Graph().parse("output.ttl", format="turtle")
 declarations = data_quality.ontology_declarations(rdflib.Graph().parse("ontology.ttl"))
@@ -114,9 +112,9 @@ print(conformance["undeclared_classes_used"], conformance["undeclared_properties
 
 `tests/test_tarql_output_data_alignment.py` is a complete, runnable
 worked example of this pattern (real CSV + real query + real ontology,
-before/after an ontology version bump). Requires a built `oxi-gen` binary
-(`cargo build --release` in the sibling checkout) -- `config.find_oxi_gen_binary()`
-returns `None` if it isn't found, same as the `triplify`/`run` CLI stages.
+before/after an ontology version bump). tarka comes with `semops-system`,
+so it runs anywhere the suite is installed; until 0.29.0 this needed a built
+`oxi-gen` binary and the test skipped without one.
 
 ## What the results mean
 

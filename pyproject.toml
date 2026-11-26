@@ -1,6 +1,6 @@
 [project]
 name = "ontology-quality-suite"
-version = "0.28.0"
+version = "0.29.0"
 description = "Ontology Quality Suite -- assess OWL2 DL/RL/QL ontologies, TARQL/oxi-gen CONSTRUCT-query sketches, and the RDF data graphs they triplify -- structural, logical, documentation, efficiency, style, data quality, OWL2 profile membership, and reasoner-based consistency -- plus ontology-version and TARQL/ontology consistency checking with suggested repair diffs, locally or against a live Fuseki triplestore."
 readme = "README.md"
 license = "MIT OR Apache-2.0"
@@ -21,51 +21,42 @@ classifiers = [
 ]
 dependencies = [
     # rdflib parses, holds graphs and holds results. It no longer evaluates
-    # anything: SPARQL is holosdb's job and SHACL is the `shacl` engine's. The
+    # anything: SPARQL is HOLOS's job and SHACL is the SHACL engine's. The
     # direction of travel is for those two to take the remaining jobs as well
     # -- see "Which engine does the work" in docs/ARCHITECTURE.md.
     "rdflib>=7.6.0",
-    # The SPARQL engine the portable .rq checks run on. A runtime dependency
-    # rather than an option: rdflib's leniency let a check pass here and fail
-    # in the field, so there is one engine and it is the conformant one. See
-    # checks/holos_sparql.py.
-    # >=0.23 because the previous floor, >=0.15, was far below anything this
-    # suite can actually run on and would have let a clean install resolve an
-    # unusable environment. It is not a performance floor: 0.23.0 unified
-    # `Engine::query`, which checks/holos_sparql.py calls, with the
-    # `query_with` pipeline it had drifted from, and on this suite's own
-    # checks against examples/acme_robotics that is a wash -- 1989 ms against
-    # 2025 ms, three runs each, with byte-identical findings.
+    # Both engines, from one wheel: HOLOS (`semops_system.holos`), which runs
+    # the portable .rq checks -- see checks/holos_sparql.py -- and the SHACL
+    # engine (`semops_system.shacl`), which runs the shapes -- see
+    # checks/shacl_native_runner.py. Runtime dependencies rather than options:
+    # rdflib's leniency let a check pass here and fail in the field, so there
+    # is one engine per formulation and it is the conformant one.
     #
-    # One measured caveat for whoever runs this on a large graph. The 0.23
-    # plan uses a filter's constants as bindings, which helps a selective
+    # One wheel rather than `holosdb` and `shacl` because SemOps System
+    # (https://github.com/pwin/SemopsSystem) now builds both from one commit at
+    # one version, and its versions.toml is the pin every consumer -- the
+    # editor, the VS Code extension, this suite -- has to share, or a graph
+    # passes in one and fails in another. The modules are the same ones the
+    # separate wheels carry, stubs and all, so nothing here changed but the
+    # import. The separate wheels moved to the workspace version as well
+    # (shacl 0.3.9 -> 0.31.0), which the old `shacl<0.4` could never have
+    # resolved.
+    #
+    # Upper bound deliberate, for the reason the old `shacl<0.4` had one: a
+    # minor release can change an answer. shacl 0.3.0 changed what sh:conforms
+    # means (issue #4); holos 0.27.0 started refusing lexical forms
+    # `sh:datatype` used to pass. Take a new minor by moving this bound and the
+    # lock together, after the parity tests have run on it.
+    #
+    # The old floors (`holosdb>=0.24`, `shacl>=0.3.3`) and what each was for
+    # are in the history of this file. Both are below 0.31.0, so nothing they
+    # guarded is lost. One measured caveat from that history still describes
+    # the engine, for whoever runs this on a large graph: since holosdb 0.23
+    # the plan uses a filter's constants as bindings, which helps a selective
     # filter and hurts an unselective one. On 800k triples, counting subjects
     # with an equality filter: 1 matching row 133 ms -> 114 ms, but 50,000
-    # matching rows 147 ms -> 227 ms. Most checks here scan broadly, so the
-    # second shape is the common one; it does not show on acme_robotics
-    # because that fixture is too small for query time to dominate.
-    #
-    # >=0.24 for a wrong answer, not speed. Before 0.24.0 the index join
-    # treated a value it had bound earlier as if the query had written it,
-    # so a zero-length path between two variables -- `?a :p* ?b`, `?a :p? ?b`
-    # -- matched a term the graph does not contain: `VALUES ?v { 1 } ?v :p? ?v`
-    # answered one row over a graph without 1. No shipped check has that
-    # shape. DAT-004's two `rdfs:subClassOf*` legs each end at a constant,
-    # which keeps its zero-length meaning; a witness graph with a directly
-    # typed unit, a subclass-typed unit, an untyped one, a missing one and the
-    # class itself as the unit gives the same three findings on 0.23, 0.24
-    # and 0.25, and pyoxigraph agrees. The floor is for checks written next.
-    # 0.25's changes are to holosdb's SHACL engine, which this suite does not
-    # use: SHACL is the `shacl` engine's job.
-    "holosdb>=0.24",
-    # The SHACL engine. Upper bound deliberate: 0.3.0 changed the default
-    # meaning of sh:conforms to the specification's -- warnings and infos break
-    # conformance, as they already did in pyshacl -- so a minor bump is not
-    # safe to pick up unattended. See issue #4.
-    # >=0.3.3 for `shacl.rdfs_closure`, which --inference rdfs now applies to
-    # the graph both arms read. Against 0.3.2 the import succeeds and the call
-    # raises AttributeError the first time anyone passes --inference.
-    "shacl>=0.3.3,<0.4",
+    # matching rows 147 ms -> 227 ms. Most checks here scan broadly.
+    "semops-system>=0.31.0,<0.32",
     "pandas>=2.0.0",
     "matplotlib>=3.7.0",
     "tabulate>=0.9.0",
@@ -82,8 +73,8 @@ reasoner = [
     "owlready2>=0.47",
 ]
 # Kept so that `uv sync --extra native-shacl` and any requirements file
-# carrying it are still valid. It installs nothing: `shacl` is a runtime
-# dependency now, not an opt-in. Plain `uv sync` used to *uninstall* it and
+# carrying it are still valid. It installs nothing: the SHACL engine is a
+# runtime dependency now (in `semops-system`), not an opt-in. Plain `uv sync` used to *uninstall* it and
 # silently move the default engine back to pyshacl, which is exactly the trap
 # that made it worth promoting.
 native-shacl = []
@@ -92,8 +83,8 @@ native-shacl = []
 dev = [
     "pytest>=8.0.0",
     # Two independent engines, for the parity tests only. Neither is a runtime
-    # dependency: the suite runs on holosdb and `shacl`, and these exist to
-    # disagree with them when they are wrong.
+    # dependency: the suite runs on semops-system's HOLOS and SHACL engine,
+    # and these exist to disagree with them when they are wrong.
     #
     #   pyoxigraph  a second SPARQL engine (tests/test_sparql_engine_parity.py).
     #               The VS Code extension does not ship it: since its 0.13.11

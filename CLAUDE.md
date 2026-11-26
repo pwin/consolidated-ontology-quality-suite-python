@@ -58,6 +58,13 @@ Two rules learned the hard way:
   `shacl>=0.3.3` landed six hours before shacl 0.3.3 existed, and broke
   resolution on every branch until it did.
 
+Both engines come from one wheel, `semops-system`
+(https://github.com/pwin/SemopsSystem), not from `holosdb` and `shacl`. Its
+bound is capped at the next minor on purpose, because a SemOps minor can
+change an answer. To take a new one, move the bound and the lock together to
+the `[platform]` version in SemOps System's `versions.toml`, which is the pin
+every consumer shares, and run the parity tests on it before releasing.
+
 ## Severity
 
 A check's severity is declared twice and the two must agree: `sh:resultSeverity`

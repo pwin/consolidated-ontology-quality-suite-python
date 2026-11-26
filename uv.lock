@@ -164,19 +164,6 @@ wheels = [
 ]
 
 [[package]]
-name = "holosdb"
-version = "0.26.4"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/a6/82/72d76428f83e989491131c9242901ae4926da0df78a895e28654394f9b06/holosdb-0.26.4.tar.gz", hash = "sha256:80cef5cc0a61753de3c6f79f9323a883dbba33b8d48ab3fda0dfb75af85af9e3", size = 690905, upload-time = "2026-11-18T19:27:22.045Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/0b/6d/ba79628ae77ac3ab05aa72e6a7e0be3de93f78733e0aeed2fcd662c8a817/holosdb-0.26.4-cp311-abi3-macosx_10_13_x86_64.whl", hash = "sha256:df6deb4f11e1579ff6363be94543500d1831531c92ec26b2067feda496405ecc", size = 6081899, upload-time = "2026-11-18T19:27:10.863Z" },
-    { url = "https://files.pythonhosted.org/packages/73/08/006f079d4b34b1977f6c17feb5e176a600c151e75ac79f61f3936be32791/holosdb-0.26.4-cp311-abi3-macosx_11_0_arm64.whl", hash = "sha256:5508a92cb7febe82fc9ab5e41b409eb7cc0f60e41d30874d3da65b6d2e5f0bbd", size = 5521535, upload-time = "2026-11-18T19:27:13.6Z" },
-    { url = "https://files.pythonhosted.org/packages/ab/2e/f3ea2f81e99659584594773e012ae916ebde70836d9c70d4a4ae7cc604a7/holosdb-0.26.4-cp311-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:5a7674919431710199e5848d8e6ea5c03b3af55239261532ce9c92b2ef06a66d", size = 6468499, upload-time = "2026-11-18T19:27:15.316Z" },
-    { url = "https://files.pythonhosted.org/packages/7f/68/82c5dd8bec9a3f10546dc31d153784a37faa9dad31aef20845f0ab745929/holosdb-0.26.4-cp311-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:4664057f60848487913ec51f3835fbd0f0bea186fc48d609e19a7615a0ae648d", size = 7028293, upload-time = "2026-11-18T19:27:17.308Z" },
-    { url = "https://files.pythonhosted.org/packages/10/45/38ca22b443daa7aefff02356ff678f412b307c5ff5c2046d7ea8ec829320/holosdb-0.26.4-cp311-abi3-win_amd64.whl", hash = "sha256:a3839f4e40b0eddabb7b0f4d7b74b9c672fc4924e97688a5f842d9d5767e77fe", size = 5728536, upload-time = "2026-11-18T19:27:20.359Z" },
-]
-
-[[package]]
 name = "html5rdf"
 version = "1.2.1"
 source = { registry = "https://pypi.org/simple" }
@@ -522,16 +509,15 @@ wheels = [
 
 [[package]]
 name = "ontology-quality-suite"
-version = "0.28.0"
+version = "0.29.0"
 source = { editable = "." }
 dependencies = [
-    { name = "holosdb" },
     { name = "matplotlib" },
     { name = "owlready2" },
     { name = "owlrl" },
     { name = "pandas" },
     { name = "rdflib" },
-    { name = "shacl" },
+    { name = "semops-system" },
     { name = "tabulate" },
 ]
 
@@ -549,14 +535,13 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "holosdb", specifier = ">=0.24" },
     { name = "matplotlib", specifier = ">=3.7.0" },
     { name = "owlready2", specifier = ">=0.51" },
     { name = "owlready2", marker = "extra == 'reasoner'", specifier = ">=0.47" },
     { name = "owlrl", specifier = ">=6.0.2" },
     { name = "pandas", specifier = ">=2.0.0" },
     { name = "rdflib", specifier = ">=7.6.0" },
-    { name = "shacl", specifier = ">=0.3.3,<0.4" },
+    { name = "semops-system", specifier = ">=0.31.0,<0.32" },
     { name = "tabulate", specifier = ">=0.9.0" },
 ]
 provides-extras = ["reasoner", "native-shacl"]
@@ -873,14 +858,16 @@ html = [
 ]
 
 [[package]]
-name = "shacl"
-version = "0.3.8"
+name = "semops-system"
+version = "0.31.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/09/47/58063ac4c815dffa364c2c1b0e2b113937e4d9deab694a719f9bac6915f2/shacl-0.3.8.tar.gz", hash = "sha256:b2e3d761695f67557c4c9fad58bf11791dfc2a190585573dee429f9c93126661", size = 202703, upload-time = "2026-11-18T23:03:00.095Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1a/74/9a81567c82348edea2e462d0dc131838d979bd763d7084fe6cc6c22605b0/semops_system-0.31.0.tar.gz", hash = "sha256:cea00cff6857d033d0db16ece2a83f397fef840fd6f62c5ad05118b5c7492208", size = 1464950, upload-time = "2026-11-25T09:13:29.661Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/70/ad/cc2ccd273873966e1c7b4a3f695e47d59dc4da3282f4d12eb0ef4d731cbd/shacl-0.3.8-cp39-abi3-macosx_10_12_universal2.macosx_10_12_x86_64.macosx_11_0_arm64.whl", hash = "sha256:d15dff4f75a263ebfeb8df607fb33a9f52022670c42cb6a820e791b84165e623", size = 4404909, upload-time = "2026-11-18T23:02:55.569Z" },
-    { url = "https://files.pythonhosted.org/packages/2b/82/8e2032f27678be3520e8b80d439ec82bd3a695d489f933ae85eaa299e2af/shacl-0.3.8-cp39-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:ba5632c4c574ad4ffe3a6d0fa40f026b13d58f5335eeca06a3c54ae4ac14d454", size = 2348765, upload-time = "2026-11-18T23:02:57.259Z" },
-    { url = "https://files.pythonhosted.org/packages/97/2b/bdb606fd87452e0ecd15852dd772d6065acc3beb200f58fb4df95434133f/shacl-0.3.8-cp39-abi3-win_amd64.whl", hash = "sha256:1292c4c1219316eec13d944f4aeb11067084e4af65c09d8e98780d6025753a42", size = 2406339, upload-time = "2026-11-18T23:02:58.699Z" },
+    { url = "https://files.pythonhosted.org/packages/a2/53/3dc40f49f30bc91a9ee4e5b000862d6041a4306a82389858c3674d5fb868/semops_system-0.31.0-cp39-abi3-macosx_10_13_x86_64.whl", hash = "sha256:3657287f2209a8bc9ae6be127e11442a30b0e2d8cf2ff6cdd2b4fa6ecc0e340e", size = 21979392, upload-time = "2026-11-25T09:13:15.267Z" },
+    { url = "https://files.pythonhosted.org/packages/a2/a0/67014d3be4b8d4c480f1f625029fbcefabf9740ad1541ab6bf99f2bd7766/semops_system-0.31.0-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:a3d736bf40e5ef4d2a4d847310d286badd0fee6492e7544087836c56a3562442", size = 20554267, upload-time = "2026-11-25T09:13:17.671Z" },
+    { url = "https://files.pythonhosted.org/packages/f8/f6/9a1e18511d07494e188164d94b8cadc56b4bdfaa5b7a51aaba58c48fc0db/semops_system-0.31.0-cp39-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:f97f226cfff6120d06098389f291d13567f671fd5156d99f236cb82103fba950", size = 22342476, upload-time = "2026-11-25T09:13:20.296Z" },
+    { url = "https://files.pythonhosted.org/packages/b7/25/3ed6d4b6b4f62a2f45a83934e192f0a6406d46e079caa1a75953dc99574d/semops_system-0.31.0-cp39-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:cf2b586486d89b46e9237cbcc39035abc21a339bfbd9fbd4762388095c76e8d9", size = 23363625, upload-time = "2026-11-25T09:13:24.147Z" },
+    { url = "https://files.pythonhosted.org/packages/89/1f/88f3587a63d11598387c83224c1c72b8385169cbad25035e10cd77822643/semops_system-0.31.0-cp39-abi3-win_amd64.whl", hash = "sha256:7bb67ef4c711877ea794447a6c02330ad67d4d8f6c0aa89b1b8f049bd6f861a9", size = 22060568, upload-time = "2026-11-25T09:13:27.291Z" },
 ]
 
 [[package]]

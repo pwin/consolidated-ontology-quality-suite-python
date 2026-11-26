@@ -1,9 +1,8 @@
 """Extends the version-alignment scenario in test_tarql_ontology_version_alignment.py
 with a review of *real triplified output data*, not just the static
 CONSTRUCT-template/sketch analysis: actually runs each transform version's
-query against a real CSV through the real ``oxi-gen`` binary (the same
-engine ``pipeline.run_triplify_stage``/the ``triplify`` CLI stage shells out
-to), then checks the genuine resulting RDF against each ontology version
+query against a real CSV through tarka (the same engine
+``pipeline.run_triplify_stage``/the ``triplify`` CLI stage runs), then checks the genuine resulting RDF against each ontology version
 via ``dataquality.data_quality``'s conformance logic -- the same check the
 ``data`` pipeline stage's CNF-001/CNF-002 findings come from.
 
@@ -13,25 +12,17 @@ doesn't), not just that the query text mentions the right vocabulary --
 catching things like a CSV column binding to a literal of an unexpected
 form that the template-only view can't see.
 
-Requires a built ``oxi-gen`` binary (sibling checkout,
-``cargo build --release``) -- skipped entirely if one isn't found, the same
-way this suite's other optional-external-tool tests are.
+It used to need a built ``oxi-gen`` binary and skipped without one, which
+on CI was always. tarka comes with ``semops-system``, so it runs everywhere.
 """
 from pathlib import Path
 
 import pytest
 import rdflib
 
-from ontology_suite import config
 from ontology_suite.dataquality import data_quality
-from ontology_suite.triplify import oxigen
+from ontology_suite.triplify import tarka
 from ontology_suite.triplify.discovery import TriplifyJob
-
-OXI_GEN_BIN = config.find_oxi_gen_binary()
-pytestmark = pytest.mark.skipif(
-    OXI_GEN_BIN is None,
-    reason="oxi-gen binary not built (cargo build --release in the sibling oxi-gen checkout)",
-)
 
 EX = "https://example.org/demo/"
 
@@ -46,7 +37,7 @@ def output_data_fixtures(tmp_path_factory):
     """Same vocabulary-rename scenario as test_tarql_ontology_version_alignment.py's
     rename_fixtures (ex:Widget/ex:price -> ex:Product/ex:cost, + new
     ex:sku), plus a small CSV for each transform version so it can actually
-    be run through oxi-gen rather than only inspected as text."""
+    be run through tarka rather than only inspected as text."""
     d = tmp_path_factory.mktemp("output_data_fixtures")
 
     onto_v1 = _write(
@@ -93,9 +84,9 @@ def output_data_fixtures(tmp_path_factory):
     items_v2 = _write(d / "items-v2.csv", "id,p,sku\n1,9.99,SKU-1\n2,14.50,SKU-2\n")
 
     output_v1 = d / "output-v1.ttl"
-    oxigen.run_oxi_gen(OXI_GEN_BIN, TriplifyJob(csv_path=items_v1, query_path=transform_v1), output_v1)
+    tarka.run_tarka(TriplifyJob(csv_path=items_v1, query_path=transform_v1), output_v1)
     output_v2 = d / "output-v2.ttl"
-    oxigen.run_oxi_gen(OXI_GEN_BIN, TriplifyJob(csv_path=items_v2, query_path=transform_v2), output_v2)
+    tarka.run_tarka(TriplifyJob(csv_path=items_v2, query_path=transform_v2), output_v2)
 
     return {"onto_v1": onto_v1, "onto_v2": onto_v2, "output_v1": output_v1, "output_v2": output_v2}
 
@@ -112,7 +103,7 @@ def _conformance(output_path, ontology_path):
 
 
 def test_v1_output_data_was_actually_triplified(output_data_fixtures):
-    """Sanity check that this is reviewing real oxi-gen output, not a mock:
+    """Sanity check that this is reviewing real tarka output, not a mock:
     the expected real triples (from real CSV values) are actually there."""
     graph = _load(output_data_fixtures["output_v1"])
     widget1 = rdflib.URIRef(f"{EX}item-1")
