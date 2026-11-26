@@ -396,8 +396,8 @@ installed 0.31.1, not assumed:
 |---|---|
 | The term model | `URIRef`, `BNode`, `Literal` and `Identifier` are this suite's internal vocabulary -- `ResultRow`, `merge.py`, every check. HOLOS answers in `QuerySolution` objects and N-Triples strings, so replacing the model is not a swap but a new type threaded through everything that reports a finding. |
 | Graph traversal | 118 call sites across the package: `.subjects()` 40, `.subject_objects()` 31, `.objects()` 24, `.value()` 20, `.triples()` 3. `Store` has `query` but no accessor API, so each of these becomes a SPARQL query. Some sit in per-shape or per-result loops (`registry.resolve_check_id`, `merge._path_expression`), where a query per call is the wrong shape. |
-| Parsing from text | `Store.load` is path-only: given Turtle as a string it raises `ValueError: cannot infer an RDF format`. Every test fixture, and `docgen/turtle_parser.py`, parse from strings. `check_text()` does take text, but it runs the whole check suite rather than loading a graph. |
-| Parsing over HTTP | `ontologyeval/ontology_evaluation.py` resolves a vocabulary by IRI. `Store.load` treats a URL as a filename and raises `OSError`. |
+| Parsing from text | `Store.load`'s first parameter is named `path`: given Turtle as a string it raises `ValueError: cannot infer an RDF format`, and with an explicit `format=` it raises `OSError` from opening the string as a filename. Every test fixture, and `docgen/turtle_parser.py`, parse from strings. `check_text()` takes text but runs the whole check suite rather than loading a graph. **A binding gap, not an engine one** -- see below. |
+| Parsing over HTTP | `ontologyeval/ontology_evaluation.py` resolves a vocabulary by IRI. `Store.load` treats a URL as a filename and raises `OSError`, with or without `format=`. |
 | Reading another engine's results | `remote/fuseki.py` parses a remote endpoint's SPARQL JSON with rdflib's `Result.parse`. HOLOS produces results; it does not read a foreign engine's result format. |
 | Holding results | Both engines hand back Turtle or N-Triples, which the suite parses into an rdflib results graph for `merge.py` to read. |
 
@@ -405,6 +405,37 @@ So the facade is real but not yet thin, and the thing standing in the way is
 the term model rather than any missing engine feature. Nothing new should
 route *evaluation* through rdflib; that rule has not changed and is not what
 the list above is about.
+
+#### Reading RDF from memory is one small change upstream
+
+Two of the rows above look like engine limitations and only one is. Read in
+SemOps System's source rather than inferred from the Python surface:
+`holos_engine::Engine::bulk_load` takes `reader: impl Read + Send`, so the
+engine will load from anything readable. `holos/crates/holos-python/src/lib.rs`
+narrows that to a file, with `source::reader(Path::new(path))` -- which is also
+where `.gz` transparency comes from, via `is_compressed(path)`.
+
+So loading from a string or bytes needs a `load_text`/`load_bytes` beside the
+existing `load`, handing `bulk_load` a cursor over the buffer. The engine
+needs nothing. That one addition is worth more than it looks:
+
+- `checks/holos_sparql.py` would stop serialising an rdflib graph to
+  N-Triples in a temporary directory on every run just to get it into the
+  store.
+- It would close the `DAT-001` gap that module's docstring records. A literal
+  rdflib normalised at parse time cannot be recovered by re-serialising, so
+  the suite finds 2 bad literals on the stress fixture where HOLOS reading
+  the source itself finds 3. Loading the authored bytes straight into HOLOS
+  is how that third one is seen in a run rather than only in a test.
+- It is what HTTP needs. Fetching is a caller's job -- redirects, content
+  negotiation, timeouts, and whether a store should open arbitrary URLs at
+  all, which is a security question an embedded engine should not answer by
+  itself. `ontology_evaluation.py` already has that policy, in
+  `allow_network`. What it lacks is a way to hand the bytes it fetched to
+  HOLOS without writing them to a file first.
+
+A URL loader inside the engine is the larger and more opinionated change, and
+is not needed for the suite to read RDF over HTTP on SemOps.
 
 ### OWL-RL has no SemOps equivalent yet
 
